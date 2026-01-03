@@ -2,36 +2,48 @@ import { config } from '@/lib/config';
 import type { IContainerBackend, ContainerBackendType } from './interfaces';
 import { DockerBackend } from './backends/docker-backend';
 
-// Singleton instances
-let dockerBackend: DockerBackend | null = null;
-let proxmoxBackend: IContainerBackend | null = null;
+// Use globalThis to share singleton across Next.js API routes and custom server
+const globalWithBackends = globalThis as typeof globalThis & {
+  __dockerBackend?: DockerBackend;
+  __proxmoxBackend?: IContainerBackend;
+  __proxmoxInitPromise?: Promise<IContainerBackend>;
+};
 
 /**
  * Get the Docker backend instance
  */
 function getDockerBackend(): DockerBackend {
-  if (!dockerBackend) {
-    dockerBackend = new DockerBackend();
+  if (!globalWithBackends.__dockerBackend) {
+    globalWithBackends.__dockerBackend = new DockerBackend();
   }
-  return dockerBackend;
+  return globalWithBackends.__dockerBackend;
 }
 
 /**
- * Get the Proxmox backend instance
- * Lazy-loaded to avoid import errors when Proxmox is not configured
+ * Get the Proxmox backend instance (async - uses dynamic import to avoid bundling ssh2)
  */
 async function getProxmoxBackendAsync(): Promise<IContainerBackend> {
-  if (!proxmoxBackend) {
-    // Dynamic import to avoid loading Proxmox dependencies when not needed
-    const { ProxmoxBackend } = await import('./backends/proxmox-backend');
-    proxmoxBackend = new ProxmoxBackend();
+  if (globalWithBackends.__proxmoxBackend) {
+    return globalWithBackends.__proxmoxBackend;
   }
-  return proxmoxBackend;
+
+  if (!globalWithBackends.__proxmoxInitPromise) {
+    globalWithBackends.__proxmoxInitPromise = (async () => {
+      const { ProxmoxBackend } = await import('./backends/proxmox-backend');
+      globalWithBackends.__proxmoxBackend = new ProxmoxBackend();
+      console.log('Proxmox backend initialized');
+      return globalWithBackends.__proxmoxBackend;
+    })();
+  }
+
+  return globalWithBackends.__proxmoxInitPromise;
 }
 
 /**
  * Get the configured container backend
  * Uses the CONTAINER_BACKEND environment variable to determine which backend to use
+ *
+ * For Proxmox backend, auto-initializes if not already initialized.
  *
  * @returns The container backend instance (Docker or Proxmox)
  */
@@ -42,13 +54,15 @@ export function getContainerBackend(): IContainerBackend {
     case 'docker':
       return getDockerBackend();
     case 'proxmox':
-      // For synchronous access, we need to ensure Proxmox backend is pre-initialized
-      if (!proxmoxBackend) {
+      // Auto-initialize if not already done
+      if (!globalWithBackends.__proxmoxBackend) {
+        // Start async initialization
+        getProxmoxBackendAsync().catch(console.error);
         throw new Error(
-          'Proxmox backend not initialized. Call initializeBackend() first or use getContainerBackendAsync().'
+          'Proxmox backend initializing. Please retry in a moment.'
         );
       }
-      return proxmoxBackend;
+      return globalWithBackends.__proxmoxBackend;
     default:
       throw new Error(`Unknown container backend: ${backendType}`);
   }

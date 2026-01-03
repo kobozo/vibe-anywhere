@@ -75,9 +75,11 @@ export async function waitForContainerIp(
     timeoutMs?: number;
     pollIntervalMs?: number;
     interfaceName?: string;
+    triggerDhcp?: boolean;  // Try to trigger DHCP via pct exec if taking too long
   } = {}
 ): Promise<string> {
-  const { timeoutMs = 60000, pollIntervalMs = 2000, interfaceName = 'eth0' } = options;
+  const { timeoutMs = 90000, pollIntervalMs = 3000, interfaceName = 'eth0', triggerDhcp = true } = options;
+  let dhcpTriggered = false;
 
   const startTime = Date.now();
 
@@ -105,6 +107,22 @@ export async function waitForContainerIp(
         const ipMatch = config.net0.match(/ip=(\d+\.\d+\.\d+\.\d+)/);
         if (ipMatch && !ipMatch[1].startsWith('127.')) {
           return ipMatch[1];
+        }
+      }
+
+      // If we've waited a while and still no IP, try triggering DHCP
+      const elapsed = Date.now() - startTime;
+      if (triggerDhcp && !dhcpTriggered && elapsed > 15000) {
+        console.log(`Container ${vmid} has no IP after ${elapsed}ms, triggering DHCP...`);
+        try {
+          // Try to run dhclient via Proxmox API exec
+          await client.execInLxc(vmid, ['dhclient', interfaceName]);
+          dhcpTriggered = true;
+          console.log(`DHCP triggered for container ${vmid}`);
+        } catch (e) {
+          // dhclient might not be available or might fail, continue polling
+          console.warn(`Could not trigger DHCP for container ${vmid}:`, e);
+          dhcpTriggered = true; // Don't retry
         }
       }
 

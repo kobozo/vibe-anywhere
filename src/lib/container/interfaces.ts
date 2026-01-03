@@ -107,6 +107,18 @@ export interface IContainerBackend {
    * Ensure base image/template is ready
    */
   ensureImage(): Promise<void>;
+
+  /**
+   * Sync workspace files to container (Proxmox only, no-op for Docker)
+   * Called after container is started to copy worktree files
+   */
+  syncWorkspace?(containerId: string, localPath: string, remotePath?: string): Promise<void>;
+
+  /**
+   * Sync workspace files back from container (Proxmox only, no-op for Docker)
+   * Called before stopping to save any changes
+   */
+  syncWorkspaceBack?(containerId: string, remotePath: string, localPath: string): Promise<void>;
 }
 
 /**

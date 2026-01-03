@@ -13,8 +13,9 @@ interface RouteContext {
 }
 
 /**
- * POST /api/workspaces/[id]/restart - Restart the workspace container
- * This stops all running tab streams, removes the container, and recreates it
+ * POST /api/workspaces/[id]/destroy - Destroy the workspace container
+ * This stops and removes the container but keeps the workspace record.
+ * The container can be recreated by starting a tab.
  */
 export const POST = withErrorHandling(async (request: NextRequest, context: unknown) => {
   const user = await requireAuth(request);
@@ -35,21 +36,12 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     throw new NotFoundError('Workspace', id);
   }
 
-  // Stop all tab streams for this workspace
+  // Close all tab streams for this workspace
   const tabStreamManager = getTabStreamManager();
-  // Note: tabs will need to be restarted after container restart
+  tabStreamManager.closeAllForWorkspace(id);
 
-  // Stop the container if running
-  if (workspace.containerId) {
-    try {
-      await workspaceService.stopContainer(id);
-    } catch (error) {
-      console.error('Error stopping container:', error);
-    }
-  }
-
-  // Start a fresh container
-  const updatedWorkspace = await workspaceService.startContainer(id);
+  // Destroy the container (keeps workspace record)
+  const updatedWorkspace = await workspaceService.destroyContainer(id);
 
   return successResponse({
     workspace: {
@@ -57,6 +49,6 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
       containerId: updatedWorkspace.containerId,
       containerStatus: updatedWorkspace.containerStatus,
     },
-    message: 'Container restarted successfully. Tabs need to be restarted.',
+    message: 'Container destroyed. Start a tab to create a new container.',
   });
 });

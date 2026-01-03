@@ -14,14 +14,27 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Webpack config for xterm.js compatibility
-  webpack: (config) => {
+  // Mark ssh2 and related modules as external (server-only)
+  serverExternalPackages: ['ssh2', 'cpu-features'],
+
+  // Webpack config for xterm.js and ssh2 compatibility
+  webpack: (config, { isServer }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
       tls: false,
     };
+
+    // Exclude ssh2 and native modules from client bundle
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'ssh2': false,
+        'cpu-features': false,
+      };
+    }
+
     return config;
   },
 };

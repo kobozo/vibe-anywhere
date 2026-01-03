@@ -15,10 +15,11 @@ interface WorkspaceMenuProps {
   workspace: Workspace;
   onClose: () => void;
   onRestart: () => void;
+  onDestroy: () => void;
   onDelete: () => void;
 }
 
-function WorkspaceMenu({ workspace, onClose, onRestart, onDelete }: WorkspaceMenuProps) {
+function WorkspaceMenu({ workspace, onClose, onRestart, onDestroy, onDelete }: WorkspaceMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,21 +32,38 @@ function WorkspaceMenu({ workspace, onClose, onRestart, onDelete }: WorkspaceMen
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
+  const hasContainer = workspace.containerId && workspace.containerStatus !== 'none';
+
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[160px]"
+      className="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[180px]"
     >
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRestart();
-          onClose();
-        }}
-        className="w-full px-3 py-1.5 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-      >
-        <span>🔄</span> Restart Container
-      </button>
+      {hasContainer && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRestart();
+              onClose();
+            }}
+            className="w-full px-3 py-1.5 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <span>🔄</span> Restart Container
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDestroy();
+              onClose();
+            }}
+            className="w-full px-3 py-1.5 text-left text-sm text-orange-400 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <span>💥</span> Destroy Container
+          </button>
+          <div className="border-t border-gray-700 my-1"></div>
+        </>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -79,6 +97,7 @@ export function RepositoryTree({
   const [loadingRepos, setLoadingRepos] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [restartingWorkspaces, setRestartingWorkspaces] = useState<Set<string>>(new Set());
+  const [destroyingWorkspaces, setDestroyingWorkspaces] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchRepositories();
@@ -155,7 +174,7 @@ export function RepositoryTree({
   };
 
   const getContainerStatusIcon = (workspace: Workspace) => {
-    if (restartingWorkspaces.has(workspace.id)) {
+    if (restartingWorkspaces.has(workspace.id) || destroyingWorkspaces.has(workspace.id)) {
       return '🔄';
     }
     switch (workspace.containerStatus) {
@@ -199,6 +218,43 @@ export function RepositoryTree({
       alert('Failed to restart container');
     } finally {
       setRestartingWorkspaces(prev => {
+        const next = new Set(prev);
+        next.delete(workspace.id);
+        return next;
+      });
+    }
+  };
+
+  const handleDestroyContainer = async (workspace: Workspace) => {
+    if (!confirm(`Destroy container for "${workspace.name}"? The workspace will remain but you'll need to start a new container.`)) {
+      return;
+    }
+
+    setDestroyingWorkspaces(prev => new Set([...prev, workspace.id]));
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/destroy`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+
+      if (response.ok) {
+        // Refresh the workspace list to get updated container status
+        const workspacesResponse = await fetch(`/api/repositories/${workspace.repositoryId}/workspaces`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        });
+        if (workspacesResponse.ok) {
+          const { data } = await workspacesResponse.json();
+          setWorkspacesByRepo(prev => ({ ...prev, [workspace.repositoryId]: data.workspaces }));
+        }
+      } else {
+        const { error } = await response.json();
+        alert(`Failed to destroy container: ${error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error destroying container:', error);
+      alert('Failed to destroy container');
+    } finally {
+      setDestroyingWorkspaces(prev => {
         const next = new Set(prev);
         next.delete(workspace.id);
         return next;
@@ -298,6 +354,7 @@ export function RepositoryTree({
                             workspace={workspace}
                             onClose={() => setOpenMenuId(null)}
                             onRestart={() => handleRestartContainer(workspace)}
+                            onDestroy={() => handleDestroyContainer(workspace)}
                             onDelete={() => handleDeleteWorkspace(workspace)}
                           />
                         )}

@@ -22,7 +22,7 @@ async function verifyTabOwnership(tabId: string, userId: string) {
     throw new NotFoundError('Tab', tabId);
   }
 
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
   const workspace = await workspaceService.getWorkspace(tab.workspaceId);
 
   if (!workspace) {
@@ -49,7 +49,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   const { tab, workspace } = await verifyTabOwnership(id, user.id);
 
   const tabService = getTabService();
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
 
   // Sync workspace container status
   await workspaceService.syncContainerStatus(workspace.id);

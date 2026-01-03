@@ -1,4 +1,5 @@
 import { config } from '@/lib/config';
+import { randomBytes } from 'crypto';
 import type { Duplex } from 'stream';
 import type {
   IContainerBackend,
@@ -10,7 +11,7 @@ import type {
 } from '../interfaces';
 import { getProxmoxClient, ProxmoxClient } from '../proxmox/client';
 import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } from '../proxmox/task-poller';
-import { createSSHStream, execSSHCommand } from '../proxmox/ssh-stream';
+import { createSSHStream, execSSHCommand, syncWorkspaceToContainer, syncWorkspaceFromContainer, syncSSHKeyToContainer, cloneRepoInContainer, setupContainerSSHAccess } from '../proxmox/ssh-stream';
 
 /**
  * Proxmox LXC container backend implementation
@@ -21,6 +22,7 @@ export class ProxmoxBackend implements IContainerBackend {
 
   private client: ProxmoxClient;
   private containerIps: Map<string, string> = new Map(); // vmid -> IP cache
+  private workspacePaths: Map<string, string> = new Map(); // vmid -> local workspace path
 
   constructor() {
     this.client = getProxmoxClient();
@@ -61,18 +63,11 @@ export class ProxmoxBackend implements IContainerBackend {
 
     console.log(`LXC container ${newVmid} cloned successfully`);
 
-    // Configure the container with mount points and resources
-    const containerConfig2: Record<string, unknown> = {};
-
-    // Mount workspace path
-    if (workspacePath) {
-      containerConfig2.mp0 = `${workspacePath},mp=/workspace`;
-    }
-
-    // Mount Claude config if configured
-    if (cfg.claudeConfigPath) {
-      containerConfig2.mp1 = `${cfg.claudeConfigPath},mp=/root/.claude`;
-    }
+    // Configure the container resources (skip bind mounts - API tokens can't use them)
+    // For workspace files, we'll use rsync/scp after container starts
+    const containerConfig2: Record<string, unknown> = {
+      onboot: 1, // Start container on host boot
+    };
 
     // Set resources if different from template
     if (memoryLimit) {
@@ -83,9 +78,24 @@ export class ProxmoxBackend implements IContainerBackend {
       containerConfig2.cores = cpuLimit;
     }
 
+    // Configure network with VLAN tag if specified
+    if (cfg.vlanTag) {
+      // Format: name=eth0,bridge=vmbr0,tag=2,ip=dhcp
+      containerConfig2.net0 = `name=eth0,bridge=${cfg.bridge},tag=${cfg.vlanTag},ip=dhcp`;
+      console.log(`Setting network with VLAN tag ${cfg.vlanTag}`);
+    }
+
     // Apply configuration
-    if (Object.keys(containerConfig2).length > 0) {
+    try {
       await this.client.setLxcConfig(newVmid, containerConfig2);
+    } catch (error) {
+      console.warn(`Could not apply container config for ${newVmid}:`, error);
+      // Continue anyway - template defaults should work
+    }
+
+    // Store workspace path for later syncing
+    if (workspacePath) {
+      this.workspacePaths.set(String(newVmid), workspacePath);
     }
 
     // Return VMID as string (container ID)
@@ -110,6 +120,18 @@ export class ProxmoxBackend implements IContainerBackend {
       const ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
       console.log(`LXC container ${vmid} started with IP: ${ip}`);
+
+      // Setup SSH access to the container via pct exec on Proxmox host
+      // This must happen before any SSH-based operations (rsync, agent provisioning)
+      const cfg = config.proxmox;
+      if (cfg.host) {
+        try {
+          await setupContainerSSHAccess(cfg.host, vmid);
+        } catch (sshError) {
+          console.warn(`Could not setup SSH access for container ${vmid}:`, sshError);
+          // Non-fatal - SSH might already be configured in template
+        }
+      }
     } catch (error) {
       console.warn(`Could not determine IP for container ${vmid}:`, error);
     }
@@ -315,6 +337,255 @@ export class ProxmoxBackend implements IContainerBackend {
    */
   getCachedIp(containerId: string): string | undefined {
     return this.containerIps.get(containerId);
+  }
+
+  /**
+   * Sync workspace files to the container
+   * This copies the worktree files from the host to the container's /workspace
+   */
+  async syncWorkspace(containerId: string, localPath: string, remotePath: string = '/workspace'): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Syncing workspace to container ${vmid}: ${localPath} -> ${ip}:${remotePath}`);
+
+    try {
+      await syncWorkspaceToContainer(localPath, ip, remotePath, { delete: false });
+      console.log(`Workspace sync to container ${vmid} completed`);
+    } catch (error) {
+      console.error(`Failed to sync workspace to container ${vmid}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync workspace files back from the container to host
+   * This saves any changes made inside the container back to the worktree
+   */
+  async syncWorkspaceBack(containerId: string, remotePath: string, localPath: string): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 10000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Syncing workspace back from container ${vmid}: ${ip}:${remotePath} -> ${localPath}`);
+
+    try {
+      await syncWorkspaceFromContainer(ip, remotePath, localPath);
+      console.log(`Workspace sync back from container ${vmid} completed`);
+    } catch (error) {
+      console.error(`Failed to sync workspace back from container ${vmid}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get stored workspace path for a container
+   */
+  getWorkspacePath(containerId: string): string | undefined {
+    return this.workspacePaths.get(containerId);
+  }
+
+  /**
+   * Set workspace path for a container (useful when resuming from DB)
+   */
+  setWorkspacePath(containerId: string, localPath: string): void {
+    this.workspacePaths.set(containerId, localPath);
+  }
+
+  /**
+   * Sync an SSH key to the container for git operations
+   */
+  async syncSSHKey(containerId: string, privateKey: string, keyName: string = 'id_ed25519'): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    await syncSSHKeyToContainer(ip, privateKey, keyName);
+  }
+
+  /**
+   * Configure container networking (enable DHCP client)
+   * Called after container starts to ensure it gets an IP
+   */
+  async configureNetworking(containerId: string): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP (will trigger DHCP if needed)
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 90000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Container ${vmid} networking configured, IP: ${ip}`);
+
+    // Setup dhclient service for persistent networking via SSH
+    try {
+      const { execSSHCommand } = await import('../proxmox/ssh-stream');
+      await execSSHCommand(
+        { host: ip },
+        ['bash', '-c', `
+          if [ ! -f /etc/systemd/system/dhclient-eth0.service ]; then
+            cat > /etc/systemd/system/dhclient-eth0.service << 'EOF'
+[Unit]
+Description=DHCP Client for eth0
+Wants=network.target
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/dhclient eth0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            systemctl daemon-reload
+            systemctl enable dhclient-eth0.service
+          fi
+        `],
+        { workingDir: '/' }
+      );
+      console.log(`DHCP service configured in container ${vmid}`);
+    } catch (error) {
+      console.warn(`Could not configure DHCP service in container ${vmid}:`, error);
+      // Non-fatal - container should still work
+    }
+  }
+
+  /**
+   * Clone a git repo into the container
+   * This is the preferred method for Proxmox containers (instead of rsync)
+   */
+  async cloneRepo(
+    containerId: string,
+    repoUrl: string,
+    branchName: string,
+    sshKeyContent?: string
+  ): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Cloning repo to container ${vmid}: ${repoUrl} (branch: ${branchName})`);
+
+    await cloneRepoInContainer(ip, repoUrl, branchName, '/workspace', {
+      sshKeyContent,
+    });
+  }
+
+  /**
+   * Provision the sidecar agent in a container
+   * This sets up the agent configuration and downloads the agent bundle
+   */
+  async provisionAgent(
+    containerId: string,
+    workspaceId: string,
+    agentToken: string
+  ): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+    const cfg = config.proxmox;
+
+    // Get container IP
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Provisioning agent for workspace ${workspaceId} in container ${vmid}`);
+
+    const sessionHubUrl = process.env.SESSION_HUB_URL || `http://localhost:${config.server.port}`;
+    const agentBundleUrl = `${sessionHubUrl}/api/agent/bundle`;
+    const agentVersion = process.env.AGENT_VERSION || '1.0.0';
+
+    try {
+      // 1. Write agent environment configuration
+      await execSSHCommand(
+        { host: ip },
+        ['bash', '-c', `
+          cat > /etc/session-hub-agent.env << 'EOF'
+SESSION_HUB_URL=${sessionHubUrl}
+WORKSPACE_ID=${workspaceId}
+AGENT_TOKEN=${agentToken}
+AGENT_VERSION=${agentVersion}
+EOF
+          chmod 600 /etc/session-hub-agent.env
+        `],
+        { workingDir: '/' }
+      );
+      console.log(`Agent configuration written to container ${vmid}`);
+
+      // 2. Download and install the agent bundle
+      await execSSHCommand(
+        { host: ip },
+        ['bash', '-c', `
+          cd /opt/session-hub-agent
+
+          # Download agent bundle
+          echo "Downloading agent bundle from ${agentBundleUrl}..."
+          curl -fSL -o agent-bundle.tar.gz "${agentBundleUrl}" || {
+            echo "Failed to download agent bundle"
+            exit 1
+          }
+
+          # Extract bundle
+          echo "Extracting agent bundle..."
+          tar -xzf agent-bundle.tar.gz
+          rm agent-bundle.tar.gz
+
+          # Install dependencies if package.json exists
+          if [ -f package.json ]; then
+            echo "Installing agent dependencies..."
+            npm install --production --ignore-scripts 2>/dev/null || true
+          fi
+
+          echo "Agent bundle installed"
+        `],
+        { workingDir: '/opt/session-hub-agent' }
+      );
+      console.log(`Agent bundle installed in container ${vmid}`);
+
+      // 3. Start the agent service
+      await execSSHCommand(
+        { host: ip },
+        ['systemctl', 'start', 'session-hub-agent'],
+        { workingDir: '/' }
+      );
+      console.log(`Agent service started in container ${vmid}`);
+
+    } catch (error) {
+      console.error(`Failed to provision agent in container ${vmid}:`, error);
+      throw new Error(`Agent provisioning failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Generate a secure agent token
+   */
+  generateAgentToken(): string {
+    return randomBytes(32).toString('hex');
   }
 
   /**

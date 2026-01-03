@@ -1,6 +1,5 @@
 // Export all services
 export { GitService, getGitService } from './git-service';
-export { ContainerService, getContainerService } from './container-service';
 export { SessionService, getSessionService } from './session-service';
 export { AuthService, getAuthService, type AuthResult } from './auth-service';
 
@@ -11,3 +10,20 @@ export { TabService, getTabService } from './tab-service';
 export { SSHKeyService, getSSHKeyService } from './ssh-key-service';
 export { TabTemplateService, getTabTemplateService, DEFAULT_TEMPLATES } from './tab-template-service';
 export { getTabStreamManager } from './tab-stream-manager';
+export { AgentRegistry, getAgentRegistry } from './agent-registry';
+
+// Container backend (abstraction layer)
+export {
+  getContainerBackend,
+  getContainerBackendAsync,
+  initializeBackend,
+  getBackendType,
+  getContainerService, // Backwards compatibility
+  DockerBackend,
+  type IContainerBackend,
+  type ContainerBackendType,
+  type ContainerConfig,
+  type ContainerInfo,
+  type ContainerStream,
+  type ExecResult,
+} from '@/lib/container';

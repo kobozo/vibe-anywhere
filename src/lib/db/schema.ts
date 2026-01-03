@@ -101,6 +101,11 @@ export const workspaces = pgTable('workspaces', {
   containerStatus: containerStatusEnum('container_status').default('none').notNull(),
   containerBackend: containerBackendEnum('container_backend').default('docker').notNull(),
   containerIp: text('container_ip'), // IP address for Proxmox LXC containers
+  // Agent connection fields (for sidecar agent in containers)
+  agentToken: text('agent_token'), // Authentication token for agent
+  agentConnectedAt: timestamp('agent_connected_at', { withTimezone: true }), // When agent connected
+  agentLastHeartbeat: timestamp('agent_last_heartbeat', { withTimezone: true }), // Last heartbeat
+  agentVersion: text('agent_version'), // Agent version string
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).defaultNow().notNull(),

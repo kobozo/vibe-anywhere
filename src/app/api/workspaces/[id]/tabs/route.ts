@@ -29,7 +29,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   const user = await requireAuth(request);
   const { id } = await (context as RouteContext).params;
 
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
   const workspace = await workspaceService.getWorkspace(id);
 
   if (!workspace) {
@@ -64,7 +64,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     throw new ValidationError('Invalid request body', result.error.flatten());
   }
 
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
   const workspace = await workspaceService.getWorkspace(id);
 
   if (!workspace) {

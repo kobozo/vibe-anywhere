@@ -22,21 +22,33 @@ export interface TabInfo {
 }
 
 export class TabService {
-  private workspaceService: WorkspaceService;
+  private workspaceServiceInstance: WorkspaceService | null = null;
 
-  constructor() {
-    this.workspaceService = getWorkspaceService();
+  /**
+   * Get workspace service (lazy initialization)
+   */
+  private async getWorkspace(): Promise<WorkspaceService> {
+    if (!this.workspaceServiceInstance) {
+      this.workspaceServiceInstance = await getWorkspaceService();
+    }
+    return this.workspaceServiceInstance;
   }
 
   /**
    * Create a new tab in a workspace
+   * Tab is automatically set to 'running' if the workspace container is running
    */
   async createTab(workspaceId: string, input: CreateTabInput): Promise<Tab> {
-    // Verify workspace exists
-    const workspace = await this.workspaceService.getWorkspace(workspaceId);
+    // Verify workspace exists and get container status
+    const workspaceService = await this.getWorkspace();
+    const workspace = await workspaceService.getWorkspace(workspaceId);
     if (!workspace) {
       throw new Error(`Workspace ${workspaceId} not found`);
     }
+
+    // Set status based on container state
+    // If container is running, tab is immediately ready to attach
+    const status = workspace.containerStatus === 'running' ? 'running' : 'pending';
 
     // Create the tab record
     const [tab] = await db
@@ -45,12 +57,17 @@ export class TabService {
         workspaceId,
         name: input.name,
         command: input.command || ['/bin/bash'],
-        status: 'pending',
+        status,
         outputBuffer: [],
         outputBufferSize: config.session.outputBufferSize,
         autoShutdownMinutes: input.autoShutdownMinutes || null,
       })
       .returning();
+
+    // Update workspace activity
+    if (status === 'running') {
+      await workspaceService.touch(workspaceId);
+    }
 
     return tab;
   }
@@ -71,13 +88,14 @@ export class TabService {
     }
 
     // Get workspace
-    const workspace = await this.workspaceService.getWorkspace(tab.workspaceId);
+    const workspaceService = await this.getWorkspace();
+    const workspace = await workspaceService.getWorkspace(tab.workspaceId);
     if (!workspace) {
       throw new Error(`Workspace ${tab.workspaceId} not found`);
     }
 
     // Ensure workspace container is running
-    await this.workspaceService.startContainer(workspace.id);
+    await workspaceService.startContainer(workspace.id);
 
     // Mark tab as running
     const [updatedTab] = await db
@@ -91,7 +109,7 @@ export class TabService {
       .returning();
 
     // Update workspace activity
-    await this.workspaceService.touch(workspace.id);
+    await workspaceService.touch(workspace.id);
 
     return updatedTab;
   }

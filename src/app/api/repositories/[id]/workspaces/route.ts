@@ -33,7 +33,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     throw new NotFoundError('Repository', id);
   }
 
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
   const workspaces = await workspaceService.listWorkspaces(id);
 
   return successResponse({ workspaces });
@@ -41,6 +41,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
 
 /**
  * POST /api/repositories/[id]/workspaces - Create a new workspace
+ * Creates the workspace and starts its container automatically
  */
 export const POST = withErrorHandling(async (request: NextRequest, context: unknown) => {
   const user = await requireAuth(request);
@@ -59,8 +60,13 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     throw new NotFoundError('Repository', id);
   }
 
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
   const workspace = await workspaceService.createWorkspace(id, result.data);
 
-  return successResponse({ workspace }, 201);
+  // Start the container automatically
+  // This is done async - the workspace is returned immediately
+  // The container will be ready when the user opens a tab
+  const startedWorkspace = await workspaceService.startContainer(workspace.id);
+
+  return successResponse({ workspace: startedWorkspace }, 201);
 });

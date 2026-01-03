@@ -27,7 +27,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
   }
 
   // Verify ownership through workspace -> repository chain
-  const workspaceService = getWorkspaceService();
+  const workspaceService = await getWorkspaceService();
   const workspace = await workspaceService.getWorkspace(tab.workspaceId);
 
   if (!workspace) {
