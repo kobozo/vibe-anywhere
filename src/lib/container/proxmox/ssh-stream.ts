@@ -721,10 +721,32 @@ export async function setupContainerSSHAccess(
   }
 
   // Build the pct exec command that will run inside the container
-  // This sets up SSH keys and installs rsync if not present
+  // This sets up SSH keys, installs rsync, and creates the kobozo user
   // Escape the public key for use in bash
   const escapedKey = publicKey.replace(/'/g, "'\\''");
-  const pctCommand = `pct exec ${vmid} -- bash -c 'mkdir -p /root/.ssh && echo "'"${escapedKey}"'" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && chmod 700 /root/.ssh && if ! command -v rsync &> /dev/null; then apt-get update -qq && apt-get install -y -qq rsync; fi'`;
+  const pctCommand = `pct exec ${vmid} -- bash -c '
+    # Setup SSH for root
+    mkdir -p /root/.ssh
+    echo "'"${escapedKey}"'" >> /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+    chmod 700 /root/.ssh
+
+    # Install rsync if needed
+    if ! command -v rsync &> /dev/null; then
+      apt-get update -qq && apt-get install -y -qq rsync
+    fi
+
+    # Create kobozo user if not exists
+    if ! id kobozo &>/dev/null; then
+      useradd -m -s /bin/bash kobozo
+      echo "kobozo:changeme" | chpasswd
+      mkdir -p /home/kobozo/.ssh
+      echo "'"${escapedKey}"'" >> /home/kobozo/.ssh/authorized_keys
+      chmod 600 /home/kobozo/.ssh/authorized_keys
+      chmod 700 /home/kobozo/.ssh
+      chown -R kobozo:kobozo /home/kobozo/.ssh
+    fi
+  '`;
 
   console.log(`Setting up SSH access for container ${vmid} via Proxmox host ${proxmoxHost}`);
 
