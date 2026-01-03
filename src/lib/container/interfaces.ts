@@ -111,8 +111,10 @@ export interface IContainerBackend {
   /**
    * Sync workspace files to container (Proxmox only, no-op for Docker)
    * Called after container is started to copy worktree files
+   * @param options.branchName - Git branch name for initializing repo
+   * @param options.remoteUrl - Git remote URL to set as origin
    */
-  syncWorkspace?(containerId: string, localPath: string, remotePath?: string): Promise<void>;
+  syncWorkspace?(containerId: string, localPath: string, remotePath?: string, options?: { branchName?: string; remoteUrl?: string }): Promise<void>;
 
   /**
    * Sync workspace files back from container (Proxmox only, no-op for Docker)

@@ -343,7 +343,12 @@ export class ProxmoxBackend implements IContainerBackend {
    * Sync workspace files to the container
    * This copies the worktree files from the host to the container's /workspace
    */
-  async syncWorkspace(containerId: string, localPath: string, remotePath: string = '/workspace'): Promise<void> {
+  async syncWorkspace(
+    containerId: string,
+    localPath: string,
+    remotePath: string = '/workspace',
+    options: { branchName?: string; remoteUrl?: string } = {}
+  ): Promise<void> {
     const vmid = parseInt(containerId, 10);
 
     // Get container IP
@@ -358,6 +363,42 @@ export class ProxmoxBackend implements IContainerBackend {
     try {
       await syncWorkspaceToContainer(localPath, ip, remotePath, { delete: false });
       console.log(`Workspace sync to container ${vmid} completed`);
+
+      // Fix git worktree pointer - convert to standalone repo
+      // Worktrees have a .git file pointing to host path, which doesn't work in container
+      const { branchName, remoteUrl } = options;
+      if (branchName || remoteUrl) {
+        console.log(`Converting git worktree to standalone repo in container ${vmid}`);
+        const gitSetupScript = `
+          cd ${remotePath}
+          if [ -f .git ]; then
+            # It's a worktree pointer file, need to convert to real repo
+            rm -f .git
+            git init
+            ${remoteUrl ? `git remote add origin "${remoteUrl}"` : ''}
+            git add -A
+            git commit -m "Initial commit from worktree sync" --allow-empty 2>/dev/null || true
+            ${branchName ? `git branch -M "${branchName}"` : ''}
+            echo "Git repo initialized"
+          elif [ -d .git ]; then
+            echo "Already a git repo"
+          else
+            echo "No .git found, initializing"
+            git init
+            ${remoteUrl ? `git remote add origin "${remoteUrl}"` : ''}
+            git add -A
+            git commit -m "Initial commit" --allow-empty 2>/dev/null || true
+            ${branchName ? `git branch -M "${branchName}"` : ''}
+          fi
+        `;
+        try {
+          await execSSHCommand({ host: ip }, ['bash', '-c', gitSetupScript], { workingDir: '/' });
+          console.log(`Git repo initialized in container ${vmid}`);
+        } catch (gitError) {
+          console.warn(`Could not setup git in container ${vmid}:`, gitError);
+          // Non-fatal - files are synced, just git won't work
+        }
+      }
     } catch (error) {
       console.error(`Failed to sync workspace to container ${vmid}:`, error);
       throw error;

@@ -399,34 +399,36 @@ export class WorkspaceService {
             console.warn(`None of the ${keys.length} SSH keys could be decrypted. Git operations may fail.`);
           }
 
-          // Always sync the local workspace to the container
-          // This ensures local changes (even unpushed) are available in the container
-          console.log(`Syncing local workspace ${workspacePath} to container ${containerId}`);
-          if (this.containerBackend.syncWorkspace) {
-            await this.containerBackend.syncWorkspace(containerId, workspacePath, '/workspace');
-            console.log('Workspace synced successfully');
-          }
-
-          // Sync SSH keys if we have them (for git push/pull from container)
-          if (sshKeyContent) {
-            const backend = this.containerBackend as { syncSSHKey?: (containerId: string, privateKey: string, keyName: string) => Promise<void> };
-            if (backend.syncSSHKey) {
-              await backend.syncSSHKey(containerId, sshKeyContent, 'id_ed25519');
-              console.log('SSH key synced to container');
-            }
-          }
-
-          // Set up git in container
+          // Get remote URL for git setup
           const repoPath = this.repositoryService.getAbsolutePath(repo);
           const git = simpleGit(repoPath);
           const remotes = await git.getRemotes(true);
           const originRemote = remotes.find(r => r.name === 'origin');
+          const remoteUrl = originRemote?.refs?.fetch;
 
-          if (originRemote?.refs?.fetch) {
-            // Configure remote in container for push/pull
-            const backend = this.containerBackend as { execInContainer?: (containerId: string, command: string) => Promise<void> };
-            // Remote will be configured via the synced .git folder
-            console.log(`Container workspace has remote: ${originRemote.refs.fetch}`);
+          // Always sync the local workspace to the container
+          // This ensures local changes (even unpushed) are available in the container
+          console.log(`Syncing local workspace ${workspacePath} to container ${containerId}`);
+          const backend = this.containerBackend as {
+            syncWorkspace?: (containerId: string, localPath: string, remotePath: string, options?: { branchName?: string; remoteUrl?: string }) => Promise<void>;
+            syncSSHKey?: (containerId: string, privateKey: string, keyName: string) => Promise<void>;
+          };
+          if (backend.syncWorkspace) {
+            await backend.syncWorkspace(containerId, workspacePath, '/workspace', {
+              branchName: workspace.branchName,
+              remoteUrl,
+            });
+            console.log('Workspace synced successfully');
+          }
+
+          // Sync SSH keys if we have them (for git push/pull from container)
+          if (sshKeyContent && backend.syncSSHKey) {
+            await backend.syncSSHKey(containerId, sshKeyContent, 'id_ed25519');
+            console.log('SSH key synced to container');
+          }
+
+          if (remoteUrl) {
+            console.log(`Container workspace has remote: ${remoteUrl}`);
           }
         }
       } catch (error) {
