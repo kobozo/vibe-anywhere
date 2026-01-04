@@ -268,9 +268,10 @@ export class ProxmoxBackend implements IContainerBackend {
       env.ANTHROPIC_API_KEY = config.anthropic.apiKey;
     }
 
-    // Create SSH stream
+    // Create SSH stream - use configured SSH user (defaults to kobozo)
+    const cfg = config.proxmox;
     const streamResult = await createSSHStream(
-      { host: ip },
+      { host: ip, username: cfg.sshUser },
       {
         command: cmd,
         workingDir: '/workspace',
@@ -304,8 +305,10 @@ export class ProxmoxBackend implements IContainerBackend {
       env.ANTHROPIC_API_KEY = config.anthropic.apiKey;
     }
 
+    // Use configured SSH user (defaults to kobozo)
+    const cfg = config.proxmox;
     return execSSHCommand(
-      { host: ip },
+      { host: ip, username: cfg.sshUser },
       command,
       { workingDir: '/workspace', env }
     );
@@ -392,7 +395,9 @@ export class ProxmoxBackend implements IContainerBackend {
           fi
         `;
         try {
-          await execSSHCommand({ host: ip }, ['bash', '-c', gitSetupScript], { workingDir: '/' });
+          // Use configured SSH user for git operations (kobozo owns /workspace)
+          const proxmoxCfg = config.proxmox;
+          await execSSHCommand({ host: ip, username: proxmoxCfg.sshUser }, ['bash', '-c', gitSetupScript], { workingDir: '/' });
           console.log(`Git repo initialized in container ${vmid}`);
         } catch (gitError) {
           console.warn(`Could not setup git in container ${vmid}:`, gitError);
@@ -476,11 +481,11 @@ export class ProxmoxBackend implements IContainerBackend {
 
     console.log(`Container ${vmid} networking configured, IP: ${ip}`);
 
-    // Setup dhclient service for persistent networking via SSH
+    // Setup dhclient service for persistent networking via SSH (requires root for systemd)
     try {
       const { execSSHCommand } = await import('../proxmox/ssh-stream');
       await execSSHCommand(
-        { host: ip },
+        { host: ip, username: 'root' },
         ['bash', '-c', `
           if [ ! -f /etc/systemd/system/dhclient-eth0.service ]; then
             cat > /etc/systemd/system/dhclient-eth0.service << 'EOF'
@@ -562,9 +567,25 @@ EOF
     const agentVersion = process.env.AGENT_VERSION || '1.0.0';
 
     try {
-      // 1. Write agent environment configuration
+      // 1. Stop the agent service first if it's running (template may have it pre-installed)
+      // This ensures the agent doesn't start with stale/missing config
+      // Note: All agent provisioning operations use root for system-level access
+      try {
+        await execSSHCommand(
+          { host: ip, username: 'root' },
+          ['systemctl', 'stop', 'session-hub-agent'],
+          { workingDir: '/' }
+        );
+        console.log(`Stopped existing agent service in container ${vmid}`);
+      } catch {
+        // Agent service might not exist yet, that's fine
+        console.log(`No existing agent service to stop in container ${vmid}`);
+      }
+
+      // 2. Write agent environment configuration
+      // The env file needs to be readable by kobozo since the agent service runs as kobozo
       await execSSHCommand(
-        { host: ip },
+        { host: ip, username: 'root' },
         ['bash', '-c', `
           cat > /etc/session-hub-agent.env << 'EOF'
 SESSION_HUB_URL=${sessionHubUrl}
@@ -572,15 +593,17 @@ WORKSPACE_ID=${workspaceId}
 AGENT_TOKEN=${agentToken}
 AGENT_VERSION=${agentVersion}
 EOF
+          chown kobozo:kobozo /etc/session-hub-agent.env
           chmod 600 /etc/session-hub-agent.env
         `],
         { workingDir: '/' }
       );
       console.log(`Agent configuration written to container ${vmid}`);
 
-      // 2. Download and install the agent bundle
+      // 3. Download and install the agent bundle
+      // Ensure the agent directory is owned by kobozo since the service runs as kobozo
       await execSSHCommand(
-        { host: ip },
+        { host: ip, username: 'root' },
         ['bash', '-c', `
           cd /opt/session-hub-agent
 
@@ -602,15 +625,18 @@ EOF
             npm install --production --ignore-scripts 2>/dev/null || true
           fi
 
+          # Ensure kobozo owns everything in the agent directory
+          chown -R kobozo:kobozo /opt/session-hub-agent
+
           echo "Agent bundle installed"
         `],
         { workingDir: '/opt/session-hub-agent' }
       );
       console.log(`Agent bundle installed in container ${vmid}`);
 
-      // 3. Start the agent service
+      // 4. Start the agent service with the correct configuration
       await execSSHCommand(
-        { host: ip },
+        { host: ip, username: 'root' },
         ['systemctl', 'start', 'session-hub-agent'],
         { workingDir: '/' }
       );

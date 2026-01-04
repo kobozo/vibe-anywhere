@@ -147,8 +147,31 @@ echo "lazygit version: $(lazygit --version)"
 echo "Installing tmux for session persistence..."
 apt-get install -y tmux
 
+echo "Configuring tmux defaults..."
+cat > /etc/tmux.conf << TMUXEOF
+# Session Hub tmux configuration
+# Disable mouse mode to allow browser text selection
+set -g mouse off
+
+# Better terminal colors
+set -g default-terminal "xterm-256color"
+set -ga terminal-overrides ",xterm-256color:Tc"
+
+# Increase scrollback buffer
+set -g history-limit 50000
+
+# No delay for escape key
+set -sg escape-time 0
+
+# Start window numbering at 1
+set -g base-index 1
+setw -g pane-base-index 1
+TMUXEOF
+chmod 644 /etc/tmux.conf
+
 echo "Setting up Session Hub agent directory..."
 mkdir -p /opt/session-hub-agent
+chown -R kobozo:kobozo /opt/session-hub-agent
 
 echo "Creating Session Hub agent systemd service..."
 cat > /etc/systemd/system/session-hub-agent.service << EOF
@@ -159,7 +182,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
+User=kobozo
+Group=kobozo
 WorkingDirectory=/opt/session-hub-agent
 ExecStart=/usr/bin/node /opt/session-hub-agent/dist/index.js
 Restart=always

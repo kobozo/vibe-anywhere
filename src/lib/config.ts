@@ -35,7 +35,7 @@ const envSchema = z.object({
   PROXMOX_STORAGE: z.string().default('local-lvm'),
   PROXMOX_BRIDGE: z.string().default('vmbr0'),
   PROXMOX_VLAN_TAG: z.string().optional().transform(v => v ? Number(v) : undefined),
-  PROXMOX_SSH_USER: z.string().default('root'),
+  PROXMOX_SSH_USER: z.string().default('kobozo'),
   PROXMOX_SSH_PRIVATE_KEY_PATH: z.string().optional(),
   PROXMOX_VMID_MIN: z.string().default('200').transform(Number),
   PROXMOX_VMID_MAX: z.string().default('299').transform(Number),
