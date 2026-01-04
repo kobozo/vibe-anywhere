@@ -55,11 +55,16 @@ export class TmuxManager {
       if (stdout.includes('exists')) {
         console.log(`Recovering existing tmux session: ${this.sessionName}`);
         await this.recoverExistingWindows();
+        // Ensure mouse mode is disabled for the session
+        await exec(`tmux set-option -t ${this.sessionName} -g mouse off`).catch(() => {});
       }
     } catch {
       // Session doesn't exist, create it
       console.log(`Creating new tmux session: ${this.sessionName}`);
       await exec(`tmux new-session -d -s ${this.sessionName} -x 120 -y 30`);
+      // Disable mouse mode to prevent escape codes from being sent to the terminal
+      // This allows the browser to handle text selection normally
+      await exec(`tmux set-option -t ${this.sessionName} -g mouse off`).catch(() => {});
     }
 
     this.initialized = true;

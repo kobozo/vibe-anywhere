@@ -8,6 +8,18 @@ import { AgentWebSocket } from './websocket.js';
 import { TmuxManager } from './tmux-manager.js';
 import { OutputBufferManager } from './output-buffer.js';
 import { selfUpdate } from './updater.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Directory for clipboard-pasted files (images, etc.)
+const CLIPBOARD_DIR = '/tmp/clipboard-uploads';
+
+// Ensure clipboard upload directory exists
+try {
+  fs.mkdirSync(CLIPBOARD_DIR, { recursive: true });
+} catch {
+  console.warn(`Could not create clipboard directory: ${CLIPBOARD_DIR}`);
+}
 
 // Handle --version flag
 if (process.argv.includes('--version')) {
@@ -130,10 +142,80 @@ const wsClient = new AgentWebSocket(config, {
     wsClient.sendBuffer(data.tabId, lines);
   },
 
+  onFileUpload: async (data) => {
+    console.log(`File upload request: ${data.filename} (${data.mimeType}) for tab ${data.tabId}`);
+    try {
+      // Decode base64 data
+      const buffer = Buffer.from(data.data, 'base64');
+
+      // Generate unique filename with timestamp
+      const timestamp = Date.now();
+      const ext = path.extname(data.filename) || getExtFromMimeType(data.mimeType);
+      const safeFilename = `clipboard-${timestamp}${ext}`;
+      const filePath = path.join(CLIPBOARD_DIR, safeFilename);
+
+      // Write file
+      fs.writeFileSync(filePath, buffer);
+      console.log(`File saved: ${filePath} (${buffer.length} bytes)`);
+
+      // Use tmux native paste if we have the tab info
+      if (data.tabId && tmuxManager.hasActiveWindow(data.tabId)) {
+        try {
+          // Set tmux buffer with the file path
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+
+          // Set the tmux buffer to the file path
+          await execAsync(`tmux set-buffer -- "${filePath}"`);
+
+          // Get the window index for this tab
+          const windows = tmuxManager.getWindowStatus();
+          const window = windows.find(w => w.tabId === data.tabId);
+          if (window) {
+            // Paste the buffer into the specific window using tmux native paste
+            const sessionName = `sh-${config.workspaceId}`;
+            await execAsync(`tmux paste-buffer -t ${sessionName}:${window.windowIndex}`);
+            console.log(`Pasted file path via tmux into window ${window.windowIndex}`);
+          }
+        } catch (tmuxError) {
+          console.warn('Failed to use tmux paste, path saved to file:', tmuxError);
+        }
+      }
+
+      wsClient.sendFileUploaded(data.requestId, true, filePath);
+    } catch (error) {
+      console.error('File upload failed:', error);
+      wsClient.sendFileUploaded(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
   onError: (error) => {
     console.error('WebSocket error:', error);
   },
 });
+
+/**
+ * Get file extension from MIME type
+ */
+function getExtFromMimeType(mimeType: string): string {
+  const mimeToExt: Record<string, string> = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'image/bmp': '.bmp',
+    'application/pdf': '.pdf',
+    'text/plain': '.txt',
+  };
+  return mimeToExt[mimeType] || '.bin';
+}
 
 // Start connection
 wsClient.connect();

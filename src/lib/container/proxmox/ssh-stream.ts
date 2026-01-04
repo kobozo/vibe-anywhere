@@ -414,10 +414,14 @@ export async function syncSSHKeyToContainer(
   options: {
     username?: string;
     privateKeyPath?: string;
+    targetUser?: string;  // User whose home directory to put the key in
   } = {}
 ): Promise<void> {
   const cfg = config.proxmox;
-  const username = options.username || cfg.sshUser || 'root';
+  // Always connect as root for system operations
+  const connectUser = 'root';
+  // Target user for SSH key (whose home dir to put it in)
+  const targetUser = options.targetUser || cfg.sshUser || 'kobozo';
 
   // Find SSH private key for our connection
   let hostPrivateKeyPath = options.privateKeyPath || cfg.sshPrivateKeyPath;
@@ -439,38 +443,60 @@ export async function syncSSHKeyToContainer(
     throw new Error('No SSH private key found for connection to container');
   }
 
-  console.log(`Syncing SSH key '${keyName}' to container ${containerIp}`);
+  console.log(`Syncing SSH key '${keyName}' to container ${containerIp} for user ${targetUser}`);
+  console.log(`Using host key: ${hostPrivateKeyPath}, connecting as ${connectUser}`);
 
-  // Connect to container and setup SSH directory and key
-  const ssh = await createSSHConnection({ host: containerIp });
+  // Connect to container as root for system operations
+  const ssh = await createSSHConnection({ host: containerIp, username: connectUser });
+  console.log('SSH connection established, executing setup script...');
 
   try {
-    // Create ~/.ssh directory, write key, set permissions, and configure git
+    // Create SSH directory for target user, write key, set permissions, and configure git
+    // Use absolute paths since we're connecting as root
+    const targetHome = targetUser === 'root' ? '/root' : `/home/${targetUser}`;
     const setupScript = `
-      mkdir -p ~/.ssh
-      chmod 700 ~/.ssh
-      cat > ~/.ssh/${keyName} << 'SSHKEY'
+      mkdir -p ${targetHome}/.ssh
+      chmod 700 ${targetHome}/.ssh
+      cat > ${targetHome}/.ssh/${keyName} << 'SSHKEY'
 ${privateKey}
 SSHKEY
-      chmod 600 ~/.ssh/${keyName}
+      chmod 600 ${targetHome}/.ssh/${keyName}
 
       # Create SSH config to use this key for git
-      cat > ~/.ssh/config << 'SSHCONFIG'
+      cat > ${targetHome}/.ssh/config << 'SSHCONFIG'
 Host *
   IdentityFile ~/.ssh/${keyName}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 SSHCONFIG
-      chmod 600 ~/.ssh/config
+      chmod 600 ${targetHome}/.ssh/config
 
-      # Configure git to use SSH
-      git config --global core.sshCommand "ssh -i ~/.ssh/${keyName} -o StrictHostKeyChecking=no"
+      # Set ownership to target user
+      chown -R ${targetUser}:${targetUser} ${targetHome}/.ssh
+
+      # Configure git for target user
+      su - ${targetUser} -c "git config --global core.sshCommand 'ssh -i ~/.ssh/${keyName} -o StrictHostKeyChecking=no'"
+      su - ${targetUser} -c "git config --global --add safe.directory /workspace"
     `;
 
+    const EXEC_TIMEOUT = 30000; // 30 second timeout for command execution
     await new Promise<void>((resolve, reject) => {
+      let resolved = false;
+
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error(`SSH key setup timed out after ${EXEC_TIMEOUT}ms`));
+        }
+      }, EXEC_TIMEOUT);
+
       ssh.exec(setupScript, (err, channel) => {
         if (err) {
-          reject(err);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            reject(err);
+          }
           return;
         }
 
@@ -480,15 +506,25 @@ SSHCONFIG
         });
 
         channel.on('close', (code: number) => {
-          if (code === 0) {
-            console.log(`SSH key '${keyName}' synced to container ${containerIp}`);
-            resolve();
-          } else {
-            reject(new Error(`SSH key setup failed with code ${code}: ${stderr}`));
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            if (code === 0) {
+              console.log(`SSH key '${keyName}' synced to container ${containerIp}`);
+              resolve();
+            } else {
+              reject(new Error(`SSH key setup failed with code ${code}: ${stderr}`));
+            }
           }
         });
 
-        channel.on('error', reject);
+        channel.on('error', (err) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            reject(err);
+          }
+        });
       });
     });
   } finally {
@@ -721,7 +757,7 @@ export async function setupContainerSSHAccess(
   }
 
   // Build the pct exec command that will run inside the container
-  // This sets up SSH keys, installs rsync, and creates the kobozo user
+  // This sets up SSH keys, installs rsync, creates the kobozo user, and configures tmux
   // Escape the public key for use in bash
   const escapedKey = publicKey.replace(/'/g, "'\\''");
   const pctCommand = `pct exec ${vmid} -- bash -c '
@@ -740,12 +776,37 @@ export async function setupContainerSSHAccess(
     if ! id kobozo &>/dev/null; then
       useradd -m -s /bin/bash kobozo
       echo "kobozo:changeme" | chpasswd
-      mkdir -p /home/kobozo/.ssh
-      echo "'"${escapedKey}"'" >> /home/kobozo/.ssh/authorized_keys
-      chmod 600 /home/kobozo/.ssh/authorized_keys
-      chmod 700 /home/kobozo/.ssh
-      chown -R kobozo:kobozo /home/kobozo/.ssh
     fi
+
+    # Always setup SSH for kobozo (even if user already exists in template)
+    mkdir -p /home/kobozo/.ssh
+    # Add key if not already present
+    grep -qF "'"${escapedKey}"'" /home/kobozo/.ssh/authorized_keys 2>/dev/null || echo "'"${escapedKey}"'" >> /home/kobozo/.ssh/authorized_keys
+    chmod 600 /home/kobozo/.ssh/authorized_keys
+    chmod 700 /home/kobozo/.ssh
+    chown -R kobozo:kobozo /home/kobozo/.ssh
+
+    # Configure tmux to disable mouse mode (allows browser text selection)
+    cat > /etc/tmux.conf << TMUXEOF
+# Session Hub tmux configuration
+# Disable mouse mode to allow browser text selection
+set -g mouse off
+
+# Better terminal colors
+set -g default-terminal "xterm-256color"
+set -ga terminal-overrides ",xterm-256color:Tc"
+
+# Increase scrollback buffer
+set -g history-limit 50000
+
+# No delay for escape key
+set -sg escape-time 0
+
+# Start window numbering at 1
+set -g base-index 1
+setw -g pane-base-index 1
+TMUXEOF
+    chmod 644 /etc/tmux.conf
   '`;
 
   console.log(`Setting up SSH access for container ${vmid} via Proxmox host ${proxmoxHost}`);

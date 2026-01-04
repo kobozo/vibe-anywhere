@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTabs, TabInfo } from '@/hooks/useTabs';
 import { CreateTabDialog } from './create-tab-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface TabBarProps {
   workspaceId: string | null;
@@ -29,6 +30,7 @@ export function TabBar({
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [tabToDelete, setTabToDelete] = useState<TabInfo | null>(null);
 
   useEffect(() => {
     if (workspaceId) {
@@ -73,21 +75,25 @@ export function TabBar({
     }
   };
 
-  const handleDeleteTab = async (e: React.MouseEvent, tab: TabInfo) => {
+  const handleDeleteTabClick = (e: React.MouseEvent, tab: TabInfo) => {
     e.stopPropagation();
+    setTabToDelete(tab);
+  };
 
-    if (!confirm(`Delete tab "${tab.name}"?`)) return;
+  const confirmDeleteTab = async () => {
+    if (!tabToDelete) return;
 
     try {
-      setActionLoading(tab.id);
-      await deleteTab(tab.id);
-      if (selectedTabId === tab.id) {
-        onSelectTab(tabs.find(t => t.id !== tab.id) || null);
+      setActionLoading(tabToDelete.id);
+      await deleteTab(tabToDelete.id);
+      if (selectedTabId === tabToDelete.id) {
+        onSelectTab(tabs.find(t => t.id !== tabToDelete.id) || null);
       }
     } catch (error) {
       console.error('Failed to delete tab:', error);
     } finally {
       setActionLoading(null);
+      setTabToDelete(null);
     }
   };
 
@@ -139,7 +145,7 @@ export function TabBar({
             <span className="text-xs animate-spin">⏳</span>
           ) : (
             <button
-              onClick={(e) => handleDeleteTab(e, tab)}
+              onClick={(e) => handleDeleteTabClick(e, tab)}
               className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 ml-1"
             >
               ×
@@ -163,6 +169,17 @@ export function TabBar({
         onClose={() => setIsCreateDialogOpen(false)}
         onCreate={handleCreateTab}
         isLoading={actionLoading === 'create'}
+      />
+
+      {/* Delete tab confirmation */}
+      <ConfirmDialog
+        isOpen={!!tabToDelete}
+        title="Delete Tab"
+        message={`Are you sure you want to delete "${tabToDelete?.name}"?`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteTab}
+        onCancel={() => setTabToDelete(null)}
       />
     </div>
   );

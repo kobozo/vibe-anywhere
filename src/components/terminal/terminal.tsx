@@ -229,6 +229,69 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
     };
   }, [socket]);
 
+  // Handle clipboard paste events (for image pasting)
+  // Uploads image to container and uses tmux native paste-buffer
+  useEffect(() => {
+    if (!socket || !terminalRef.current) return;
+
+    const container = terminalRef.current;
+
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      // Check for image in clipboard
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          try {
+            // Read file as base64
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result as string;
+                // Remove data URL prefix (e.g., "data:image/png;base64,")
+                const base64Data = result.split(',')[1];
+                resolve(base64Data);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+
+            const requestId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            const filename = file.name || `clipboard-image.${item.type.split('/')[1]}`;
+
+            // Send to server - agent will save file and use tmux native paste
+            socket.emit('file:upload', {
+              requestId,
+              filename,
+              data: base64,
+              mimeType: item.type,
+            });
+
+          } catch (error) {
+            console.error('Image paste error:', error);
+            if (xtermRef.current) {
+              xtermRef.current.write(`\r\n\x1b[31m[Paste error: ${error instanceof Error ? error.message : 'Unknown error'}]\x1b[0m\r\n`);
+            }
+          }
+
+          return; // Only handle first image
+        }
+      }
+    };
+
+    container.addEventListener('paste', handlePaste);
+
+    return () => {
+      container.removeEventListener('paste', handlePaste);
+    };
+  }, [socket]);
+
   // Attach to tab when connected
   useEffect(() => {
     // Only attach if not already attached to this specific tab

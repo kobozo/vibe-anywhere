@@ -11,6 +11,7 @@ import {
   getSessionService,
 } from '@/lib/services';
 import { getTabStreamManager } from '@/lib/services/tab-stream-manager';
+import { getWorkspaceStateBroadcaster } from '@/lib/services/workspace-state-broadcaster';
 import type { ContainerStream } from '@/lib/container';
 
 interface AuthenticatedSocket extends Socket {
@@ -20,6 +21,13 @@ interface AuthenticatedSocket extends Socket {
   containerStream?: ContainerStream; // Legacy support only
 }
 
+// Track pending file uploads for relay between browser and agent
+interface PendingUpload {
+  socket: AuthenticatedSocket;
+  timeoutId: NodeJS.Timeout;
+}
+const pendingUploads: Map<string, PendingUpload> = new Map();
+
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
@@ -28,6 +36,10 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     },
     transports: ['websocket', 'polling'],
   });
+
+  // Initialize workspace state broadcaster
+  const workspaceStateBroadcaster = getWorkspaceStateBroadcaster();
+  workspaceStateBroadcaster.initialize(io);
 
   // Authentication middleware
   io.use(async (socket: AuthenticatedSocket, next) => {
@@ -108,6 +120,53 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
         }
       } catch (error) {
         console.error('Error resizing terminal:', error);
+      }
+    });
+
+    // Handle file upload (for clipboard image paste)
+    socket.on('file:upload', async (data: { requestId: string; filename: string; data: string; mimeType: string }) => {
+      console.log(`File upload request from ${socket.id}: ${data.filename} (${data.mimeType})`);
+      try {
+        if (!socket.tabId) {
+          socket.emit('file:uploaded', { requestId: data.requestId, success: false, error: 'No tab attached' });
+          return;
+        }
+
+        // Get the workspace for this tab
+        const tabService = getTabService();
+        const tab = await tabService.getTab(socket.tabId);
+        if (!tab) {
+          socket.emit('file:uploaded', { requestId: data.requestId, success: false, error: 'Tab not found' });
+          return;
+        }
+
+        const agentRegistry = getAgentRegistry();
+
+        // Store pending upload callback
+        const timeoutId = setTimeout(() => {
+          socket.emit('file:uploaded', { requestId: data.requestId, success: false, error: 'Upload timeout' });
+          pendingUploads.delete(data.requestId);
+        }, 30000);
+
+        pendingUploads.set(data.requestId, {
+          socket,
+          timeoutId,
+        });
+
+        // Send to agent with tabId for tmux native paste
+        const sent = agentRegistry.uploadFile(tab.workspaceId, data.requestId, socket.tabId, data.filename, data.data, data.mimeType);
+        if (!sent) {
+          clearTimeout(timeoutId);
+          pendingUploads.delete(data.requestId);
+          socket.emit('file:uploaded', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        console.error('File upload error:', error);
+        socket.emit('file:uploaded', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Upload failed',
+        });
       }
     });
 
@@ -235,6 +294,17 @@ function setupAgentNamespace(io: SocketServer): void {
       console.error(`Agent error from ${socket.workspaceId}: [${data.code}] ${data.message}`);
       if (data.tabId) {
         tabStreamManager.notifyError(data.tabId, data.message);
+      }
+    });
+
+    // Handle file uploaded response from agent (relay back to browser)
+    socket.on('file:uploaded', (data: { requestId: string; success: boolean; filePath?: string; error?: string }) => {
+      console.log(`File upload result for ${data.requestId}: ${data.success ? 'success' : 'failed'}`);
+      const pending = pendingUploads.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('file:uploaded', data);
+        pendingUploads.delete(data.requestId);
       }
     });
 

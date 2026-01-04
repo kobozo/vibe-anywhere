@@ -11,6 +11,7 @@ export { SSHKeyService, getSSHKeyService } from './ssh-key-service';
 export { TabTemplateService, getTabTemplateService, DEFAULT_TEMPLATES } from './tab-template-service';
 export { getTabStreamManager } from './tab-stream-manager';
 export { AgentRegistry, getAgentRegistry } from './agent-registry';
+export { ContainerStatusSyncService, getContainerStatusSyncService } from './container-status-sync';
 
 // Container backend (abstraction layer)
 export {

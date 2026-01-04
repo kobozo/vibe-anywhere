@@ -4,6 +4,7 @@ import { workspaces, type Workspace, type NewWorkspace, type WorkspaceStatus, ty
 import { getRepositoryService, RepositoryService } from './repository-service';
 import { getSSHKeyService } from './ssh-key-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
+import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { config } from '@/lib/config';
 import simpleGit from 'simple-git';
 import * as fs from 'fs/promises';
@@ -423,8 +424,14 @@ export class WorkspaceService {
 
           // Sync SSH keys if we have them (for git push/pull from container)
           if (sshKeyContent && backend.syncSSHKey) {
-            await backend.syncSSHKey(containerId, sshKeyContent, 'id_ed25519');
-            console.log('SSH key synced to container');
+            try {
+              console.log('Starting SSH key sync...');
+              await backend.syncSSHKey(containerId, sshKeyContent, 'id_ed25519');
+              console.log('SSH key synced to container');
+            } catch (sshKeyError) {
+              console.error('SSH key sync failed:', sshKeyError);
+              // Continue - SSH key sync is not critical for basic container operation
+            }
           }
 
           if (remoteUrl) {
@@ -436,12 +443,17 @@ export class WorkspaceService {
         // Continue anyway - container is running but might not have files
       }
 
+      console.log('Workspace setup completed, proceeding to agent provisioning...');
+
       // Provision sidecar agent for Proxmox containers
       try {
+        console.log('Attempting to provision agent for Proxmox container...');
         const proxmoxBackend = this.containerBackend as {
           provisionAgent?: (containerId: string, workspaceId: string, agentToken: string) => Promise<void>;
           generateAgentToken?: () => string;
         };
+
+        console.log(`provisionAgent exists: ${!!proxmoxBackend.provisionAgent}, generateAgentToken exists: ${!!proxmoxBackend.generateAgentToken}`);
 
         if (proxmoxBackend.provisionAgent && proxmoxBackend.generateAgentToken) {
           const agentToken = proxmoxBackend.generateAgentToken();
@@ -477,6 +489,15 @@ export class WorkspaceService {
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
+
+    // Broadcast container started
+    try {
+      const broadcaster = getWorkspaceStateBroadcaster();
+      broadcaster.broadcastContainerStatus(workspaceId, containerId, 'running', containerInfo?.ipAddress || null);
+      console.log(`Broadcast container started for workspace ${workspaceId}`);
+    } catch (e) {
+      // Broadcaster might not be initialized
+    }
 
     return updated;
   }
@@ -564,6 +585,15 @@ export class WorkspaceService {
       .where(eq(workspaces.id, workspaceId))
       .returning();
 
+    // Broadcast container destroyed
+    try {
+      const broadcaster = getWorkspaceStateBroadcaster();
+      broadcaster.broadcastContainerStatus(workspaceId, null, 'none', null);
+      console.log(`Broadcast container destroyed for workspace ${workspaceId}`);
+    } catch (e) {
+      // Broadcaster might not be initialized
+    }
+
     return updated;
   }
 
@@ -646,6 +676,14 @@ export class WorkspaceService {
 
     if (!updated) {
       throw new Error(`Workspace ${workspaceId} not found`);
+    }
+
+    // Broadcast container status change
+    try {
+      const broadcaster = getWorkspaceStateBroadcaster();
+      broadcaster.broadcastContainerStatus(workspaceId, containerId, containerStatus, updated.containerIp);
+    } catch (e) {
+      // Broadcaster might not be initialized
     }
 
     return updated;

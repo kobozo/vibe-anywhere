@@ -17,6 +17,7 @@ export interface AgentEvents {
   onTabClose: (data: { tabId: string }) => void;
   onTabAttach: (data: { tabId: string }) => void;
   onTabBufferRequest: (data: { tabId: string; lines: number }) => void;
+  onFileUpload: (data: { requestId: string; tabId?: string; filename: string; data: string; mimeType: string }) => void;
   onError: (error: Error) => void;
 }
 
@@ -136,6 +137,10 @@ export class AgentWebSocket {
 
     this.socket.on('tab:buffer-request', (data) => {
       this.events.onTabBufferRequest(data);
+    });
+
+    this.socket.on('file:upload', (data) => {
+      this.events.onFileUpload(data);
     });
 
     this.socket.on('error', (error) => {
@@ -265,6 +270,15 @@ export class AgentWebSocket {
     if (!this.socket?.connected) return;
 
     this.socket.emit('agent:error', { code, message, tabId });
+  }
+
+  /**
+   * Send file upload result back to Session Hub
+   */
+  sendFileUploaded(requestId: string, success: boolean, filePath?: string, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('file:uploaded', { requestId, success, filePath, error });
   }
 
   /**

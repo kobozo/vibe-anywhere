@@ -7,6 +7,7 @@ import type { Socket } from 'socket.io';
 import { db } from '@/lib/db';
 import { workspaces } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 
 interface TabState {
   tabId: string;
@@ -89,6 +90,14 @@ class AgentRegistry {
 
     console.log(`Agent registered for workspace ${workspaceId} (version ${version})`);
 
+    // Broadcast agent connection status
+    try {
+      const broadcaster = getWorkspaceStateBroadcaster();
+      broadcaster.broadcastAgentStatus(workspaceId, true, version);
+    } catch (e) {
+      // Broadcaster might not be initialized yet
+    }
+
     // Check if update is needed
     const needsUpdate = this.shouldUpdate(version, EXPECTED_AGENT_VERSION);
     if (needsUpdate) {
@@ -117,6 +126,14 @@ class AgentRegistry {
           agentConnectedAt: null,
         })
         .where(eq(workspaces.id, workspaceId));
+
+      // Broadcast agent disconnection status
+      try {
+        const broadcaster = getWorkspaceStateBroadcaster();
+        broadcaster.broadcastAgentStatus(workspaceId, false);
+      } catch (e) {
+        // Broadcaster might not be initialized
+      }
     }
 
     this.socketToWorkspace.delete(socket.id);
@@ -221,6 +238,27 @@ class AgentRegistry {
     return this.emit(workspaceId, 'agent:update', {
       version: EXPECTED_AGENT_VERSION,
       bundleUrl,
+    });
+  }
+
+  /**
+   * Upload a file to the container (for clipboard image paste)
+   * Uses tmux native paste-buffer for seamless integration
+   */
+  uploadFile(
+    workspaceId: string,
+    requestId: string,
+    tabId: string,
+    filename: string,
+    data: string,
+    mimeType: string
+  ): boolean {
+    return this.emit(workspaceId, 'file:upload', {
+      requestId,
+      tabId,
+      filename,
+      data,
+      mimeType,
     });
   }
 

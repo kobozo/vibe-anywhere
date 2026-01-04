@@ -8,7 +8,7 @@ Session Hub is a web application for running persistent Claude Code CLI instance
 - **Database**: PostgreSQL + Drizzle ORM
 - **Real-time**: Socket.io
 - **Terminal**: xterm.js
-- **Containers**: Docker (Dockerode)
+- **Containers**: Docker (Dockerode) or Proxmox LXC
 - **Git**: simple-git
 - **Auth**: Simple token-based (bcrypt)
 
@@ -126,5 +126,30 @@ See `.env.example` for all required variables:
 - `terminal:end` - Session ended
 - `error` - Error message
 
+## Proxmox LXC Configuration
+
+### Template (VMID 150)
+The Proxmox LXC template contains:
+- Debian 12 (Bookworm)
+- Node.js 22.x
+- Docker 29.x
+- Claude Code CLI 2.x
+- tmux, git, lazygit, lazydocker
+- Session Hub Agent (systemd service)
+
+### Container User
+| Setting | Value |
+|---------|-------|
+| Username | `kobozo` |
+| Password | `SessionHub2024!` |
+| Sudo | NOPASSWD (passwordless) |
+| Groups | sudo, docker |
+| Home | `/home/kobozo` |
+| Workspace | `/workspace` (owned by kobozo) |
+
+### Network
+- Containers get DHCP IP on VLAN 2 (192.168.3.x)
+- SSH enabled for rsync sync operations
+
 ---
-*Last updated: 2026-01-02*
+*Last updated: 2026-01-03*

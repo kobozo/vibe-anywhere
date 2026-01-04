@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
-import type { Repository, Workspace } from '@/lib/db/schema';
+import { useWorkspaceState } from './useWorkspaceState';
+import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 
 interface DirectoryEntry {
   name: string;
@@ -183,6 +184,41 @@ export function useWorkspaces(repositoryId: string | null) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Extract workspace IDs for real-time updates
+  const workspaceIds = workspaces.map(w => w.id);
+
+  // Handle real-time workspace state updates
+  const handleWorkspaceUpdate = useCallback((update: {
+    workspaceId: string;
+    containerId?: string | null;
+    containerStatus?: ContainerStatus;
+    containerIp?: string | null;
+    agentConnected?: boolean;
+    agentVersion?: string | null;
+  }) => {
+    setWorkspaces(prev => prev.map(ws => {
+      if (ws.id !== update.workspaceId) return ws;
+
+      // Create updated workspace with changed fields
+      const updated = { ...ws };
+      if (update.containerId !== undefined) updated.containerId = update.containerId;
+      if (update.containerStatus !== undefined) updated.containerStatus = update.containerStatus;
+      if (update.containerIp !== undefined) updated.containerIp = update.containerIp;
+      if (update.agentConnected !== undefined) {
+        updated.agentConnectedAt = update.agentConnected ? new Date() : null;
+      }
+      if (update.agentVersion !== undefined) updated.agentVersion = update.agentVersion;
+
+      return updated;
+    }));
+  }, []);
+
+  // Subscribe to real-time workspace state updates
+  useWorkspaceState({
+    workspaceIds,
+    onUpdate: handleWorkspaceUpdate,
+  });
 
   const fetchWorkspaces = useCallback(async () => {
     if (!token || !repositoryId) return;

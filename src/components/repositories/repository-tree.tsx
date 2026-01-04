@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRepositories, useWorkspaces } from '@/hooks/useRepositories';
-import type { Repository, Workspace } from '@/lib/db/schema';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useRepositories } from '@/hooks/useRepositories';
+import { useWorkspaceState } from '@/hooks/useWorkspaceState';
+import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface RepositoryTreeProps {
   onSelectWorkspace: (workspace: Workspace, repository: Repository) => void;
@@ -98,6 +100,52 @@ export function RepositoryTree({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [restartingWorkspaces, setRestartingWorkspaces] = useState<Set<string>>(new Set());
   const [destroyingWorkspaces, setDestroyingWorkspaces] = useState<Set<string>>(new Set());
+  const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
+  const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
+
+  // Extract all workspace IDs for WebSocket subscription
+  const allWorkspaceIds = useMemo(() => {
+    return Object.values(workspacesByRepo).flat().map(w => w.id);
+  }, [workspacesByRepo]);
+
+  // Handle real-time workspace state updates via WebSocket
+  const handleWorkspaceUpdate = useCallback((update: {
+    workspaceId: string;
+    containerId?: string | null;
+    containerStatus?: ContainerStatus;
+    containerIp?: string | null;
+    agentConnected?: boolean;
+    agentVersion?: string | null;
+  }) => {
+    setWorkspacesByRepo(prev => {
+      const updated = { ...prev };
+      for (const repoId of Object.keys(updated)) {
+        updated[repoId] = updated[repoId].map(ws => {
+          if (ws.id !== update.workspaceId) return ws;
+
+          // Create updated workspace with changed fields
+          const newWs = { ...ws };
+          if (update.containerId !== undefined) newWs.containerId = update.containerId;
+          if (update.containerStatus !== undefined) newWs.containerStatus = update.containerStatus;
+          if (update.containerIp !== undefined) newWs.containerIp = update.containerIp;
+          if (update.agentConnected !== undefined) {
+            newWs.agentConnectedAt = update.agentConnected ? new Date() : null;
+          }
+          if (update.agentVersion !== undefined) newWs.agentVersion = update.agentVersion;
+
+          return newWs;
+        });
+      }
+      return updated;
+    });
+  }, []);
+
+  // Subscribe to real-time workspace state updates
+  useWorkspaceState({
+    workspaceIds: allWorkspaceIds,
+    onUpdate: handleWorkspaceUpdate,
+  });
 
   useEffect(() => {
     fetchRepositories();
@@ -147,20 +195,25 @@ export function RepositoryTree({
     }
   }, [expandedRepos, workspacesByRepo]);
 
-  const handleDeleteRepo = async (e: React.MouseEvent, repo: Repository) => {
+  const handleDeleteRepoClick = (e: React.MouseEvent, repo: Repository) => {
     e.stopPropagation();
-    if (!confirm(`Delete repository "${repo.name}"? This will remove all workspaces and tabs.`)) {
-      return;
-    }
-    await deleteRepository(repo.id);
+    setRepoToDelete(repo);
   };
 
-  const handleDeleteWorkspace = async (workspace: Workspace) => {
-    if (!confirm(`Delete workspace "${workspace.name}"? This will remove the worktree and all tabs.`)) {
-      return;
-    }
+  const confirmDeleteRepo = async () => {
+    if (!repoToDelete) return;
+    await deleteRepository(repoToDelete.id);
+    setRepoToDelete(null);
+  };
 
-    const response = await fetch(`/api/workspaces/${workspace.id}`, {
+  const handleDeleteWorkspaceClick = (workspace: Workspace) => {
+    setWorkspaceToDelete(workspace);
+  };
+
+  const confirmDeleteWorkspace = async () => {
+    if (!workspaceToDelete) return;
+
+    const response = await fetch(`/api/workspaces/${workspaceToDelete.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
     });
@@ -168,9 +221,10 @@ export function RepositoryTree({
     if (response.ok) {
       setWorkspacesByRepo(prev => ({
         ...prev,
-        [workspace.repositoryId]: prev[workspace.repositoryId]?.filter(w => w.id !== workspace.id) || [],
+        [workspaceToDelete.repositoryId]: prev[workspaceToDelete.repositoryId]?.filter(w => w.id !== workspaceToDelete.id) || [],
       }));
     }
+    setWorkspaceToDelete(null);
   };
 
   const getContainerStatusIcon = (workspace: Workspace) => {
@@ -225,26 +279,30 @@ export function RepositoryTree({
     }
   };
 
-  const handleDestroyContainer = async (workspace: Workspace) => {
-    if (!confirm(`Destroy container for "${workspace.name}"? The workspace will remain but you'll need to start a new container.`)) {
-      return;
-    }
+  const handleDestroyContainerClick = (workspace: Workspace) => {
+    setWorkspaceToDestroy(workspace);
+  };
 
-    setDestroyingWorkspaces(prev => new Set([...prev, workspace.id]));
+  const confirmDestroyContainer = async () => {
+    if (!workspaceToDestroy) return;
+
+    setDestroyingWorkspaces(prev => new Set([...prev, workspaceToDestroy.id]));
+    setWorkspaceToDestroy(null);
+
     try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/destroy`, {
+      const response = await fetch(`/api/workspaces/${workspaceToDestroy.id}/destroy`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
       });
 
       if (response.ok) {
         // Refresh the workspace list to get updated container status
-        const workspacesResponse = await fetch(`/api/repositories/${workspace.repositoryId}/workspaces`, {
+        const workspacesResponse = await fetch(`/api/repositories/${workspaceToDestroy.repositoryId}/workspaces`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
         });
         if (workspacesResponse.ok) {
           const { data } = await workspacesResponse.json();
-          setWorkspacesByRepo(prev => ({ ...prev, [workspace.repositoryId]: data.workspaces }));
+          setWorkspacesByRepo(prev => ({ ...prev, [workspaceToDestroy.repositoryId]: data.workspaces }));
         }
       } else {
         const { error } = await response.json();
@@ -256,7 +314,7 @@ export function RepositoryTree({
     } finally {
       setDestroyingWorkspaces(prev => {
         const next = new Set(prev);
-        next.delete(workspace.id);
+        next.delete(workspaceToDestroy.id);
         return next;
       });
     }
@@ -311,7 +369,7 @@ export function RepositoryTree({
                 {repo.sourceType === 'cloned' ? '🔗' : '📂'}
               </span>
               <button
-                onClick={(e) => handleDeleteRepo(e, repo)}
+                onClick={(e) => handleDeleteRepoClick(e, repo)}
                 className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1"
                 title="Delete repository"
               >
@@ -354,8 +412,8 @@ export function RepositoryTree({
                             workspace={workspace}
                             onClose={() => setOpenMenuId(null)}
                             onRestart={() => handleRestartContainer(workspace)}
-                            onDestroy={() => handleDestroyContainer(workspace)}
-                            onDelete={() => handleDeleteWorkspace(workspace)}
+                            onDestroy={() => handleDestroyContainerClick(workspace)}
+                            onDelete={() => handleDeleteWorkspaceClick(workspace)}
                           />
                         )}
                       </div>
@@ -374,6 +432,39 @@ export function RepositoryTree({
           </div>
         ))}
       </div>
+
+      {/* Delete Repository Confirmation */}
+      <ConfirmDialog
+        isOpen={!!repoToDelete}
+        title="Delete Repository"
+        message={`Delete repository "${repoToDelete?.name}"? This will remove all workspaces and tabs.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteRepo}
+        onCancel={() => setRepoToDelete(null)}
+      />
+
+      {/* Delete Workspace Confirmation */}
+      <ConfirmDialog
+        isOpen={!!workspaceToDelete}
+        title="Delete Workspace"
+        message={`Delete workspace "${workspaceToDelete?.name}"? This will remove the worktree and all tabs.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteWorkspace}
+        onCancel={() => setWorkspaceToDelete(null)}
+      />
+
+      {/* Destroy Container Confirmation */}
+      <ConfirmDialog
+        isOpen={!!workspaceToDestroy}
+        title="Destroy Container"
+        message={`Destroy container for "${workspaceToDestroy?.name}"? The workspace will remain but you'll need to start a new container.`}
+        confirmLabel="Destroy"
+        confirmVariant="warning"
+        onConfirm={confirmDestroyContainer}
+        onCancel={() => setWorkspaceToDestroy(null)}
+      />
     </div>
   );
 }
