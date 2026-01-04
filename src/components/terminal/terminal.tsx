@@ -136,7 +136,14 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
       if (xtermRef.current) {
         // Clear terminal before writing buffer
         xtermRef.current.clear();
-        data.lines.forEach((line) => xtermRef.current!.write(line));
+        // Write each line with proper line endings
+        data.lines.forEach((line, index) => {
+          xtermRef.current!.write(line);
+          // Add newline after each line except the last (which is current line)
+          if (index < data.lines.length - 1) {
+            xtermRef.current!.write('\r\n');
+          }
+        });
       }
     };
 

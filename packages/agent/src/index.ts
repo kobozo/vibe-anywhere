@@ -129,16 +129,19 @@ const wsClient = new AgentWebSocket(config, {
     console.log(`Tab attach request for ${data.tabId}`);
     // This is a reconnect - the window should already exist
     if (tmuxManager.hasActiveWindow(data.tabId)) {
-      // Send buffered output
-      const lines = bufferManager.getAll(data.tabId);
+      // Capture scrollback from tmux (the real terminal history)
+      const lines = await tmuxManager.captureScrollback(data.tabId, 1000);
       if (lines.length > 0) {
+        console.log(`Sending ${lines.length} lines of scrollback for ${data.tabId}`);
         wsClient.sendBuffer(data.tabId, lines);
       }
     }
   },
 
-  onTabBufferRequest: (data) => {
-    const lines = bufferManager.getRecent(data.tabId, data.lines);
+  onTabBufferRequest: async (data) => {
+    // Use tmux capture-pane to get real scrollback buffer
+    const lines = await tmuxManager.captureScrollback(data.tabId, data.lines);
+    console.log(`Buffer request for ${data.tabId}: sending ${lines.length} lines`);
     wsClient.sendBuffer(data.tabId, lines);
   },
 

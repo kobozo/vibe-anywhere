@@ -1,83 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRepositories } from '@/hooks/useRepositories';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { WorkspaceInfoPanel } from '@/components/ui/workspace-info-panel';
 
 interface RepositoryTreeProps {
   onSelectWorkspace: (workspace: Workspace, repository: Repository) => void;
   selectedWorkspaceId?: string | null;
   onAddRepository: () => void;
   onAddWorkspace: (repositoryId: string) => void;
-}
-
-interface WorkspaceMenuProps {
-  workspace: Workspace;
-  onClose: () => void;
-  onRestart: () => void;
-  onDestroy: () => void;
-  onDelete: () => void;
-}
-
-function WorkspaceMenu({ workspace, onClose, onRestart, onDestroy, onDelete }: WorkspaceMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  const hasContainer = workspace.containerId && workspace.containerStatus !== 'none';
-
-  return (
-    <div
-      ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[180px]"
-    >
-      {hasContainer && (
-        <>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRestart();
-              onClose();
-            }}
-            className="w-full px-3 py-1.5 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-          >
-            <span>🔄</span> Restart Container
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDestroy();
-              onClose();
-            }}
-            className="w-full px-3 py-1.5 text-left text-sm text-orange-400 hover:bg-gray-700 flex items-center gap-2"
-          >
-            <span>💥</span> Destroy Container
-          </button>
-          <div className="border-t border-gray-700 my-1"></div>
-        </>
-      )}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-          onClose();
-        }}
-        className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2"
-      >
-        <span>🗑️</span> Delete Workspace
-      </button>
-    </div>
-  );
 }
 
 export function RepositoryTree({
@@ -97,7 +31,7 @@ export function RepositoryTree({
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set());
   const [workspacesByRepo, setWorkspacesByRepo] = useState<Record<string, Workspace[]>>({});
   const [loadingRepos, setLoadingRepos] = useState<Set<string>>(new Set());
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [infoPanelWorkspace, setInfoPanelWorkspace] = useState<Workspace | null>(null);
   const [restartingWorkspaces, setRestartingWorkspaces] = useState<Set<string>>(new Set());
   const [destroyingWorkspaces, setDestroyingWorkspaces] = useState<Set<string>>(new Set());
   const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
@@ -400,22 +334,13 @@ export function RepositoryTree({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenMenuId(openMenuId === workspace.id ? null : workspace.id);
+                            setInfoPanelWorkspace(workspace);
                           }}
                           className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white px-1"
-                          title="Workspace options"
+                          title="Workspace info"
                         >
-                          ⋮
+                          ⓘ
                         </button>
-                        {openMenuId === workspace.id && (
-                          <WorkspaceMenu
-                            workspace={workspace}
-                            onClose={() => setOpenMenuId(null)}
-                            onRestart={() => handleRestartContainer(workspace)}
-                            onDestroy={() => handleDestroyContainerClick(workspace)}
-                            onDelete={() => handleDeleteWorkspaceClick(workspace)}
-                          />
-                        )}
                       </div>
                     ))}
                     <button
@@ -465,6 +390,17 @@ export function RepositoryTree({
         onConfirm={confirmDestroyContainer}
         onCancel={() => setWorkspaceToDestroy(null)}
       />
+
+      {/* Workspace Info Panel */}
+      {infoPanelWorkspace && (
+        <WorkspaceInfoPanel
+          workspace={infoPanelWorkspace}
+          onClose={() => setInfoPanelWorkspace(null)}
+          onRestart={() => handleRestartContainer(infoPanelWorkspace)}
+          onDestroy={() => handleDestroyContainerClick(infoPanelWorkspace)}
+          onDelete={() => handleDeleteWorkspaceClick(infoPanelWorkspace)}
+        />
+      )}
     </div>
   );
 }

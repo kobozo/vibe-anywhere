@@ -321,6 +321,38 @@ export class TmuxManager {
   }
 
   /**
+   * Capture the scrollback buffer from tmux for a tab
+   * Uses tmux capture-pane to get the actual terminal history
+   */
+  async captureScrollback(tabId: string, lines: number = 1000): Promise<string[]> {
+    const window = this.windows.get(tabId);
+    if (!window) {
+      return [];
+    }
+
+    try {
+      // capture-pane with -p prints to stdout, -S specifies start line (negative = from end)
+      // -E specifies end line (empty = current position)
+      const { stdout } = await exec(
+        `tmux capture-pane -t ${this.sessionName}:${window.windowIndex} -p -S -${lines}`
+      );
+
+      // Split by newlines and filter empty trailing lines
+      const result = stdout.split('\n');
+
+      // Remove trailing empty lines but keep internal ones
+      while (result.length > 0 && result[result.length - 1] === '') {
+        result.pop();
+      }
+
+      return result;
+    } catch (err) {
+      console.error(`Failed to capture scrollback for ${tabId}:`, err);
+      return [];
+    }
+  }
+
+  /**
    * Cleanup all windows and session
    */
   async cleanup(): Promise<void> {

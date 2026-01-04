@@ -2,6 +2,25 @@
  * Agent configuration from environment variables
  */
 
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get version from package.json
+function getPackageVersion(): string {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    // Look for package.json in parent directory (dist/../package.json)
+    const packagePath = join(__dirname, '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+    return packageJson.version || '1.0.0';
+  } catch (error) {
+    console.warn('Could not read version from package.json, using default');
+    return '1.0.0';
+  }
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -42,7 +61,7 @@ export function loadConfig(): AgentConfig {
     sessionHubUrl: requireEnv('SESSION_HUB_URL'),
     workspaceId: requireEnv('WORKSPACE_ID'),
     agentToken: requireEnv('AGENT_TOKEN'),
-    version: optionalEnv('AGENT_VERSION', '1.0.0'),
+    version: getPackageVersion(),
     heartbeatInterval: parseInt(optionalEnv('HEARTBEAT_INTERVAL', '30000'), 10),
     maxReconnectAttempts: parseInt(optionalEnv('MAX_RECONNECT_ATTEMPTS', '0'), 10),
     reconnectBaseDelay: parseInt(optionalEnv('RECONNECT_BASE_DELAY', '1000'), 10),

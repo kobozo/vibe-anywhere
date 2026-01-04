@@ -6,6 +6,7 @@
 import { exec as execCb, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
+import { createWriteStream } from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
@@ -28,7 +29,7 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const protocol = url.startsWith('https') ? https : http;
 
-    const file = require('fs').createWriteStream(dest);
+    const file = createWriteStream(dest);
 
     protocol.get(url, (response) => {
       // Handle redirects
@@ -63,18 +64,18 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 
 /**
  * Perform self-update
+ * Uses sudo for directory operations since agent runs as kobozo but /opt needs root
  */
 export async function selfUpdate(bundleUrl: string, newVersion: string): Promise<UpdateResult> {
   console.log(`Starting self-update to version ${newVersion}...`);
   console.log(`Bundle URL: ${bundleUrl}`);
 
   try {
-    // 1. Clean up any previous failed updates
-    await fs.rm(NEW_DIR, { recursive: true, force: true });
-    await fs.rm(BACKUP_DIR, { recursive: true, force: true });
+    // 1. Clean up any previous failed updates (use sudo)
+    await exec(`sudo rm -rf ${NEW_DIR} ${BACKUP_DIR}`);
 
-    // 2. Create new directory
-    await fs.mkdir(NEW_DIR, { recursive: true });
+    // 2. Create new directory (use sudo, then chown to current user)
+    await exec(`sudo mkdir -p ${NEW_DIR} && sudo chown $(whoami):$(whoami) ${NEW_DIR}`);
 
     // 3. Download the bundle
     const bundlePath = path.join(NEW_DIR, 'agent-bundle.tar.gz');
@@ -98,26 +99,31 @@ export async function selfUpdate(bundleUrl: string, newVersion: string): Promise
     });
     console.log('Verification output:', stdout.trim());
 
-    // 7. Swap directories atomically
+    // 7. Swap directories atomically (use sudo for /opt operations)
     console.log('Swapping versions...');
 
     // Move current to backup
     try {
-      await fs.rename(AGENT_DIR, BACKUP_DIR);
+      await exec(`sudo mv ${AGENT_DIR} ${BACKUP_DIR}`);
     } catch (err) {
       // Current dir might not exist on fresh install
       console.log('No existing agent to backup');
     }
 
-    // Move new to current
-    await fs.rename(NEW_DIR, AGENT_DIR);
+    // Move new to current and ensure correct ownership
+    await exec(`sudo mv ${NEW_DIR} ${AGENT_DIR} && sudo chown -R $(whoami):$(whoami) ${AGENT_DIR}`);
 
     console.log(`Update to version ${newVersion} complete. Restarting...`);
 
-    // 8. Exit to let systemd restart us with the new version
-    // Give a moment for logs to flush
-    setTimeout(() => {
-      process.exit(0);
+    // 8. Restart the systemd service (use sudo)
+    // This is cleaner than exit(0) and ensures proper service restart
+    setTimeout(async () => {
+      try {
+        await exec('sudo systemctl restart session-hub-agent');
+      } catch {
+        // If systemctl fails, fall back to exit
+        process.exit(0);
+      }
     }, 500);
 
     return { success: true };
@@ -127,19 +133,19 @@ export async function selfUpdate(bundleUrl: string, newVersion: string): Promise
 
     // Attempt rollback if we have a backup
     try {
-      const backupExists = await fs.access(BACKUP_DIR).then(() => true).catch(() => false);
-      const currentExists = await fs.access(AGENT_DIR).then(() => true).catch(() => false);
+      const backupExists = await exec(`test -d ${BACKUP_DIR} && echo "yes"`).then(() => true).catch(() => false);
+      const currentExists = await exec(`test -d ${AGENT_DIR} && echo "yes"`).then(() => true).catch(() => false);
 
       if (backupExists && !currentExists) {
         console.log('Rolling back to previous version...');
-        await fs.rename(BACKUP_DIR, AGENT_DIR);
+        await exec(`sudo mv ${BACKUP_DIR} ${AGENT_DIR}`);
       }
     } catch (rollbackError) {
       console.error('Rollback failed:', rollbackError);
     }
 
     // Clean up failed update
-    await fs.rm(NEW_DIR, { recursive: true, force: true });
+    await exec(`sudo rm -rf ${NEW_DIR}`).catch(() => {});
 
     return { success: false, error: message };
   }

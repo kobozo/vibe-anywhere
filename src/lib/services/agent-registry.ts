@@ -26,7 +26,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.0.0';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.2.0';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -326,14 +326,19 @@ class AgentRegistry {
   }
 }
 
-// Singleton instance
-let agentRegistryInstance: AgentRegistry | null = null;
+// Use global storage to ensure singleton works across Next.js module boundaries
+// This is necessary because in development mode, API routes may run in different
+// module contexts than the WebSocket server
+declare global {
+  // eslint-disable-next-line no-var
+  var agentRegistryInstance: AgentRegistry | undefined;
+}
 
 export function getAgentRegistry(): AgentRegistry {
-  if (!agentRegistryInstance) {
-    agentRegistryInstance = new AgentRegistry();
+  if (!global.agentRegistryInstance) {
+    global.agentRegistryInstance = new AgentRegistry();
   }
-  return agentRegistryInstance;
+  return global.agentRegistryInstance;
 }
 
 export { AgentRegistry };
