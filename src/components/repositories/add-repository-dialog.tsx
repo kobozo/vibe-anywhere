@@ -15,8 +15,6 @@ interface TechStackInfo {
 interface AddRepositoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  /** @deprecated Local repos no longer supported. Pass no-op function. */
-  onAddLocal?: (name: string, path: string, description?: string, techStack?: string[], templateId?: string) => Promise<void>;
   onClone: (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => Promise<void>;
   isLoading: boolean;
   templates?: ProxmoxTemplate[];

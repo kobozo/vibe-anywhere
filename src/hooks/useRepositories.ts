@@ -5,19 +5,6 @@ import { useAuth } from './useAuth';
 import { useWorkspaceState } from './useWorkspaceState';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 
-interface DirectoryEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  isGitRepo: boolean;
-}
-
-interface BrowseResult {
-  currentPath: string;
-  parentPath: string | null;
-  entries: DirectoryEntry[];
-}
-
 export function useRepositories() {
   const { token } = useAuth();
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -47,17 +34,6 @@ export function useRepositories() {
       setIsLoading(false);
     }
   }, [token]);
-
-  /**
-   * @deprecated Local repositories are no longer supported.
-   * Use cloneRepository instead - repos are cloned directly in containers.
-   */
-  const createLocalRepository = useCallback(
-    async (_name: string, _originalPath: string, _description?: string, _techStack?: string[], _templateId?: string) => {
-      throw new Error('Local repositories are no longer supported. Please use cloneRepository instead.');
-    },
-    []
-  );
 
   const cloneRepository = useCallback(
     async (name: string, cloneUrl: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => {
@@ -112,25 +88,6 @@ export function useRepositories() {
     [token]
   );
 
-  const browseDirectories = useCallback(
-    async (path?: string): Promise<BrowseResult> => {
-      if (!token) throw new Error('Not authenticated');
-
-      const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse';
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to browse directories');
-      }
-
-      const { data } = await response.json();
-      return data;
-    },
-    [token]
-  );
-
   const getRepositoryWithBranches = useCallback(
     async (repoId: string): Promise<{ repository: Repository; branches: string[] }> => {
       if (!token) throw new Error('Not authenticated');
@@ -154,10 +111,8 @@ export function useRepositories() {
     isLoading,
     error,
     fetchRepositories,
-    createLocalRepository,
     cloneRepository,
     deleteRepository,
-    browseDirectories,
     getRepositoryWithBranches,
   };
 }

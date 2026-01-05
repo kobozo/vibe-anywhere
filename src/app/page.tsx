@@ -38,7 +38,6 @@ function Dashboard() {
     repositories,
     isLoading: reposLoading,
     error: reposError,
-    createLocalRepository,
     cloneRepository,
     deleteRepository,
     fetchRepositories,
@@ -152,21 +151,10 @@ function Dashboard() {
     }
   }, [workspaceRepoId, fetchRepositories]);
 
-  const handleAddLocalRepo = useCallback(async (name: string, path: string, description?: string, techStack?: string[], templateId?: string) => {
+  const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => {
     setActionLoading(true);
     try {
-      await createLocalRepository(name, path, description, techStack, templateId);
-      await fetchRepositories(); // Refresh to ensure sidebar updates
-      setIsAddRepoOpen(false);
-    } finally {
-      setActionLoading(false);
-    }
-  }, [createLocalRepository, fetchRepositories]);
-
-  const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string) => {
-    setActionLoading(true);
-    try {
-      await cloneRepository(name, url, description, sshKeyId, techStack, templateId);
+      await cloneRepository(name, url, description, sshKeyId, techStack, templateId, cloneDepth);
       await fetchRepositories(); // Refresh to ensure sidebar updates
       setIsAddRepoOpen(false);
     } finally {
@@ -531,7 +519,6 @@ function Dashboard() {
       <AddRepositoryDialog
         isOpen={isAddRepoOpen}
         onClose={() => setIsAddRepoOpen(false)}
-        onAddLocal={handleAddLocalRepo}
         onClone={handleCloneRepo}
         isLoading={actionLoading}
         templates={templates}

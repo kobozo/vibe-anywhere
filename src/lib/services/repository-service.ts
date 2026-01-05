@@ -151,33 +151,3 @@ export function getRepositoryService(): RepositoryService {
   return repositoryServiceInstance;
 }
 
-// ============================================
-// DEPRECATED - For backwards compatibility
-// ============================================
-
-/** @deprecated Use CreateRepoInput instead */
-export interface CreateLocalRepoInput {
-  name: string;
-  description?: string;
-  originalPath: string;
-  techStack?: string[];
-  templateId?: string;
-}
-
-/** @deprecated Use CreateRepoInput instead */
-export interface CloneRepoInput {
-  name: string;
-  description?: string;
-  cloneUrl: string;
-  sshKeyId?: string;
-  techStack?: string[];
-  templateId?: string;
-}
-
-/** @deprecated No longer used - folder browsing removed */
-export interface DirectoryEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  isGitRepo: boolean;
-}
