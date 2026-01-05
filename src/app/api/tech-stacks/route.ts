@@ -5,7 +5,6 @@
 
 import { NextRequest } from 'next/server';
 import { TECH_STACKS } from '@/lib/container/proxmox/tech-stacks';
-import { getSettingsService } from '@/lib/services/settings-service';
 import { requireAuth, successResponse, withErrorHandling } from '@/lib/api-utils';
 
 /**
@@ -21,7 +20,6 @@ interface TechStackInfo {
 /**
  * GET /api/tech-stacks
  * Get list of available tech stacks
- * Optionally includes which stacks are pre-installed in the template
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
   await requireAuth(request);
@@ -34,12 +32,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     requiresNesting: stack.requiresNesting,
   }));
 
-  // Get template configuration to show which stacks are pre-installed
-  const settingsService = getSettingsService();
-  const templateConfig = await settingsService.getTemplateConfig();
-
   return successResponse({
     stacks,
-    templateStacks: templateConfig.techStacks,
   });
 });

@@ -31,13 +31,11 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { vmid, storage, node, force, techStacks, customPostInstallScript } = body as {
+  const { vmid, storage, node, force } = body as {
     vmid?: number;
     storage?: string;
     node?: string;
     force?: boolean;
-    techStacks?: string[];
-    customPostInstallScript?: string;
   };
 
   const templateManager = getProxmoxTemplateManager();
@@ -89,8 +87,6 @@ export async function POST(request: NextRequest) {
         await templateManager.createTemplate(templateVmid, {
           storage,
           node: node || status.selectedNode || undefined,
-          techStacks: techStacks || [],
-          customPostInstallScript,
           onProgress: (progress) => {
             sendEvent('progress', progress);
           },

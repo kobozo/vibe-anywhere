@@ -12,7 +12,6 @@ export const SETTINGS_KEYS = {
   PROXMOX_TEMPLATE: 'proxmox.template',
   PROXMOX_VMID_CONFIG: 'proxmox.vmidConfig',
   PROXMOX_SETTINGS: 'proxmox.settings',
-  PROXMOX_TEMPLATE_CONFIG: 'proxmox.templateConfig',
 } as const;
 
 // Default starting VMID for Proxmox containers
@@ -40,14 +39,6 @@ export interface ProxmoxSettings {
   defaultStorage?: string;    // Default storage ID
   defaultMemory?: number;     // Default memory in MB
   defaultCpuCores?: number;   // Default CPU cores
-}
-
-/**
- * Template configuration (tech stacks and custom script)
- */
-export interface ProxmoxTemplateConfig {
-  techStacks: string[];           // Array of tech stack IDs to pre-install
-  customPostInstallScript?: string; // Custom bash script to run after provisioning
 }
 
 class SettingsService {
@@ -211,37 +202,6 @@ class SettingsService {
   async getVlanTag(): Promise<number | undefined> {
     const settings = await this.getProxmoxSettings();
     return settings.vlanTag;
-  }
-
-  // ============================================
-  // Proxmox Template Configuration
-  // ============================================
-
-  /**
-   * Get template configuration (tech stacks and custom script)
-   */
-  async getTemplateConfig(): Promise<ProxmoxTemplateConfig> {
-    const config = await this.get<ProxmoxTemplateConfig>(SETTINGS_KEYS.PROXMOX_TEMPLATE_CONFIG);
-    return config ?? { techStacks: [] };
-  }
-
-  /**
-   * Save template configuration
-   */
-  async saveTemplateConfig(config: ProxmoxTemplateConfig): Promise<void> {
-    await this.set(
-      SETTINGS_KEYS.PROXMOX_TEMPLATE_CONFIG,
-      config,
-      'Proxmox template configuration (tech stacks, post-install script)'
-    );
-  }
-
-  /**
-   * Get the list of tech stacks pre-installed in the template
-   */
-  async getTemplateTechStacks(): Promise<string[]> {
-    const config = await this.getTemplateConfig();
-    return config.techStacks;
   }
 }
 

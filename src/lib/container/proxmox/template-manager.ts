@@ -7,8 +7,8 @@ import { config } from '@/lib/config';
 import { ProxmoxClient, getProxmoxClient } from './client';
 import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } from './task-poller';
 import { execSSHCommand } from './ssh-stream';
-import { getSettingsService, type ProxmoxTemplateSettings, type ProxmoxTemplateConfig } from '@/lib/services/settings-service';
-import { generateInstallScript, requiresNesting, getTechStacks } from './tech-stacks';
+import { getSettingsService, type ProxmoxTemplateSettings } from '@/lib/services/settings-service';
+import { generateInstallScript, requiresNesting } from './tech-stacks';
 import * as fs from 'fs';
 
 // Default Debian template to use
@@ -157,18 +157,6 @@ echo "=== Core template provisioning complete ==="
 `;
 
 /**
- * Claude CLI installation script (always required for Session Hub)
- * Requires Node.js to be installed first
- */
-const CLAUDE_CLI_INSTALL_SCRIPT = `
-set -e
-echo "=== Installing Claude Code CLI ==="
-npm install -g @anthropic-ai/claude-code
-echo "Claude version: \$(claude --version || echo 'installed')"
-echo "=== Claude Code CLI installed ==="
-`;
-
-/**
  * Cleanup script to run after all installations
  */
 const CLEANUP_SCRIPT = `
@@ -191,8 +179,6 @@ export interface TemplateStatus {
   sshKeyConfigured: boolean;
   nodes: string[];
   selectedNode: string | null;
-  techStacks: string[];  // Pre-installed tech stack IDs
-  customPostInstallScript?: string;
 }
 
 export interface CreateTemplateProgress {
@@ -265,8 +251,6 @@ export class ProxmoxTemplateManager {
     const existingTemplateVmid = await settingsService.getProxmoxTemplateVmid();
     // Get the configured starting VMID for display
     const configuredVmid = await settingsService.getTemplateVmid();
-    // Get template configuration (tech stacks, post-install script)
-    const templateConfig = await settingsService.getTemplateConfig();
 
     if (!existingTemplateVmid) {
       // No template created yet - show the configured starting VMID
@@ -277,8 +261,6 @@ export class ProxmoxTemplateManager {
         sshKeyConfigured: false,
         nodes: nodeInfo.allNodes,
         selectedNode: nodeInfo.node,
-        techStacks: templateConfig.techStacks,
-        customPostInstallScript: templateConfig.customPostInstallScript,
       };
     }
 
@@ -293,8 +275,6 @@ export class ProxmoxTemplateManager {
         sshKeyConfigured: true, // If template exists, assume SSH is configured
         nodes: nodeInfo.allNodes,
         selectedNode: nodeInfo.node,
-        techStacks: templateConfig.techStacks,
-        customPostInstallScript: templateConfig.customPostInstallScript,
       };
     } catch {
       // Template record exists in DB but not in Proxmox - clear the stale record
@@ -306,8 +286,6 @@ export class ProxmoxTemplateManager {
         sshKeyConfigured: false,
         nodes: nodeInfo.allNodes,
         selectedNode: nodeInfo.node,
-        techStacks: templateConfig.techStacks,
-        customPostInstallScript: templateConfig.customPostInstallScript,
       };
     }
   }
@@ -387,11 +365,10 @@ export class ProxmoxTemplateManager {
       storage?: string;
       node?: string;
       techStacks?: string[];
-      customPostInstallScript?: string;
       onProgress?: ProgressCallback;
     } = {}
   ): Promise<void> {
-    const { name, storage, onProgress, techStacks = [], customPostInstallScript } = options;
+    const { name, storage, onProgress, techStacks = [] } = options;
     const settingsService = getSettingsService();
 
     // Get settings from database
@@ -460,7 +437,7 @@ export class ProxmoxTemplateManager {
     // Step 6: Provision the container via SSH
     progress('provision', 45, 'Provisioning container (this may take several minutes)...');
     try {
-      await this.provisionContainer(containerIp, techStacks, customPostInstallScript, (msg) => {
+      await this.provisionContainer(containerIp, techStacks, (msg) => {
         progress('provision', 70, msg);
       });
     } catch (error) {
@@ -491,19 +468,13 @@ export class ProxmoxTemplateManager {
     progress('template', 95, 'Converting to template...');
     await this.client.convertToTemplate(vmid);
 
-    // Step 9: Save template settings to database (including tech stacks)
+    // Step 9: Save template settings to database
     progress('save', 98, 'Saving template configuration...');
     await settingsService.saveProxmoxTemplateSettings({
       vmid,
       node: options.node || this.client.getNodeName(),
       storage: storageId,
       createdAt: new Date().toISOString(),
-    });
-
-    // Save template config (tech stacks and custom script)
-    await settingsService.saveTemplateConfig({
-      techStacks,
-      customPostInstallScript,
     });
 
     progress('complete', 100, 'Template created successfully!');
@@ -515,7 +486,6 @@ export class ProxmoxTemplateManager {
   private async provisionContainer(
     containerIp: string,
     techStacks: string[] = [],
-    customPostInstallScript?: string,
     onProgress?: (message: string) => void
   ): Promise<void> {
     const sshUser = 'root';
@@ -565,21 +535,6 @@ export class ProxmoxTemplateManager {
         throw new Error(`Tech stack installation failed with exit code ${result.exitCode}`);
       }
 
-      // If Node.js was installed, also install Claude CLI
-      if (techStacks.includes('nodejs')) {
-        onProgress?.('Installing Claude Code CLI...');
-        result = await execSSHCommand(
-          { host: containerIp, username: sshUser },
-          ['bash', '-c', CLAUDE_CLI_INSTALL_SCRIPT],
-          { workingDir: '/' }
-        );
-
-        if (result.exitCode !== 0) {
-          console.error('Claude CLI installation stderr:', result.stderr);
-          throw new Error(`Claude CLI installation failed with exit code ${result.exitCode}`);
-        }
-      }
-
       // If Docker was installed, add kobozo to docker group
       if (techStacks.includes('docker')) {
         onProgress?.('Configuring Docker for kobozo user...');
@@ -591,22 +546,7 @@ export class ProxmoxTemplateManager {
       }
     }
 
-    // Step 3: Run custom post-install script if provided
-    if (customPostInstallScript && customPostInstallScript.trim()) {
-      onProgress?.('Running custom post-install script...');
-      result = await execSSHCommand(
-        { host: containerIp, username: sshUser },
-        ['bash', '-c', customPostInstallScript],
-        { workingDir: '/' }
-      );
-
-      if (result.exitCode !== 0) {
-        console.error('Custom script stderr:', result.stderr);
-        throw new Error(`Custom post-install script failed with exit code ${result.exitCode}`);
-      }
-    }
-
-    // Step 4: Cleanup
+    // Cleanup
     onProgress?.('Cleaning up...');
     await execSSHCommand(
       { host: containerIp, username: sshUser },
