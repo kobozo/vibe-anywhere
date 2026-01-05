@@ -1,22 +1,13 @@
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { workspaces, type Workspace, type NewWorkspace, type WorkspaceStatus, type ContainerStatus, type ContainerBackend } from '@/lib/db/schema';
+import { workspaces, type Workspace, type WorkspaceStatus, type ContainerStatus, type ContainerBackend } from '@/lib/db/schema';
 import { getRepositoryService, RepositoryService } from './repository-service';
 import { getSSHKeyService } from './ssh-key-service';
-import { getSettingsService } from './settings-service';
 import { getTemplateService } from './template-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
+import { gitCloneInContainer, getGitStatusInContainer, isRepoClonedInContainer, type GitStatusResult } from '@/lib/container/proxmox/ssh-stream';
 import { config } from '@/lib/config';
-import simpleGit from 'simple-git';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-
-// Configure git to allow all directories (needed for container file sync with different ownership)
-// This is safe in our context since we control all repositories
-simpleGit().addConfig('safe.directory', '*', false, 'global').catch(() => {
-  // Ignore errors - may already be set or git config may not be writable
-});
 
 export interface CreateWorkspaceInput {
   name: string;
@@ -25,110 +16,45 @@ export interface CreateWorkspaceInput {
 }
 
 export class WorkspaceService {
-  private worktreesDir: string;
   private repositoryService: RepositoryService;
   private containerBackend: IContainerBackend;
   // Lock to prevent concurrent startContainer calls for the same workspace
   private startContainerLocks: Map<string, Promise<Workspace>> = new Map();
 
   constructor(containerBackend: IContainerBackend) {
-    this.worktreesDir = config.appHome.worktrees;
     this.repositoryService = getRepositoryService();
     this.containerBackend = containerBackend;
   }
 
   /**
-   * Ensure the worktrees directory exists
-   */
-  async ensureWorktreesDir(): Promise<void> {
-    await fs.mkdir(this.worktreesDir, { recursive: true });
-  }
-
-  /**
-   * Create a new workspace (git worktree) for a repository
+   * Create a new workspace record
+   * NOTE: No local worktree is created - cloning happens in container
    */
   async createWorkspace(repositoryId: string, input: CreateWorkspaceInput): Promise<Workspace> {
-    await this.ensureWorktreesDir();
-
     // Get the repository
     const repo = await this.repositoryService.getRepository(repositoryId);
     if (!repo) {
       throw new Error(`Repository ${repositoryId} not found`);
     }
 
-    const repoPath = this.repositoryService.getAbsolutePath(repo);
-    const git = simpleGit(repoPath);
+    // Ensure repository has a clone URL
+    if (!repo.cloneUrl) {
+      throw new Error('Repository has no clone URL configured');
+    }
 
-    // Check if branch already exists
-    const branches = await git.branch();
-    const branchExists = branches.all.includes(input.branchName);
-
-    // Check if this branch is already checked out in the main repo
-    const currentBranch = branches.current;
-    const branchIsCurrentInMainRepo = currentBranch === input.branchName;
-
-    // Generate workspace ID and worktree path
+    // Create database record
     const [workspace] = await db
       .insert(workspaces)
       .values({
         repositoryId,
         name: input.name,
         branchName: input.branchName,
-        status: 'pending',
+        status: 'active',
+        containerBackend: 'proxmox', // Default to Proxmox for new workspaces
       })
       .returning();
 
-    try {
-      let workingPath: string;
-      let isMainRepoPath = false;
-
-      if (branchIsCurrentInMainRepo) {
-        // Branch is already checked out in main repo - use it directly
-        workingPath = repoPath;
-        isMainRepoPath = true;
-      } else {
-        // Create a worktree for this branch
-        const worktreePath = path.join(this.worktreesDir, workspace.id);
-
-        if (branchExists) {
-          // Checkout existing branch in worktree
-          await git.raw(['worktree', 'add', worktreePath, input.branchName]);
-        } else {
-          // Create new branch and worktree
-          const baseBranch = input.baseBranch || repo.defaultBranch || 'main';
-          await git.raw(['worktree', 'add', '-b', input.branchName, worktreePath, baseBranch]);
-        }
-
-        workingPath = worktreePath;
-      }
-
-      // Get current commit
-      const workingGit = simpleGit(workingPath);
-      const log = await workingGit.log({ n: 1 });
-      const baseCommit = log.latest?.hash || 'unknown';
-
-      // Mark directory as safe for git
-      await workingGit.addConfig('safe.directory', workingPath, false, 'global');
-
-      // Update workspace with path info
-      // For main repo, store special marker; for worktree, store workspace ID
-      const [updatedWorkspace] = await db
-        .update(workspaces)
-        .set({
-          worktreePath: isMainRepoPath ? `repo:${repoPath}` : workspace.id,
-          baseCommit,
-          status: 'active',
-          updatedAt: new Date(),
-        })
-        .where(eq(workspaces.id, workspace.id))
-        .returning();
-
-      return updatedWorkspace;
-    } catch (error) {
-      // Clean up database record on failure
-      await db.delete(workspaces).where(eq(workspaces.id, workspace.id));
-      throw new Error(`Failed to create worktree: ${error}`);
-    }
+    return workspace;
   }
 
   /**
@@ -151,7 +77,8 @@ export class WorkspaceService {
   }
 
   /**
-   * Delete a workspace (removes container and worktree if applicable)
+   * Delete a workspace
+   * NOTE: Worktree cleanup removed - there are no local worktrees
    */
   async deleteWorkspace(workspaceId: string): Promise<void> {
     const workspace = await this.getWorkspace(workspaceId);
@@ -162,10 +89,6 @@ export class WorkspaceService {
     // Stop and remove container if exists
     if (workspace.containerId) {
       try {
-        // For Proxmox containers, sync changes back before destroying
-        if (this.containerBackend.backendType === 'proxmox') {
-          await this.syncWorkspaceBack(workspace);
-        }
         await this.containerBackend.stopContainer(workspace.containerId);
         await this.containerBackend.removeContainer(workspace.containerId);
       } catch (error) {
@@ -173,39 +96,12 @@ export class WorkspaceService {
       }
     }
 
-    // Get repository for git operations
-    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
-    if (!repo) {
-      throw new Error(`Repository ${workspace.repositoryId} not found`);
-    }
-
-    // Only remove worktree if this isn't a main repo workspace
-    if (workspace.worktreePath && !this.isMainRepoWorkspace(workspace)) {
-      const repoPath = this.repositoryService.getAbsolutePath(repo);
-      const git = simpleGit(repoPath);
-
-      const worktreePath = path.join(this.worktreesDir, workspace.worktreePath);
-      try {
-        await git.raw(['worktree', 'remove', worktreePath, '--force']);
-      } catch (error) {
-        console.error('Failed to remove worktree via git:', error);
-        // Try manual cleanup
-        try {
-          await fs.rm(worktreePath, { recursive: true, force: true });
-          await git.raw(['worktree', 'prune']);
-        } catch (cleanupError) {
-          console.error('Manual cleanup also failed:', cleanupError);
-        }
-      }
-    }
-    // Note: For main repo workspaces, we just delete the DB record - the repo stays intact
-
     // Delete from database (cascades to tabs)
     await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
   }
 
   /**
-   * Archive a workspace (soft delete - keeps worktree but marks as archived)
+   * Archive a workspace (soft delete)
    */
   async archiveWorkspace(workspaceId: string): Promise<Workspace> {
     const [updated] = await db
@@ -222,28 +118,6 @@ export class WorkspaceService {
     }
 
     return updated;
-  }
-
-  /**
-   * Get the absolute path to a workspace's working directory
-   */
-  getAbsolutePath(workspace: Workspace): string | null {
-    if (!workspace.worktreePath) return null;
-
-    // Check if this is a main repo path (prefixed with "repo:")
-    if (workspace.worktreePath.startsWith('repo:')) {
-      return workspace.worktreePath.substring(5); // Remove "repo:" prefix
-    }
-
-    // Otherwise it's a worktree path (workspace ID)
-    return path.join(this.worktreesDir, workspace.worktreePath);
-  }
-
-  /**
-   * Check if workspace uses the main repo (not a worktree)
-   */
-  isMainRepoWorkspace(workspace: Workspace): boolean {
-    return workspace.worktreePath?.startsWith('repo:') || false;
   }
 
   /**
@@ -303,6 +177,83 @@ export class WorkspaceService {
   }
 
   /**
+   * Ensure the repository is cloned in the container
+   * This is called after starting any container (new or existing)
+   */
+  private async ensureRepoCloned(
+    workspaceId: string,
+    containerIp: string,
+    repo: { id: string; cloneUrl: string; cloneDepth: number | null; sshKeyId: string | null; techStack: string[] | null },
+    branchName: string,
+    containerId: string,
+  ): Promise<void> {
+    const backendType = this.containerBackend.backendType;
+    if (backendType !== 'proxmox') return; // Only for Proxmox containers
+
+    try {
+      // Check if repo is already cloned
+      const isCloned = await isRepoClonedInContainer(containerIp);
+      if (isCloned) {
+        console.log(`Repository already cloned in container for workspace ${workspaceId}`);
+        return;
+      }
+
+      console.log(`Repository not found in container, cloning ${repo.cloneUrl}`);
+
+      // Get SSH key for private repos
+      let sshKeyContent: string | undefined;
+      if (repo.sshKeyId) {
+        try {
+          const sshKeyService = getSSHKeyService();
+          const key = await sshKeyService.getKey(repo.sshKeyId);
+          if (key) {
+            sshKeyContent = await sshKeyService.getDecryptedPrivateKey(key.id);
+            console.log(`Using repository SSH key '${key.name}' for git clone`);
+          }
+        } catch (error) {
+          console.warn(`Could not decrypt repository SSH key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Clone repository
+      await gitCloneInContainer(containerIp, {
+        url: repo.cloneUrl,
+        branch: branchName,
+        depth: repo.cloneDepth ?? undefined,
+        sshKeyContent,
+      });
+      console.log('Repository cloned successfully');
+
+      // Install missing tech stacks if needed
+      if (repo.techStack && repo.techStack.length > 0) {
+        try {
+          const templateService = getTemplateService();
+          const repoTemplate = await templateService.getTemplateForRepository(repo.id);
+          const templateTechStacks = repoTemplate?.techStacks || [];
+          const missingStacks = repo.techStack.filter(
+            (stackId: string) => !templateTechStacks.includes(stackId)
+          );
+
+          if (missingStacks.length > 0) {
+            console.log(`Installing missing tech stacks: ${missingStacks.join(', ')}`);
+            const techStackBackend = this.containerBackend as {
+              installTechStacks?: (containerId: string, techStackIds: string[]) => Promise<void>;
+            };
+            if (techStackBackend.installTechStacks) {
+              await techStackBackend.installTechStacks(containerId, missingStacks);
+            }
+          }
+        } catch (techStackError) {
+          console.error('Failed to install tech stacks:', techStackError);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to ensure repo cloned:', error);
+      throw error; // Re-throw so caller knows clone failed
+    }
+  }
+
+  /**
    * Internal method to actually start the container
    */
   private async doStartContainer(workspaceId: string): Promise<Workspace> {
@@ -312,16 +263,26 @@ export class WorkspaceService {
       throw new Error(`Workspace ${workspaceId} not found`);
     }
 
+    // Get repository for clone URL and settings
+    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+    if (!repo || !repo.cloneUrl) {
+      throw new Error('Repository has no clone URL configured');
+    }
+
     // Check if container already exists and is running
-    // Save old containerId for potential reuse when recreating (Proxmox)
     const oldContainerId = workspace.containerId;
 
     if (workspace.containerId) {
       const info = await this.containerBackend.getContainerInfo(workspace.containerId);
       if (info?.status === 'running') {
-        // Update container IP if available (for Proxmox)
+        // Update container IP if available
+        const containerIp = info.ipAddress || workspace.containerIp;
         if (info.ipAddress && info.ipAddress !== workspace.containerIp) {
           await this.updateContainerIp(workspaceId, info.ipAddress);
+        }
+        // Ensure repo is cloned (may have been started before refactor)
+        if (containerIp) {
+          await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, workspace.containerId);
         }
         return workspace; // Already running
       }
@@ -329,7 +290,12 @@ export class WorkspaceService {
       if (info && info.status !== 'exited' && info.status !== 'dead') {
         await this.containerBackend.startContainer(workspace.containerId);
         const updatedInfo = await this.containerBackend.getContainerInfo(workspace.containerId);
-        await this.updateContainerIp(workspaceId, updatedInfo?.ipAddress || null);
+        const containerIp = updatedInfo?.ipAddress || null;
+        await this.updateContainerIp(workspaceId, containerIp);
+        // Ensure repo is cloned after starting
+        if (containerIp) {
+          await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, workspace.containerId);
+        }
         return this.updateContainerStatus(workspaceId, workspace.containerId, 'running');
       }
       // Container is dead/exited - remove and recreate
@@ -340,21 +306,14 @@ export class WorkspaceService {
       }
     }
 
-    // Get workspace path
-    const workspacePath = this.getAbsolutePath(workspace);
-    if (!workspacePath) {
-      throw new Error('Workspace has no working directory');
-    }
-
     // Ensure image/template exists
     await this.containerBackend.ensureImage();
 
     // Create container with backend-appropriate config
     const backendType = this.containerBackend.backendType;
-    // For Proxmox, reuse the old VMID when recreating instead of allocating a new one
     const reuseVmid = backendType === 'proxmox' && oldContainerId ? parseInt(oldContainerId, 10) : undefined;
 
-    // Get template VMID for Proxmox - prefer repository's template, fall back to config
+    // Get template VMID for Proxmox
     let proxmoxTemplateVmid: number | undefined;
     if (backendType === 'proxmox') {
       const templateService = getTemplateService();
@@ -365,12 +324,10 @@ export class WorkspaceService {
     const containerId = await this.containerBackend.createContainer(workspaceId, {
       image: backendType === 'docker' ? config.docker.claudeImage : undefined,
       templateId: proxmoxTemplateVmid,
-      workspacePath,
       reuseVmid,
     });
 
-    // IMPORTANT: Save containerId to DB immediately to prevent race conditions
-    // Other processes will see this and wait instead of creating new containers
+    // Save containerId immediately to prevent race conditions
     await db
       .update(workspaces)
       .set({
@@ -388,142 +345,34 @@ export class WorkspaceService {
 
     // Get container info (for IP address)
     const containerInfo = await this.containerBackend.getContainerInfo(containerId);
+    const containerIp = containerInfo?.ipAddress;
 
-    // For Proxmox containers, clone repo and setup SSH keys
-    if (backendType === 'proxmox') {
-      console.log(`Setting up Proxmox container ${containerId} for workspace`);
+    // For Proxmox containers, clone repo directly in container
+    if (backendType === 'proxmox' && containerIp) {
+      console.log(`Setting up Proxmox container ${containerId}`);
 
+      // Ensure repo is cloned (uses helper which handles SSH keys and tech stacks)
+      await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, containerId);
+
+      // Provision sidecar agent
       try {
-        const repo = await this.repositoryService.getRepository(workspace.repositoryId);
-        if (repo) {
-          // Get the SSH key linked to this repository (via repo.sshKeyId)
-          // This is the ONLY key that should be synced to containers
-          const sshKeyService = getSSHKeyService();
-          let sshKeyContent: string | undefined;
-
-          // Use repo.sshKeyId - the key selected during clone/setup
-          if (repo.sshKeyId) {
-            try {
-              const key = await sshKeyService.getKey(repo.sshKeyId);
-              if (key) {
-                sshKeyContent = await sshKeyService.getDecryptedPrivateKey(key.id);
-                console.log(`Using repository SSH key '${key.name}' for git operations`);
-              }
-            } catch (error) {
-              console.warn(`Could not decrypt repository SSH key: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-          } else {
-            console.log('No SSH key configured for this repository. Git push/pull may not work for private repos.');
-          }
-
-          // Get remote URL for git setup
-          const repoPath = this.repositoryService.getAbsolutePath(repo);
-          const git = simpleGit(repoPath);
-          const remotes = await git.getRemotes(true);
-          const originRemote = remotes.find(r => r.name === 'origin');
-          const remoteUrl = originRemote?.refs?.fetch;
-
-          // Always sync the local workspace to the container
-          // This ensures local changes (even unpushed) are available in the container
-          console.log(`Syncing local workspace ${workspacePath} to container ${containerId}`);
-          const backend = this.containerBackend as {
-            syncWorkspace?: (containerId: string, localPath: string, remotePath: string, options?: { branchName?: string; remoteUrl?: string }) => Promise<void>;
-            syncSSHKey?: (containerId: string, privateKey: string, keyName: string) => Promise<void>;
-          };
-          if (backend.syncWorkspace) {
-            await backend.syncWorkspace(containerId, workspacePath, '/workspace', {
-              branchName: workspace.branchName,
-              remoteUrl,
-            });
-            console.log('Workspace synced successfully');
-          }
-
-          // Sync SSH keys if we have them (for git push/pull from container)
-          if (sshKeyContent && backend.syncSSHKey) {
-            try {
-              console.log('Starting SSH key sync...');
-              await backend.syncSSHKey(containerId, sshKeyContent, 'id_ed25519');
-              console.log('SSH key synced to container');
-            } catch (sshKeyError) {
-              console.error('SSH key sync failed:', sshKeyError);
-              // Continue - SSH key sync is not critical for basic container operation
-            }
-          }
-
-          if (remoteUrl) {
-            console.log(`Container workspace has remote: ${remoteUrl}`);
-          }
-
-          // Install missing tech stacks (if repository has tech stack requirements)
-          if (repo.techStack && repo.techStack.length > 0) {
-            try {
-              // Get template's pre-installed tech stacks from repository's template
-              const templateService = getTemplateService();
-              const repoTemplate = await templateService.getTemplateForRepository(repo.id);
-              const templateTechStacks = repoTemplate?.techStacks || [];
-
-              // Calculate which stacks are missing (repo needs but template doesn't have)
-              const missingStacks = repo.techStack.filter(
-                (stackId: string) => !templateTechStacks.includes(stackId)
-              );
-
-              if (missingStacks.length > 0) {
-                console.log(`Installing missing tech stacks: ${missingStacks.join(', ')}`);
-
-                // Install missing stacks
-                const techStackBackend = this.containerBackend as {
-                  installTechStacks?: (containerId: string, techStackIds: string[]) => Promise<void>;
-                };
-
-                if (techStackBackend.installTechStacks) {
-                  await techStackBackend.installTechStacks(containerId, missingStacks);
-                  console.log('Tech stacks installed successfully');
-                }
-              } else {
-                console.log('All required tech stacks already in template, no installation needed');
-              }
-            } catch (techStackError) {
-              console.error('Failed to install tech stacks:', techStackError);
-              // Continue - tech stack install failure is non-fatal
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to setup Proxmox container workspace:', error);
-        // Continue anyway - container is running but might not have files
-      }
-
-      console.log('Workspace setup completed, proceeding to agent provisioning...');
-
-      // Provision sidecar agent for Proxmox containers
-      try {
-        console.log('Attempting to provision agent for Proxmox container...');
         const proxmoxBackend = this.containerBackend as {
           provisionAgent?: (containerId: string, workspaceId: string, agentToken: string) => Promise<void>;
           generateAgentToken?: () => string;
         };
 
-        console.log(`provisionAgent exists: ${!!proxmoxBackend.provisionAgent}, generateAgentToken exists: ${!!proxmoxBackend.generateAgentToken}`);
-
         if (proxmoxBackend.provisionAgent && proxmoxBackend.generateAgentToken) {
           const agentToken = proxmoxBackend.generateAgentToken();
-
-          // Save agent token to database first
           await db
             .update(workspaces)
-            .set({
-              agentToken,
-              updatedAt: new Date(),
-            })
+            .set({ agentToken, updatedAt: new Date() })
             .where(eq(workspaces.id, workspaceId));
 
-          // Provision the agent
           await proxmoxBackend.provisionAgent(containerId, workspaceId, agentToken);
           console.log(`Agent provisioned in container ${containerId}`);
         }
       } catch (error) {
         console.error('Failed to provision agent:', error);
-        // Continue anyway - SSH fallback might still work
       }
     }
 
@@ -534,7 +383,7 @@ export class WorkspaceService {
         containerId,
         containerStatus: 'running',
         containerBackend: backendType as ContainerBackend,
-        containerIp: containerInfo?.ipAddress || null,
+        containerIp: containerIp || null,
         updatedAt: new Date(),
       })
       .where(eq(workspaces.id, workspaceId))
@@ -543,8 +392,7 @@ export class WorkspaceService {
     // Broadcast container started
     try {
       const broadcaster = getWorkspaceStateBroadcaster();
-      broadcaster.broadcastContainerStatus(workspaceId, containerId, 'running', containerInfo?.ipAddress || null);
-      console.log(`Broadcast container started for workspace ${workspaceId}`);
+      broadcaster.broadcastContainerStatus(workspaceId, containerId, 'running', containerIp || null);
     } catch (e) {
       // Broadcaster might not be initialized
     }
@@ -567,7 +415,6 @@ export class WorkspaceService {
 
   /**
    * Stop the workspace container
-   * For Proxmox containers, syncs changes back to the host first
    */
   async stopContainer(workspaceId: string): Promise<Workspace> {
     const workspace = await this.getWorkspace(workspaceId);
@@ -576,11 +423,6 @@ export class WorkspaceService {
     }
 
     if (workspace.containerId) {
-      // For Proxmox containers, sync changes back before stopping
-      if (this.containerBackend.backendType === 'proxmox') {
-        await this.syncWorkspaceBack(workspace);
-      }
-
       try {
         await this.containerBackend.stopContainer(workspace.containerId);
       } catch (e) {
@@ -592,8 +434,48 @@ export class WorkspaceService {
   }
 
   /**
+   * Check for uncommitted changes in the container
+   */
+  async checkUncommittedChanges(workspaceId: string): Promise<GitStatusResult> {
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error(`Workspace ${workspaceId} not found`);
+    }
+
+    // Default: no changes
+    const defaultResult: GitStatusResult = { hasChanges: false, staged: 0, modified: 0, untracked: 0 };
+
+    if (!workspace.containerId || !workspace.containerIp) {
+      return defaultResult;
+    }
+
+    // Check container is running
+    const info = await this.containerBackend.getContainerInfo(workspace.containerId);
+    if (info?.status !== 'running') {
+      return defaultResult;
+    }
+
+    try {
+      const status = await getGitStatusInContainer(workspace.containerIp);
+
+      // Update cached flag in database
+      await db
+        .update(workspaces)
+        .set({
+          hasUncommittedChanges: status.hasChanges,
+          updatedAt: new Date(),
+        })
+        .where(eq(workspaces.id, workspaceId));
+
+      return status;
+    } catch (error) {
+      console.error('Failed to check git status in container:', error);
+      return defaultResult;
+    }
+  }
+
+  /**
    * Destroy the workspace container but keep the workspace record
-   * This stops, syncs back changes, and removes the container completely
    */
   async destroyContainer(workspaceId: string): Promise<Workspace> {
     const workspace = await this.getWorkspace(workspaceId);
@@ -602,20 +484,13 @@ export class WorkspaceService {
     }
 
     if (workspace.containerId) {
-      // For Proxmox containers, sync changes back before destroying
-      if (this.containerBackend.backendType === 'proxmox') {
-        await this.syncWorkspaceBack(workspace);
-      }
-
       try {
-        // Stop the container first
         await this.containerBackend.stopContainer(workspace.containerId);
       } catch (e) {
         console.error('Error stopping container:', e);
       }
 
       try {
-        // Remove the container
         await this.containerBackend.removeContainer(workspace.containerId);
         console.log(`Container ${workspace.containerId} destroyed for workspace ${workspaceId}`);
       } catch (e) {
@@ -630,6 +505,7 @@ export class WorkspaceService {
         containerId: null,
         containerStatus: 'none',
         containerIp: null,
+        hasUncommittedChanges: false,
         updatedAt: new Date(),
       })
       .where(eq(workspaces.id, workspaceId))
@@ -639,71 +515,11 @@ export class WorkspaceService {
     try {
       const broadcaster = getWorkspaceStateBroadcaster();
       broadcaster.broadcastContainerStatus(workspaceId, null, 'none', null);
-      console.log(`Broadcast container destroyed for workspace ${workspaceId}`);
     } catch (e) {
       // Broadcaster might not be initialized
     }
 
     return updated;
-  }
-
-  /**
-   * Sync changes from the container back to the host workspace
-   * This is used for Proxmox containers where files are cloned, not mounted
-   */
-  private async syncWorkspaceBack(workspace: Workspace): Promise<void> {
-    if (!workspace.containerId) {
-      return;
-    }
-
-    const backendType = this.containerBackend.backendType;
-    if (backendType !== 'proxmox') {
-      return; // Docker uses bind mounts, no sync needed
-    }
-
-    const workspacePath = this.getAbsolutePath(workspace);
-    if (!workspacePath) {
-      console.warn('Cannot sync back: workspace has no local path');
-      return;
-    }
-
-    // Check if backend supports sync back
-    const backend = this.containerBackend as { syncWorkspaceBack?: (containerId: string, remotePath: string, localPath: string) => Promise<void> };
-    if (!backend.syncWorkspaceBack) {
-      console.warn('Container backend does not support syncWorkspaceBack');
-      return;
-    }
-
-    try {
-      console.log(`Syncing changes from container ${workspace.containerId} back to ${workspacePath}`);
-      await backend.syncWorkspaceBack(workspace.containerId, '/workspace', workspacePath);
-      console.log(`Successfully synced changes back from container ${workspace.containerId}`);
-    } catch (error) {
-      console.error(`Failed to sync workspace back from container:`, error);
-      // Don't throw - we still want to stop the container even if sync fails
-    }
-  }
-
-  /**
-   * Public method to manually sync changes back from container
-   * Useful for saving work without stopping the container
-   */
-  async syncChangesBack(workspaceId: string): Promise<void> {
-    const workspace = await this.getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new Error(`Workspace ${workspaceId} not found`);
-    }
-
-    if (!workspace.containerId) {
-      throw new Error('Workspace has no running container');
-    }
-
-    const info = await this.containerBackend.getContainerInfo(workspace.containerId);
-    if (info?.status !== 'running') {
-      throw new Error('Container is not running');
-    }
-
-    await this.syncWorkspaceBack(workspace);
   }
 
   /**
@@ -749,11 +565,9 @@ export class WorkspaceService {
     const containerInfo = await this.containerBackend.getContainerInfo(workspace.containerId);
 
     if (!containerInfo) {
-      // Container no longer exists
       return this.updateContainerStatus(workspaceId, null, 'none');
     }
 
-    // Map Docker status to our status
     let containerStatus: ContainerStatus = 'none';
     switch (containerInfo.status) {
       case 'running':
@@ -783,54 +597,50 @@ export class WorkspaceService {
   }
 
   /**
-   * Get git status for a workspace
+   * Get git status for a workspace (from container)
    */
   async getGitStatus(workspaceId: string): Promise<{
     branch: string;
     isClean: boolean;
-    staged: string[];
-    modified: string[];
-    untracked: string[];
+    staged: number;
+    modified: number;
+    untracked: number;
   }> {
     const workspace = await this.getWorkspace(workspaceId);
     if (!workspace) {
       throw new Error(`Workspace ${workspaceId} not found`);
     }
 
-    const worktreePath = this.getAbsolutePath(workspace);
-    if (!worktreePath) {
-      throw new Error('Workspace has no worktree path');
+    if (!workspace.containerIp) {
+      // No container running - return workspace branch info
+      return {
+        branch: workspace.branchName,
+        isClean: true,
+        staged: 0,
+        modified: 0,
+        untracked: 0,
+      };
     }
 
-    const git = simpleGit(worktreePath);
-    const status = await git.status();
-
-    return {
-      branch: status.current || workspace.branchName,
-      isClean: status.isClean(),
-      staged: status.staged,
-      modified: status.modified,
-      untracked: status.not_added,
-    };
-  }
-
-  /**
-   * Get git diff for a workspace
-   */
-  async getGitDiff(workspaceId: string, staged = false): Promise<string> {
-    const workspace = await this.getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new Error(`Workspace ${workspaceId} not found`);
+    try {
+      const status = await getGitStatusInContainer(workspace.containerIp);
+      return {
+        branch: workspace.branchName,
+        isClean: !status.hasChanges,
+        staged: status.staged,
+        modified: status.modified,
+        untracked: status.untracked,
+      };
+    } catch (error) {
+      console.error('Failed to get git status from container:', error);
+      return {
+        branch: workspace.branchName,
+        isClean: true,
+        staged: 0,
+        modified: 0,
+        untracked: 0,
+      };
     }
-
-    const worktreePath = this.getAbsolutePath(workspace);
-    if (!worktreePath) {
-      throw new Error('Workspace has no worktree path');
-    }
-
-    const git = simpleGit(worktreePath);
-    const args = staged ? ['--staged'] : [];
-    return git.diff(args);
   }
 }
 

@@ -11,7 +11,7 @@ export type ContainerBackendType = 'docker' | 'proxmox';
 export interface ContainerConfig {
   image?: string;              // Docker image (Docker only)
   templateId?: number;         // LXC template VMID (Proxmox only)
-  workspacePath: string;       // Host path to mount as workspace
+  workspacePath?: string;      // DEPRECATED: Host path to mount (Docker only, Proxmox uses git clone)
   env?: Record<string, string>;
   memoryLimit?: string;        // e.g., "2g", "512m"
   cpuLimit?: number;           // CPU cores
@@ -110,16 +110,14 @@ export interface IContainerBackend {
   ensureImage(): Promise<void>;
 
   /**
+   * @deprecated Use gitCloneInContainer() directly instead
    * Sync workspace files to container (Proxmox only, no-op for Docker)
-   * Called after container is started to copy worktree files
-   * @param options.branchName - Git branch name for initializing repo
-   * @param options.remoteUrl - Git remote URL to set as origin
    */
   syncWorkspace?(containerId: string, localPath: string, remotePath?: string, options?: { branchName?: string; remoteUrl?: string }): Promise<void>;
 
   /**
+   * @deprecated No longer needed - changes stay in container, user must push to persist
    * Sync workspace files back from container (Proxmox only, no-op for Docker)
-   * Called before stopping to save any changes
    */
   syncWorkspaceBack?(containerId: string, remotePath: string, localPath: string): Promise<void>;
 

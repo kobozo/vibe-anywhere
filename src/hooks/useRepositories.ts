@@ -48,46 +48,22 @@ export function useRepositories() {
     }
   }, [token]);
 
+  /**
+   * @deprecated Local repositories are no longer supported.
+   * Use cloneRepository instead - repos are cloned directly in containers.
+   */
   const createLocalRepository = useCallback(
-    async (name: string, originalPath: string, description?: string, techStack?: string[], templateId?: string) => {
-      if (!token) throw new Error('Not authenticated');
-
-      const body: Record<string, unknown> = {
-        type: 'local',
-        name,
-        originalPath,
-      };
-      if (description) body.description = description;
-      if (techStack && techStack.length > 0) body.techStack = techStack;
-      if (templateId) body.templateId = templateId;
-
-      const response = await fetch('/api/repositories', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const { error } = await response.json();
-        throw new Error(error?.message || 'Failed to create repository');
-      }
-
-      const { data } = await response.json();
-      setRepositories((prev) => [data.repository, ...prev]);
-      return data.repository as Repository;
+    async (_name: string, _originalPath: string, _description?: string, _techStack?: string[], _templateId?: string) => {
+      throw new Error('Local repositories are no longer supported. Please use cloneRepository instead.');
     },
-    [token]
+    []
   );
 
   const cloneRepository = useCallback(
-    async (name: string, cloneUrl: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string) => {
+    async (name: string, cloneUrl: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => {
       if (!token) throw new Error('Not authenticated');
 
       const body: Record<string, unknown> = {
-        type: 'clone',
         name,
         cloneUrl,
       };
@@ -95,6 +71,7 @@ export function useRepositories() {
       if (sshKeyId) body.sshKeyId = sshKeyId;
       if (techStack && techStack.length > 0) body.techStack = techStack;
       if (templateId) body.templateId = templateId;
+      if (cloneDepth !== undefined) body.cloneDepth = cloneDepth;
 
       const response = await fetch('/api/repositories', {
         method: 'POST',
@@ -107,7 +84,7 @@ export function useRepositories() {
 
       if (!response.ok) {
         const { error } = await response.json();
-        throw new Error(error?.message || 'Failed to clone repository');
+        throw new Error(error?.message || 'Failed to add repository');
       }
 
       const { data } = await response.json();

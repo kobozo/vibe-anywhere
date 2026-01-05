@@ -1,27 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWorkspaceService } from '@/lib/services/workspace-service';
+import { requireAuth, withErrorHandling, NotFoundError, successResponse } from '@/lib/api-utils';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-// POST /api/workspaces/:id/sync - Sync changes back from container
-export async function POST(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: workspaceId } = await context.params;
-    const workspaceService = await getWorkspaceService();
+/**
+ * POST /api/workspaces/:id/sync - Check git status in container
+ * NOTE: Previously this synced changes back to host. Now it just checks git status
+ * since repositories are cloned directly in containers and changes must be pushed.
+ */
+export const POST = withErrorHandling(async (request: NextRequest, context: unknown) => {
+  const user = await requireAuth(request);
+  const { id: workspaceId } = await (context as RouteContext).params;
+  const workspaceService = await getWorkspaceService();
 
-    await workspaceService.syncChangesBack(workspaceId);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Changes synced back from container',
-    });
-  } catch (error) {
-    console.error('Failed to sync changes:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to sync changes' },
-      { status: 500 }
-    );
+  const workspace = await workspaceService.getWorkspace(workspaceId);
+  if (!workspace) {
+    throw new NotFoundError('Workspace', workspaceId);
   }
-}
+
+  // Check for uncommitted changes in container
+  const status = await workspaceService.checkUncommittedChanges(workspaceId);
+
+  return successResponse({
+    message: status.hasChanges
+      ? 'Workspace has uncommitted changes. Push to remote to persist.'
+      : 'Workspace is clean.',
+    status,
+  });
+});

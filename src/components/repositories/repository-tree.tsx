@@ -318,8 +318,8 @@ export function RepositoryTree({
                   ? 'text-blue-400'
                   : 'text-gray-200'
               }`}>{repo.name}</span>
-              <span className="text-xs text-gray-500">
-                {repo.sourceType === 'cloned' ? '🔗' : '📂'}
+              <span className="text-xs text-gray-500" title={repo.cloneUrl}>
+                🔗
               </span>
               <button
                 onClick={(e) => {

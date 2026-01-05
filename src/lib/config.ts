@@ -14,9 +14,10 @@ const envSchema = z.object({
   // App Home Directory - where all repos, worktrees, and SSH keys are stored
   APP_HOME_DIR: z.string().default('/opt/session-hub'),
 
-  // Git Configuration (legacy - kept for backwards compatibility)
+  // DEPRECATED: Git worktrees are no longer used. Repos are cloned directly in containers.
+  // These are kept only for legacy session API backward compatibility.
   BASE_REPO_PATH: z.string().optional(),
-  WORKTREE_BASE_PATH: z.string().optional(), // Now derived from APP_HOME_DIR
+  WORKTREE_BASE_PATH: z.string().optional(),
 
   // Container Backend Selection ('docker' or 'proxmox')
   CONTAINER_BACKEND: z.enum(['docker', 'proxmox']).default('docker'),
@@ -105,16 +106,23 @@ export const config = {
     const homeDir = getConfig().APP_HOME_DIR;
     return {
       root: homeDir,
+      sshKeys: `${homeDir}/.ssh/keys`,
+      // DEPRECATED: Repositories are now cloned directly in containers
+      // These paths are kept for legacy session API backward compatibility
       repositories: `${homeDir}/repositories`,
       worktrees: `${homeDir}/.worktrees`,
-      sshKeys: `${homeDir}/.ssh/keys`,
     };
   },
 
+  /**
+   * @deprecated Git worktrees on host are no longer used.
+   * Repositories are cloned directly in containers.
+   * This config section is kept for legacy session API backward compatibility.
+   */
   get git() {
     const homeDir = getConfig().APP_HOME_DIR;
     return {
-      baseRepoPath: getConfig().BASE_REPO_PATH, // Legacy, optional
+      baseRepoPath: getConfig().BASE_REPO_PATH,
       worktreeBasePath: getConfig().WORKTREE_BASE_PATH || `${homeDir}/.worktrees`,
     };
   },

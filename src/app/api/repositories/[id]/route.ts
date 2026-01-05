@@ -12,9 +12,14 @@ import {
 // Valid tech stack IDs
 const validTechStacks = ['nodejs', 'python', 'go', 'rust', 'docker'] as const;
 
+const gitUrlPattern = /^(https?:\/\/[^\s]+|git@[^\s:]+:[^\s]+|ssh:\/\/[^\s]+)$/;
+
 const updateRepositorySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional().nullable().transform(v => v ?? undefined),
+  cloneUrl: z.string().regex(gitUrlPattern, 'Invalid git URL').optional(),
+  cloneDepth: z.number().int().positive().optional().nullable(),
+  defaultBranch: z.string().min(1).max(100).optional(),
   templateId: z.string().uuid().optional().nullable(),
   techStack: z.array(z.enum(validTechStacks)).optional(),
   sshKeyId: z.string().uuid().optional().nullable(),
@@ -38,8 +43,9 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     throw new NotFoundError('Repository', id);
   }
 
-  // Get branches for the repository
-  const branches = await repoService.getBranches(id);
+  // Return default branch as the only known branch
+  // Full branch list would require querying from a running container
+  const branches = repository.defaultBranch ? [repository.defaultBranch] : ['main'];
 
   return successResponse({ repository, branches });
 });

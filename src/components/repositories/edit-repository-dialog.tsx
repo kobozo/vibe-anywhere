@@ -144,16 +144,16 @@ export function EditRepositoryDialog({
             {/* Repository Info */}
             <div className="bg-gray-700/50 rounded p-3 text-sm">
               <div className="text-gray-400">
-                Type: <span className="text-white capitalize">{repository.sourceType}</span>
+                Clone URL: <span className="text-white font-mono text-xs">{repository.cloneUrl}</span>
               </div>
-              <div className="text-gray-400">
-                Path: <span className="text-white">{repository.originalPath || repository.path}</span>
-              </div>
-              {repository.cloneUrl && (
+              {repository.cloneDepth && (
                 <div className="text-gray-400">
-                  Clone URL: <span className="text-white">{repository.cloneUrl}</span>
+                  Clone Depth: <span className="text-white">{repository.cloneDepth}</span>
                 </div>
               )}
+              <div className="text-gray-400">
+                Default Branch: <span className="text-white">{repository.defaultBranch || 'main'}</span>
+              </div>
             </div>
 
             {/* Error */}

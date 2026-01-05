@@ -114,12 +114,8 @@ export function RepositoryDashboard({ repository }: RepositoryDashboardProps) {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 text-xs rounded ${
-                repository.sourceType === 'cloned'
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-green-500/20 text-green-400'
-              }`}>
-                {repository.sourceType === 'cloned' ? 'Cloned' : 'Local'}
+              <span className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400">
+                {repository.cloneDepth ? `Shallow (depth=${repository.cloneDepth})` : 'Full Clone'}
               </span>
             </div>
           </div>
@@ -349,12 +345,10 @@ export function RepositoryDashboard({ repository }: RepositoryDashboardProps) {
               <span className="text-gray-500">Last Updated</span>
               <p className="text-white">{new Date(repository.updatedAt).toLocaleDateString()}</p>
             </div>
-            {repository.originalPath && (
-              <div className="col-span-2">
-                <span className="text-gray-500">Local Path</span>
-                <p className="text-white font-mono text-xs truncate">{repository.originalPath}</p>
-              </div>
-            )}
+            <div className="col-span-2">
+              <span className="text-gray-500">Clone URL</span>
+              <p className="text-white font-mono text-xs truncate">{repository.cloneUrl}</p>
+            </div>
           </div>
         </div>
       </div>

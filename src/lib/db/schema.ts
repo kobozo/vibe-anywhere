@@ -36,10 +36,8 @@ export const workspaceStatusEnum = pgEnum('workspace_status', [
   'archived',
 ]);
 
-export const repoSourceTypeEnum = pgEnum('repo_source_type', [
-  'local',
-  'cloned',
-]);
+// DEPRECATED: repoSourceTypeEnum removed - repos are always cloned in containers
+// The enum still exists in DB for backward compatibility with legacy sessions API
 
 export const sshKeyTypeEnum = pgEnum('ssh_key_type', [
   'ed25519',
@@ -99,6 +97,7 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
 });
 
 // Repositories table - top-level entity
+// Repositories are cloned directly in containers - no local storage
 export const repositories = pgTable('repositories', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')
@@ -108,18 +107,17 @@ export const repositories = pgTable('repositories', {
   sshKeyId: uuid('ssh_key_id'), // FK to sshKeys - the SSH key to use for this repository
   name: text('name').notNull(),
   description: text('description'),
-  path: text('path').notNull(), // Path relative to APP_HOME_DIR/repositories/ or symlink name
-  originalPath: text('original_path'), // Original path for symlinked local repos
-  sourceType: repoSourceTypeEnum('source_type').default('local').notNull(),
-  cloneUrl: text('clone_url'), // Original URL if cloned
+  cloneUrl: text('clone_url').notNull(), // Remote URL for git clone
+  cloneDepth: integer('clone_depth'), // null = full clone, positive int = shallow clone depth
   defaultBranch: text('default_branch').default('main'),
   techStack: jsonb('tech_stack').$type<string[]>().default([]), // Tech stack IDs to install on workspaces (override template)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Workspaces table - worktrees within a repository
+// Workspaces table - branches within a repository
 // Each workspace has ONE container that all tabs share
+// Repository is cloned directly in container when it starts
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),
   repositoryId: uuid('repository_id')
@@ -127,14 +125,14 @@ export const workspaces = pgTable('workspaces', {
     .notNull(),
   name: text('name').notNull(),
   branchName: text('branch_name').notNull(),
-  worktreePath: text('worktree_path'), // Relative to APP_HOME_DIR/.worktrees/
-  baseCommit: text('base_commit'),
   status: workspaceStatusEnum('status').default('pending').notNull(),
   // Container fields - one container per workspace
   containerId: text('container_id'),
   containerStatus: containerStatusEnum('container_status').default('none').notNull(),
   containerBackend: containerBackendEnum('container_backend').default('docker').notNull(),
   containerIp: text('container_ip'), // IP address for Proxmox LXC containers
+  // Git status tracking
+  hasUncommittedChanges: boolean('has_uncommitted_changes').default(false).notNull(), // Cached flag for UI warning
   // Agent connection fields (for sidecar agent in containers)
   agentToken: text('agent_token'), // Authentication token for agent
   agentConnectedAt: timestamp('agent_connected_at', { withTimezone: true }), // When agent connected
@@ -387,7 +385,6 @@ export type NewUser = typeof users.$inferInsert;
 // Repositories
 export type Repository = typeof repositories.$inferSelect;
 export type NewRepository = typeof repositories.$inferInsert;
-export type RepoSourceType = (typeof repoSourceTypeEnum.enumValues)[number];
 
 // Workspaces
 export type Workspace = typeof workspaces.$inferSelect;
