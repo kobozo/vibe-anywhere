@@ -2,14 +2,18 @@
 
 import { useState, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import type { Tab } from '@/lib/db/schema';
+import type { Tab, TabType } from '@/lib/db/schema';
 
 export interface TabInfo {
   id: string;
   workspaceId: string;
   name: string;
   status: string;
+  tabType: TabType;
+  isPinned: boolean;
+  sortOrder: number;
   command: string[];
+  exitOnClose: boolean;
   createdAt: Date;
   updatedAt: Date;
   lastActivityAt: Date;

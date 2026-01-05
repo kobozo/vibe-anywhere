@@ -10,6 +10,7 @@ export const DEFAULT_TEMPLATES: Omit<NewTabTemplate, 'userId'>[] = [
     command: 'claude',
     args: [],
     description: 'Claude Code AI assistant',
+    exitOnClose: true, // Exit when Claude exits
     sortOrder: 0,
     isBuiltIn: true,
   },
@@ -19,6 +20,7 @@ export const DEFAULT_TEMPLATES: Omit<NewTabTemplate, 'userId'>[] = [
     command: 'lazygit',
     args: [],
     description: 'Terminal UI for git commands',
+    exitOnClose: true, // Exit when LazyGit exits
     sortOrder: 1,
     isBuiltIn: true,
   },
@@ -28,6 +30,7 @@ export const DEFAULT_TEMPLATES: Omit<NewTabTemplate, 'userId'>[] = [
     command: 'lazydocker',
     args: [],
     description: 'Terminal UI for Docker',
+    exitOnClose: true, // Exit when LazyDocker exits
     sortOrder: 2,
     isBuiltIn: true,
   },
@@ -37,6 +40,7 @@ export const DEFAULT_TEMPLATES: Omit<NewTabTemplate, 'userId'>[] = [
     command: '/bin/bash',
     args: [],
     description: 'Free terminal session',
+    exitOnClose: false, // Terminal stays open
     sortOrder: 3,
     isBuiltIn: true,
   },
@@ -89,7 +93,7 @@ export class TabTemplateService {
    */
   async createTemplate(
     userId: string,
-    input: { name: string; icon?: string; command: string; args?: string[]; description?: string }
+    input: { name: string; icon?: string; command: string; args?: string[]; description?: string; exitOnClose?: boolean }
   ): Promise<TabTemplate> {
     // Get max sort order
     const templates = await this.getTemplates(userId);
@@ -104,6 +108,7 @@ export class TabTemplateService {
         command: input.command,
         args: input.args || [],
         description: input.description,
+        exitOnClose: input.exitOnClose ?? true, // Default to true for new templates
         sortOrder: maxSortOrder + 1,
         isBuiltIn: false,
       })

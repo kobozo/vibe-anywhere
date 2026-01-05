@@ -52,6 +52,11 @@ export const containerBackendEnum = pgEnum('container_backend', [
   'proxmox',
 ]);
 
+export const tabTypeEnum = pgEnum('tab_type', [
+  'terminal',
+  'git',
+]);
+
 export const portForwardProtocolEnum = pgEnum('port_forward_protocol', [
   'http',
   'tcp',
@@ -120,7 +125,11 @@ export const tabs = pgTable('tabs', {
     .notNull(),
   name: text('name').notNull(),
   status: sessionStatusEnum('status').default('pending').notNull(),
+  tabType: tabTypeEnum('tab_type').default('terminal').notNull(),
+  isPinned: boolean('is_pinned').default(false).notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
   command: jsonb('command').$type<string[]>().default(['/bin/bash']), // Command to exec
+  exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
   outputBuffer: jsonb('output_buffer').$type<string[]>().default([]),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -157,6 +166,7 @@ export const tabTemplates = pgTable('tab_templates', {
   command: text('command').notNull(), // Command to run: "claude", "lazygit", etc.
   args: jsonb('args').$type<string[]>().default([]), // Command arguments
   description: text('description'), // Optional description
+  exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
   sortOrder: integer('sort_order').default(0).notNull(),
   isBuiltIn: boolean('is_built_in').default(false).notNull(), // For default templates
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -341,6 +351,7 @@ export type WorkspaceStatus = (typeof workspaceStatusEnum.enumValues)[number];
 // Tabs
 export type Tab = typeof tabs.$inferSelect;
 export type NewTab = typeof tabs.$inferInsert;
+export type TabType = (typeof tabTypeEnum.enumValues)[number];
 
 // SSH Keys
 export type SSHKey = typeof sshKeys.$inferSelect;

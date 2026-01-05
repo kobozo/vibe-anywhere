@@ -27,7 +27,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   // Tab Templates
   const { templates, fetchTemplates, createTemplate, deleteTemplate, isLoading: templatesLoading } = useTabTemplates();
   const [showAddTemplate, setShowAddTemplate] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({ name: '', command: '', icon: 'terminal', description: '' });
+  const [newTemplate, setNewTemplate] = useState({ name: '', command: '', icon: 'terminal', description: '', exitOnClose: true });
 
   // SSH Keys
   const { keys, fetchKeys, generateKey, deleteKey, setDefaultKey, isLoading: keysLoading } = useSSHKeys();
@@ -56,8 +56,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         command: newTemplate.command,
         icon: newTemplate.icon,
         description: newTemplate.description || undefined,
+        exitOnClose: newTemplate.exitOnClose,
       });
-      setNewTemplate({ name: '', command: '', icon: 'terminal', description: '' });
+      setNewTemplate({ name: '', command: '', icon: 'terminal', description: '', exitOnClose: true });
       setShowAddTemplate(false);
     } catch (error) {
       console.error('Failed to create template:', error);
@@ -227,6 +228,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
                     />
                   </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="exitOnClose"
+                      checked={newTemplate.exitOnClose}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, exitOnClose: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600"
+                    />
+                    <label htmlFor="exitOnClose" className="text-sm text-gray-300">
+                      Exit on close
+                    </label>
+                    <span className="text-xs text-gray-500">
+                      (close tab when command exits)
+                    </span>
+                  </div>
                   <button
                     onClick={handleAddTemplate}
                     disabled={!newTemplate.name || !newTemplate.command}
@@ -254,6 +270,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           {template.isBuiltIn && (
                             <span className="text-xs px-1.5 py-0.5 bg-gray-600 text-gray-400 rounded">
                               built-in
+                            </span>
+                          )}
+                          {template.exitOnClose && (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded">
+                              exit on close
                             </span>
                           )}
                         </div>

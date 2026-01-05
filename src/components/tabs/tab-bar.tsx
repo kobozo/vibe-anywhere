@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTabs, TabInfo } from '@/hooks/useTabs';
+import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
 import { CreateTabDialog } from './create-tab-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -33,6 +34,30 @@ export function TabBar({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tabToDelete, setTabToDelete] = useState<TabInfo | null>(null);
+  const [agentUpdating, setAgentUpdating] = useState(false);
+  const prevAgentUpdating = useRef(false);
+
+  // Handle workspace state updates (agent updating status)
+  const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
+    if (update.agentUpdating !== undefined) {
+      setAgentUpdating(update.agentUpdating);
+    }
+  }, []);
+
+  // Subscribe to workspace state updates
+  useWorkspaceState({
+    workspaceIds: workspaceId ? [workspaceId] : undefined,
+    onUpdate: handleWorkspaceUpdate,
+  });
+
+  // Refresh tabs when agent update completes (agentUpdating: true -> false)
+  useEffect(() => {
+    if (prevAgentUpdating.current && !agentUpdating) {
+      console.log('Agent update completed, refreshing tabs...');
+      fetchTabs();
+    }
+    prevAgentUpdating.current = agentUpdating;
+  }, [agentUpdating, fetchTabs]);
 
   useEffect(() => {
     if (workspaceId) {
@@ -126,7 +151,14 @@ export function TabBar({
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 bg-gray-800 border-b border-gray-700 overflow-x-auto">
-      {isLoading && tabs.length === 0 && (
+      {agentUpdating && (
+        <span className="text-yellow-400 text-sm px-2 flex items-center gap-1">
+          <span className="animate-spin">⟳</span>
+          Agent updating...
+        </span>
+      )}
+
+      {isLoading && tabs.length === 0 && !agentUpdating && (
         <span className="text-gray-500 text-sm px-2">Loading tabs...</span>
       )}
 
@@ -134,7 +166,10 @@ export function TabBar({
         <div
           key={tab.id}
           onClick={() => {
-            if (tab.status === 'running') {
+            // Git tabs don't need starting - they're UI-only
+            if (tab.tabType === 'git') {
+              onSelectTab(tab);
+            } else if (tab.status === 'running') {
               onSelectTab(tab);
             } else if (tab.status === 'pending' || tab.status === 'stopped') {
               handleStartTab(tab);
@@ -146,11 +181,18 @@ export function TabBar({
               : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
             }`}
         >
-          <span className={`w-2 h-2 rounded-full ${getStatusColor(tab.status)}`} />
+          {/* Git icon for git tabs */}
+          {tab.tabType === 'git' ? (
+            <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3-3 3 3m0 6l-3 3-3-3" />
+            </svg>
+          ) : (
+            <span className={`w-2 h-2 rounded-full ${getStatusColor(tab.status)}`} />
+          )}
           <span className="text-sm whitespace-nowrap">{tab.name}</span>
           {actionLoading === tab.id ? (
             <span className="text-xs animate-spin">⏳</span>
-          ) : (
+          ) : !tab.isPinned && (
             <button
               onClick={(e) => handleDeleteTabClick(e, tab)}
               className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 ml-1"

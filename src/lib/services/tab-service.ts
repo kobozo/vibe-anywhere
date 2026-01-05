@@ -1,13 +1,17 @@
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, asc, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { tabs, type Tab, type NewTab, type SessionStatus } from '@/lib/db/schema';
+import { tabs, type Tab, type NewTab, type SessionStatus, type TabType } from '@/lib/db/schema';
 import { getWorkspaceService, WorkspaceService } from './workspace-service';
 import { config } from '@/lib/config';
 
 export interface CreateTabInput {
   name: string;
   command?: string[];
+  exitOnClose?: boolean;
   autoShutdownMinutes?: number;
+  tabType?: TabType;
+  isPinned?: boolean;
+  sortOrder?: number;
 }
 
 export interface TabInfo {
@@ -15,7 +19,11 @@ export interface TabInfo {
   workspaceId: string;
   name: string;
   status: SessionStatus;
+  tabType: TabType;
+  isPinned: boolean;
+  sortOrder: number;
   command: string[];
+  exitOnClose: boolean;
   createdAt: Date;
   updatedAt: Date;
   lastActivityAt: Date;
@@ -57,7 +65,11 @@ export class TabService {
         workspaceId,
         name: input.name,
         command: input.command || ['/bin/bash'],
+        exitOnClose: input.exitOnClose ?? false,
         status,
+        tabType: input.tabType || 'terminal',
+        isPinned: input.isPinned || false,
+        sortOrder: input.sortOrder ?? 0,
         outputBuffer: [],
         outputBufferSize: config.session.outputBufferSize,
         autoShutdownMinutes: input.autoShutdownMinutes || null,
@@ -158,14 +170,53 @@ export class TabService {
   }
 
   /**
-   * List tabs for a workspace
+   * List tabs for a workspace (sorted by sortOrder first, then creation date)
    */
   async listTabs(workspaceId: string): Promise<Tab[]> {
     return db
       .select()
       .from(tabs)
       .where(eq(tabs.workspaceId, workspaceId))
-      .orderBy(desc(tabs.createdAt));
+      .orderBy(asc(tabs.sortOrder), asc(tabs.createdAt));
+  }
+
+  /**
+   * Ensure a Git tab exists for the workspace
+   * Creates one if it doesn't exist, returns existing if it does
+   */
+  async ensureGitTab(workspaceId: string): Promise<Tab> {
+    // Check if git tab already exists
+    const existingTabs = await this.listTabs(workspaceId);
+    const gitTab = existingTabs.find(t => t.tabType === 'git');
+
+    if (gitTab) {
+      return gitTab;
+    }
+
+    // Get workspace to check container status
+    const workspaceService = await this.getWorkspace();
+    const workspace = await workspaceService.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error(`Workspace ${workspaceId} not found`);
+    }
+
+    // Create git tab - it's always running since it doesn't need a terminal session
+    const [tab] = await db
+      .insert(tabs)
+      .values({
+        workspaceId,
+        name: 'Git',
+        command: [], // Git tabs don't run commands
+        status: 'running', // Git tabs are always "running" since they just display UI
+        tabType: 'git',
+        isPinned: true,
+        sortOrder: -100, // Always first
+        outputBuffer: [],
+        outputBufferSize: 0,
+      })
+      .returning();
+
+    return tab;
   }
 
   /**
@@ -233,7 +284,11 @@ export class TabService {
       workspaceId: tab.workspaceId,
       name: tab.name,
       status: tab.status,
+      tabType: tab.tabType,
+      isPinned: tab.isPinned,
+      sortOrder: tab.sortOrder,
       command: tab.command || ['/bin/bash'],
+      exitOnClose: tab.exitOnClose,
       createdAt: tab.createdAt,
       updatedAt: tab.updatedAt,
       lastActivityAt: tab.lastActivityAt,

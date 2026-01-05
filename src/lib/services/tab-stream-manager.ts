@@ -84,7 +84,15 @@ class TabStreamManager {
       socket.emit('terminal:buffer', { lines: buffer });
     }
 
-    const command = tab.command || ['/bin/bash'];
+    // Build the command, wrapping with && exit if exitOnClose is enabled
+    let command = tab.command || ['/bin/bash'];
+    if (tab.exitOnClose && command.length > 0) {
+      // Wrap command to exit when it finishes: /bin/bash -c "command args && exit"
+      const cmdString = command.map(arg =>
+        arg.includes(' ') || arg.includes('"') ? `'${arg.replace(/'/g, "'\\''")}'` : arg
+      ).join(' ');
+      command = ['/bin/bash', '-c', `${cmdString} && exit`];
+    }
 
     if (useAgent) {
       // Agent-based: Request agent to create the tab

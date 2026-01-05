@@ -14,6 +14,7 @@ const createTemplateSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
   description: z.string().max(200).optional(),
+  exitOnClose: z.boolean().optional(),
 });
 
 /**

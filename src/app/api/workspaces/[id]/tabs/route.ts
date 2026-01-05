@@ -19,6 +19,7 @@ const createTabSchema = z.object({
   templateId: z.string().uuid().optional(),
   args: z.array(z.string()).optional(),
   command: z.array(z.string()).optional(),
+  exitOnClose: z.boolean().optional(),
   autoShutdownMinutes: z.number().int().positive().optional(),
 });
 
@@ -45,6 +46,10 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   }
 
   const tabService = getTabService();
+
+  // Ensure git tab exists for this workspace
+  await tabService.ensureGitTab(id);
+
   const tabs = await tabService.listTabs(id);
   const tabInfos = tabs.map((t) => tabService.toTabInfo(t));
 
@@ -81,6 +86,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
   // Build the command from template if templateId provided
   let command: string[] | undefined = result.data.command;
+  let exitOnClose: boolean | undefined = result.data.exitOnClose;
 
   if (result.data.templateId) {
     const templateService = getTabTemplateService();
@@ -92,12 +98,18 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
     // Build command: [command, ...templateArgs, ...userArgs]
     command = [template.command, ...(template.args || []), ...(result.data.args || [])];
+
+    // Use template's exitOnClose if not explicitly provided
+    if (exitOnClose === undefined) {
+      exitOnClose = template.exitOnClose;
+    }
   }
 
   const tabService = getTabService();
   const tab = await tabService.createTab(id, {
     name: result.data.name,
     command,
+    exitOnClose,
     autoShutdownMinutes: result.data.autoShutdownMinutes,
   });
 
