@@ -1,0 +1,26 @@
+[Unit]
+Description=Session Hub - Claude Code Session Manager
+Documentation=https://github.com/kobozo/session-hub
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=sessionhub
+Group=sessionhub
+WorkingDirectory=/opt/session-hub
+EnvironmentFile=/opt/session-hub/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/session-hub /home/sessionhub
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
