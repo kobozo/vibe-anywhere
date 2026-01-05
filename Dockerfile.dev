@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     git \
     openssh-client \
     docker-cli \
+    rsync \
     && rm -rf /var/cache/apk/*
 
 # Copy package files first for better layer caching

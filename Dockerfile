@@ -47,6 +47,7 @@ RUN apk add --no-cache \
     git \
     openssh-client \
     docker-cli \
+    rsync \
     && rm -rf /var/cache/apk/*
 
 # Create non-root user for security
