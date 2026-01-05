@@ -35,13 +35,13 @@ export class ProxmoxBackend implements IContainerBackend {
    */
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
     const cfg = config.proxmox;
-    const { workspacePath, env = {}, memoryLimit, cpuLimit, reuseVmid } = containerConfig;
+    const { workspacePath, env = {}, memoryLimit, cpuLimit, reuseVmid, templateId } = containerConfig;
     const settingsService = getSettingsService();
 
-    // Get template VMID from settings (database)
-    const templateVmid = await settingsService.getProxmoxTemplateVmid();
+    // Use provided templateId from containerConfig, or fall back to settings (backwards compatibility)
+    const templateVmid = templateId ?? await settingsService.getProxmoxTemplateVmid();
     if (!templateVmid) {
-      throw new Error('No template configured. Create a template in Settings first.');
+      throw new Error('No template configured. Create and provision a template first.');
     }
 
     // Use provided VMID if recreating, otherwise allocate next sequential VMID
@@ -318,33 +318,25 @@ export class ProxmoxBackend implements IContainerBackend {
   }
 
   /**
-   * Check if the template exists
+   * Check if a template exists
+   * Note: For Proxmox with the new multi-template system, actual template validation
+   * happens in createContainer() with the proper template context from the repository.
+   * This method returns true to skip the generic check.
    */
   async imageExists(): Promise<boolean> {
-    const settingsService = getSettingsService();
-    const templateVmid = await settingsService.getProxmoxTemplateVmid();
-    if (!templateVmid) {
-      return false;
-    }
-
-    try {
-      const status = await this.client.getLxcStatus(templateVmid);
-      return !!status;
-    } catch {
-      return false;
-    }
+    // Template validation is now done in createContainer with proper context
+    // The workspace-service passes the correct templateId based on repository settings
+    return true;
   }
 
   /**
-   * Ensure the template is available
+   * Ensure a template is available
+   * Note: With the new multi-template system, actual template validation
+   * happens in createContainer() where we have the proper template context.
    */
   async ensureImage(): Promise<void> {
-    const exists = await this.imageExists();
-    if (!exists) {
-      throw new Error(
-        'No Proxmox LXC template found. Create a template in Settings > Proxmox Template first.'
-      );
-    }
+    // No-op for Proxmox - template validation happens in createContainer
+    // with the correct templateId from repository/user settings
   }
 
   /**
