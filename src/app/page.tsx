@@ -52,8 +52,9 @@ function Dashboard() {
     createTemplate,
     updateTemplate,
     deleteTemplate,
-    provisionTemplate,
-    recreateTemplate,
+    startProvisionInBackground,
+    startRecreateInBackground,
+    isTemplateProvisioning,
   } = useTemplates();
 
   // Fetch repositories on mount
@@ -86,9 +87,9 @@ function Dashboard() {
 
   // Template details modal state (for viewing status, errors, actions)
   const [selectedTemplate, setSelectedTemplate] = useState<ProxmoxTemplate | null>(null);
-  const [provisionProgress, setProvisionProgress] = useState<ProvisionProgress | null>(null);
-  const [isProvisioning, setIsProvisioning] = useState(false);
-  const [provisionError, setProvisionError] = useState<string | null>(null);
+  // Track progress per template (keyed by template ID)
+  const [templateProgress, setTemplateProgress] = useState<Map<string, ProvisionProgress>>(new Map());
+  const [templateErrors, setTemplateErrors] = useState<Map<string, string>>(new Map());
 
   // Terminal state
   const [isTerminalConnected, setIsTerminalConnected] = useState(false);
@@ -208,7 +209,7 @@ function Dashboard() {
     }
   }, [editingRepository, fetchRepositories]);
 
-  // Template handlers - create and auto-provision
+  // Template handlers - create and auto-provision in background
   const handleCreateTemplate = useCallback(async (input: {
     name: string;
     description?: string;
@@ -221,32 +222,45 @@ function Dashboard() {
       setIsTemplateDialogOpen(false);
       setEditingTemplate(null);
 
-      // Auto-start provisioning
-      setSelectedTemplate(template);
-      setProvisionProgress(null);
-      setProvisionError(null);
-      setIsProvisioning(true);
+      // Clear any previous errors for this template
+      setTemplateErrors((prev) => {
+        const next = new Map(prev);
+        next.delete(template.id);
+        return next;
+      });
 
-      try {
-        await provisionTemplate(template.id, undefined, (progress) => {
-          setProvisionProgress(progress);
-        });
-        await fetchTemplates();
-        // Close modal on success
-        setSelectedTemplate(null);
-        setProvisionProgress(null);
-      } catch (err) {
-        setProvisionError(err instanceof Error ? err.message : 'Provisioning failed');
-        await fetchTemplates(); // Refresh to show error status
-      } finally {
-        setIsProvisioning(false);
-      }
+      // Auto-start provisioning in background (non-blocking)
+      startProvisionInBackground(
+        template.id,
+        undefined,
+        // onProgress - update progress for this specific template
+        (progress) => {
+          setTemplateProgress((prev) => new Map(prev).set(template.id, progress));
+        },
+        // onComplete - clear progress
+        () => {
+          setTemplateProgress((prev) => {
+            const next = new Map(prev);
+            next.delete(template.id);
+            return next;
+          });
+        },
+        // onError - set error for this template
+        (err) => {
+          setTemplateErrors((prev) => new Map(prev).set(template.id, err.message));
+          setTemplateProgress((prev) => {
+            const next = new Map(prev);
+            next.delete(template.id);
+            return next;
+          });
+        }
+      );
 
       return template;
     } finally {
       setIsTemplateDialogLoading(false);
     }
-  }, [createTemplate, provisionTemplate, fetchTemplates]);
+  }, [createTemplate, startProvisionInBackground]);
 
   const handleUpdateTemplate = useCallback(async (id: string, updates: {
     name?: string;
@@ -266,8 +280,6 @@ function Dashboard() {
   // Open template details modal
   const handleSelectTemplate = useCallback((template: ProxmoxTemplate) => {
     setSelectedTemplate(template);
-    setProvisionProgress(null);
-    setProvisionError(null);
   }, []);
 
   // Open edit dialog from details modal
@@ -277,49 +289,70 @@ function Dashboard() {
     setIsTemplateDialogOpen(true);
   }, []);
 
-  const handleProvisionTemplate = useCallback(async (template: ProxmoxTemplate) => {
-    // Keep details modal open and show progress there
-    setSelectedTemplate(template);
-    setProvisionProgress(null);
-    setProvisionError(null);
-    setIsProvisioning(true);
-    try {
-      await provisionTemplate(template.id, undefined, (progress) => {
-        setProvisionProgress(progress);
-      });
-      await fetchTemplates();
-      // Close modal on success
-      setSelectedTemplate(null);
-      setProvisionProgress(null);
-    } catch (err) {
-      setProvisionError(err instanceof Error ? err.message : 'Provisioning failed');
-      await fetchTemplates(); // Refresh to show error status
-    } finally {
-      setIsProvisioning(false);
-    }
-  }, [provisionTemplate, fetchTemplates]);
+  const handleProvisionTemplate = useCallback((template: ProxmoxTemplate) => {
+    // Clear any previous error
+    setTemplateErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(template.id);
+      return next;
+    });
 
-  const handleRecreateTemplate = useCallback(async (template: ProxmoxTemplate) => {
-    // Keep details modal open and show progress there
-    setSelectedTemplate(template);
-    setProvisionProgress(null);
-    setProvisionError(null);
-    setIsProvisioning(true);
-    try {
-      await recreateTemplate(template.id, (progress) => {
-        setProvisionProgress(progress);
-      });
-      await fetchTemplates();
-      // Close modal on success
-      setSelectedTemplate(null);
-      setProvisionProgress(null);
-    } catch (err) {
-      setProvisionError(err instanceof Error ? err.message : 'Recreation failed');
-      await fetchTemplates(); // Refresh to show error status
-    } finally {
-      setIsProvisioning(false);
-    }
-  }, [recreateTemplate, fetchTemplates]);
+    // Start provisioning in background - modal can be closed
+    startProvisionInBackground(
+      template.id,
+      undefined,
+      (progress) => {
+        setTemplateProgress((prev) => new Map(prev).set(template.id, progress));
+      },
+      () => {
+        setTemplateProgress((prev) => {
+          const next = new Map(prev);
+          next.delete(template.id);
+          return next;
+        });
+      },
+      (err) => {
+        setTemplateErrors((prev) => new Map(prev).set(template.id, err.message));
+        setTemplateProgress((prev) => {
+          const next = new Map(prev);
+          next.delete(template.id);
+          return next;
+        });
+      }
+    );
+  }, [startProvisionInBackground]);
+
+  const handleRecreateTemplate = useCallback((template: ProxmoxTemplate) => {
+    // Clear any previous error
+    setTemplateErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(template.id);
+      return next;
+    });
+
+    // Start recreation in background - modal can be closed
+    startRecreateInBackground(
+      template.id,
+      (progress) => {
+        setTemplateProgress((prev) => new Map(prev).set(template.id, progress));
+      },
+      () => {
+        setTemplateProgress((prev) => {
+          const next = new Map(prev);
+          next.delete(template.id);
+          return next;
+        });
+      },
+      (err) => {
+        setTemplateErrors((prev) => new Map(prev).set(template.id, err.message));
+        setTemplateProgress((prev) => {
+          const next = new Map(prev);
+          next.delete(template.id);
+          return next;
+        });
+      }
+    );
+  }, [startRecreateInBackground]);
 
   const handleDeleteTemplate = useCallback(async (templateId: string) => {
     await deleteTemplate(templateId);
@@ -553,19 +586,16 @@ function Dashboard() {
         isOpen={!!selectedTemplate}
         template={selectedTemplate}
         onClose={() => {
-          if (!isProvisioning) {
-            setSelectedTemplate(null);
-            setProvisionProgress(null);
-            setProvisionError(null);
-          }
+          // Always allow closing - provisioning continues in background
+          setSelectedTemplate(null);
         }}
         onEdit={handleEditTemplateFromDetails}
         onProvision={handleProvisionTemplate}
         onRecreate={handleRecreateTemplate}
         onDelete={handleDeleteTemplate}
-        isProvisioning={isProvisioning}
-        provisionProgress={provisionProgress}
-        provisionError={provisionError}
+        isProvisioning={selectedTemplate ? isTemplateProvisioning(selectedTemplate.id) : false}
+        provisionProgress={selectedTemplate ? templateProgress.get(selectedTemplate.id) || null : null}
+        provisionError={selectedTemplate ? templateErrors.get(selectedTemplate.id) || null : null}
       />
     </div>
   );
