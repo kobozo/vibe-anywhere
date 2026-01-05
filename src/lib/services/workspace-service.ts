@@ -10,6 +10,12 @@ import simpleGit from 'simple-git';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+// Configure git to allow all directories (needed for container file sync with different ownership)
+// This is safe in our context since we control all repositories
+simpleGit().addConfig('safe.directory', '*', false, 'global').catch(() => {
+  // Ignore errors - may already be set or git config may not be writable
+});
+
 export interface CreateWorkspaceInput {
   name: string;
   branchName: string;
