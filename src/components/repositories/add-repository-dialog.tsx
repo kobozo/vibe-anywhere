@@ -1,15 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FolderPicker } from './folder-picker';
 import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
+import { useAuth } from '@/hooks/useAuth';
+import type { ProxmoxTemplate } from '@/lib/db/schema';
+
+interface TechStackInfo {
+  id: string;
+  name: string;
+  description: string;
+  requiresNesting?: boolean;
+}
 
 interface AddRepositoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddLocal: (name: string, path: string, description?: string) => Promise<void>;
-  onClone: (name: string, url: string, description?: string, sshKeyId?: string) => Promise<void>;
+  onAddLocal: (name: string, path: string, description?: string, techStack?: string[], templateId?: string) => Promise<void>;
+  onClone: (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string) => Promise<void>;
   isLoading: boolean;
+  templates?: ProxmoxTemplate[];
 }
 
 type TabType = 'local' | 'clone';
@@ -20,7 +30,9 @@ export function AddRepositoryDialog({
   onAddLocal,
   onClone,
   isLoading,
+  templates = [],
 }: AddRepositoryDialogProps) {
+  const { token } = useAuth();
   const { keys, fetchKeys, generateKey } = useSSHKeys();
   const [activeTab, setActiveTab] = useState<TabType>('local');
   const [name, setName] = useState('');
@@ -28,6 +40,7 @@ export function AddRepositoryDialog({
   const [selectedPath, setSelectedPath] = useState('');
   const [cloneUrl, setCloneUrl] = useState('');
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   // SSH key generation state
@@ -38,12 +51,35 @@ export function AddRepositoryDialog({
   const [generatedKey, setGeneratedKey] = useState<SSHKeyInfo | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Fetch SSH keys when dialog opens
+  // Tech stack state
+  const [availableTechStacks, setAvailableTechStacks] = useState<TechStackInfo[]>([]);
+  const [templateTechStacks, setTemplateTechStacks] = useState<string[]>([]);
+  const [selectedTechStacks, setSelectedTechStacks] = useState<string[]>([]);
+
+  // Fetch tech stacks
+  const fetchTechStacks = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/tech-stacks', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableTechStacks(data.stacks || []);
+        setTemplateTechStacks(data.templateStacks || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tech stacks:', err);
+    }
+  }, [token]);
+
+  // Fetch SSH keys and tech stacks when dialog opens
   useEffect(() => {
     if (isOpen) {
       fetchKeys();
+      fetchTechStacks();
     }
-  }, [isOpen, fetchKeys]);
+  }, [isOpen, fetchKeys, fetchTechStacks]);
 
   // Auto-select default key
   useEffect(() => {
@@ -52,6 +88,19 @@ export function AddRepositoryDialog({
       setSelectedKeyId(defaultKey.id);
     }
   }, [keys, selectedKeyId]);
+
+  // Auto-select default template
+  useEffect(() => {
+    if (templates.length > 0 && !selectedTemplateId) {
+      const defaultTemplate = templates.find(t => t.isDefault && t.status === 'ready');
+      const firstReady = templates.find(t => t.status === 'ready');
+      if (defaultTemplate) {
+        setSelectedTemplateId(defaultTemplate.id);
+      } else if (firstReady) {
+        setSelectedTemplateId(firstReady.id);
+      }
+    }
+  }, [templates, selectedTemplateId]);
 
   if (!isOpen) return null;
 
@@ -62,12 +111,20 @@ export function AddRepositoryDialog({
     setError(null);
 
     try {
+      // Filter out tech stacks already in template (they don't need to be installed per-workspace)
+      const techStacksToInstall = selectedTechStacks.filter(
+        id => !templateTechStacks.includes(id)
+      );
+
+      // Get template ID (use selected or leave undefined to use default)
+      const templateIdToUse = selectedTemplateId || undefined;
+
       if (activeTab === 'local') {
         if (!selectedPath) {
           setError('Please select a folder');
           return;
         }
-        await onAddLocal(name, selectedPath, description || undefined);
+        await onAddLocal(name, selectedPath, description || undefined, techStacksToInstall.length > 0 ? techStacksToInstall : undefined, templateIdToUse);
       } else {
         if (!cloneUrl) {
           setError('Please enter a clone URL');
@@ -75,7 +132,7 @@ export function AddRepositoryDialog({
         }
         // Only pass SSH key for SSH URLs
         const keyId = isSSHUrl ? selectedKeyId || undefined : undefined;
-        await onClone(name, cloneUrl, description || undefined, keyId);
+        await onClone(name, cloneUrl, description || undefined, keyId, techStacksToInstall.length > 0 ? techStacksToInstall : undefined, templateIdToUse);
       }
 
       // Reset form
@@ -84,10 +141,20 @@ export function AddRepositoryDialog({
       setSelectedPath('');
       setCloneUrl('');
       setSelectedKeyId('');
+      setSelectedTemplateId('');
+      setSelectedTechStacks([]);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add repository');
     }
+  };
+
+  const toggleTechStack = (stackId: string) => {
+    setSelectedTechStacks(prev =>
+      prev.includes(stackId)
+        ? prev.filter(id => id !== stackId)
+        : [...prev, stackId]
+    );
   };
 
   const handlePathSelect = (path: string, folderName: string) => {
@@ -425,6 +492,94 @@ export function AddRepositoryDialog({
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
             />
           </div>
+
+          {/* Template Selection */}
+          {templates.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">
+                Template
+              </label>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+              >
+                <option value="">Use default template</option>
+                {templates.map((template) => (
+                  <option
+                    key={template.id}
+                    value={template.id}
+                    disabled={template.status !== 'ready'}
+                  >
+                    {template.name}
+                    {template.status !== 'ready' && ` (${template.status})`}
+                    {template.isDefault && ' - Default'}
+                  </option>
+                ))}
+              </select>
+              {selectedTemplateId && (() => {
+                const selected = templates.find(t => t.id === selectedTemplateId);
+                return selected?.techStacks && selected.techStacks.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Includes: {selected.techStacks.join(', ')}
+                  </p>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Tech Stack Selection */}
+          {availableTechStacks.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">
+                Tech Stack
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Select development tools to install on workspaces created from this repository.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {availableTechStacks.map((stack) => {
+                  const isInTemplate = templateTechStacks.includes(stack.id);
+                  const isSelected = selectedTechStacks.includes(stack.id);
+
+                  return (
+                    <label
+                      key={stack.id}
+                      className={`flex items-start gap-2 p-2 rounded cursor-pointer transition-colors ${
+                        isInTemplate
+                          ? 'bg-green-600/10 border border-green-500/30 cursor-default'
+                          : isSelected
+                          ? 'bg-blue-600/20 border border-blue-500/50'
+                          : 'bg-gray-700/50 border border-gray-600/50 hover:bg-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected || isInTemplate}
+                        onChange={() => !isInTemplate && toggleTechStack(stack.id)}
+                        disabled={isInTemplate}
+                        className="mt-0.5 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 disabled:opacity-50"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white flex items-center gap-1">
+                          {stack.name}
+                          {isInTemplate && (
+                            <span className="text-xs text-green-400">(in template)</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 truncate">{stack.description}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              {templateTechStacks.length > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Stacks marked "in template" are already pre-installed and will be available immediately.
+                </p>
+              )}
+            </div>
+          )}
         </form>
 
         {/* Footer */}

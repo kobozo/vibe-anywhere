@@ -40,3 +40,37 @@ export interface CommitResult {
   author: string;
   date: Date;
 }
+
+// Agent communication types
+
+export interface GitStatusRequest {
+  requestId: string;
+}
+
+export interface GitDiffRequest {
+  requestId: string;
+  staged?: boolean;
+  files?: string[];
+}
+
+export interface GitStageRequest {
+  requestId: string;
+  files: string[]; // Empty array = stage all
+}
+
+export interface GitUnstageRequest {
+  requestId: string;
+  files: string[];
+}
+
+export interface GitCommitRequest {
+  requestId: string;
+  message: string;
+}
+
+export interface GitOperationResponse<T = unknown> {
+  requestId: string;
+  success: boolean;
+  data?: T;
+  error?: string;
+}

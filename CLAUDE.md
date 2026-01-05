@@ -31,6 +31,12 @@ Session Hub is a web application for running persistent Claude Code CLI instance
 - Use `Plan` agents for architectural decisions
 - Run independent tasks in parallel whenever possible
 
+### Database Changes
+- NEVER modify the database directly with `db:push`
+- ALWAYS use `npm run db:generate` after changing `src/lib/db/schema.ts`
+- Run `npm run db:migrate` to apply migrations
+- Commit migration files (`drizzle/*.sql`) to version control
+
 ## Architecture
 
 ```
@@ -75,12 +81,13 @@ Session Hub is a web application for running persistent Claude Code CLI instance
 npm run dev              # Start dev server
 npm run docker:up        # Start PostgreSQL
 npm run docker:build     # Build Claude CLI image
-npm run db:push          # Push schema to database
 
 # Setup
 npm run setup            # Full setup (docker + db + image)
 
 # Database
+npm run db:generate      # Generate migration after schema changes
+npm run db:migrate       # Apply migrations
 npm run db:studio        # Open Drizzle Studio
 npx tsx scripts/seed-user.ts [username] [password]  # Create user
 
@@ -132,9 +139,10 @@ See `.env.example` for all required variables:
 The Proxmox LXC template contains:
 - Debian 12 (Bookworm)
 - Node.js 22.x
-- Docker 29.x
-- Claude Code CLI 2.x
-- tmux, git, lazygit, lazydocker
+- Docker
+- Claude Code CLI
+- GitHub CLI (gh)
+- tmux, git, vim, jq
 - Session Hub Agent (systemd service)
 
 ### Container User
@@ -152,4 +160,4 @@ The Proxmox LXC template contains:
 - SSH enabled for rsync sync operations
 
 ---
-*Last updated: 2026-01-03*
+*Last updated: 2026-01-05*

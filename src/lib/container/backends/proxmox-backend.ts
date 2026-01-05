@@ -13,6 +13,7 @@ import { getProxmoxClient, ProxmoxClient } from '../proxmox/client';
 import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } from '../proxmox/task-poller';
 import { createSSHStream, execSSHCommand, syncWorkspaceToContainer, syncWorkspaceFromContainer, syncSSHKeyToContainer, cloneRepoInContainer, setupContainerSSHAccess } from '../proxmox/ssh-stream';
 import { getSettingsService } from '@/lib/services/settings-service';
+import { generateInstallScript, getTechStacks } from '../proxmox/tech-stacks';
 
 /**
  * Proxmox LXC container backend implementation
@@ -34,7 +35,7 @@ export class ProxmoxBackend implements IContainerBackend {
    */
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
     const cfg = config.proxmox;
-    const { workspacePath, env = {}, memoryLimit, cpuLimit } = containerConfig;
+    const { workspacePath, env = {}, memoryLimit, cpuLimit, reuseVmid } = containerConfig;
     const settingsService = getSettingsService();
 
     // Get template VMID from settings (database)
@@ -43,9 +44,9 @@ export class ProxmoxBackend implements IContainerBackend {
       throw new Error('No template configured. Create a template in Settings first.');
     }
 
-    // Allocate next sequential VMID from settings
-    const newVmid = await settingsService.allocateWorkspaceVmid();
-    console.log(`Creating LXC container ${newVmid} from template ${templateVmid} for workspace ${workspaceId}`);
+    // Use provided VMID if recreating, otherwise allocate next sequential VMID
+    const newVmid = reuseVmid ?? await settingsService.allocateWorkspaceVmid();
+    console.log(`Creating LXC container ${newVmid} from template ${templateVmid} for workspace ${workspaceId}${reuseVmid ? ' (reusing VMID)' : ''}`);
 
     // Clone the template
     const upid = await this.client.cloneLxc(templateVmid, newVmid, {
@@ -664,6 +665,50 @@ EOF
    */
   generateAgentToken(): string {
     return randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Install tech stacks in a running container
+   * Used to install required tech stacks that aren't pre-installed in the template
+   */
+  async installTechStacks(containerId: string, techStackIds: string[]): Promise<void> {
+    if (!techStackIds || techStackIds.length === 0) {
+      console.log(`No tech stacks to install for container ${containerId}`);
+      return;
+    }
+
+    const vmid = parseInt(containerId, 10);
+    const stacks = getTechStacks(techStackIds);
+
+    if (stacks.length === 0) {
+      console.log(`No valid tech stacks found for IDs: ${techStackIds.join(', ')}`);
+      return;
+    }
+
+    // Get container IP
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Installing tech stacks in container ${vmid}: ${stacks.map(s => s.name).join(', ')}`);
+
+    // Generate the install script
+    const installScript = generateInstallScript(techStackIds);
+
+    try {
+      // Run the install script via SSH as root (tech stacks need root privileges)
+      await execSSHCommand(
+        { host: ip, username: 'root' },
+        ['bash', '-c', installScript],
+        { workingDir: '/' }
+      );
+      console.log(`Tech stacks installed successfully in container ${vmid}`);
+    } catch (error) {
+      console.error(`Failed to install tech stacks in container ${vmid}:`, error);
+      throw new Error(`Tech stack installation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**

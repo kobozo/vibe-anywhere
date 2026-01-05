@@ -8,11 +8,15 @@ import {
   ValidationError,
 } from '@/lib/api-utils';
 
+// Valid tech stack IDs
+const validTechStacks = ['nodejs', 'python', 'go', 'rust', 'docker'];
+
 const createLocalRepoSchema = z.object({
   type: z.literal('local'),
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional(),
   originalPath: z.string().min(1, 'Path is required'),
+  techStack: z.array(z.enum(['nodejs', 'python', 'go', 'rust', 'docker'])).optional().default([]),
 });
 
 // Git URL pattern: supports both HTTPS and SSH URLs
@@ -26,6 +30,7 @@ const cloneRepoSchema = z.object({
   description: z.string().max(500).optional(),
   cloneUrl: z.string().min(1, 'Clone URL is required').regex(gitUrlPattern, 'Invalid git URL. Use HTTPS or SSH format.'),
   sshKeyId: z.string().uuid().optional(),
+  techStack: z.array(z.enum(['nodejs', 'python', 'go', 'rust', 'docker'])).optional().default([]),
 });
 
 const createRepoSchema = z.discriminatedUnion('type', [
@@ -65,6 +70,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
       name: result.data.name,
       description: result.data.description,
       originalPath: result.data.originalPath,
+      techStack: result.data.techStack,
     });
   } else {
     repository = await repoService.cloneRepository(user.id, {
@@ -72,6 +78,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
       description: result.data.description,
       cloneUrl: result.data.cloneUrl,
       sshKeyId: result.data.sshKeyId,
+      techStack: result.data.techStack,
     });
   }
 

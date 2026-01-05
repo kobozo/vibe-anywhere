@@ -7,10 +7,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { WorkspaceInfoPanel } from '@/components/ui/workspace-info-panel';
 
 interface RepositoryTreeProps {
-  onSelectWorkspace: (workspace: Workspace, repository: Repository) => void;
+  onSelectWorkspace: (workspace: Workspace | null, repository: Repository) => void;
   selectedWorkspaceId?: string | null;
+  selectedRepositoryId?: string | null;
   onAddRepository: () => void;
   onAddWorkspace: (repositoryId: string) => void;
+  onEditRepository: (repository: Repository) => void;
   repositories: Repository[];
   isLoading: boolean;
   error: Error | null;
@@ -20,8 +22,10 @@ interface RepositoryTreeProps {
 export function RepositoryTree({
   onSelectWorkspace,
   selectedWorkspaceId,
+  selectedRepositoryId,
   onAddRepository,
   onAddWorkspace,
+  onEditRepository,
   repositories,
   isLoading,
   error,
@@ -286,18 +290,47 @@ export function RepositoryTree({
           <div key={repo.id} className="mb-1">
             {/* Repository header */}
             <div
-              onClick={() => toggleRepo(repo.id)}
+              onClick={() => {
+                // Select repository to show dashboard
+                onSelectWorkspace(null, repo);
+              }}
               className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
-                hover:bg-gray-700/50 ${expandedRepos.has(repo.id) ? 'bg-gray-700/30' : ''}`}
+                hover:bg-gray-700/50 ${
+                  selectedRepositoryId === repo.id && !selectedWorkspaceId
+                    ? 'bg-blue-600/20 ring-1 ring-blue-500/30'
+                    : expandedRepos.has(repo.id)
+                    ? 'bg-gray-700/30'
+                    : ''
+                }`}
             >
-              <span className="text-gray-400 text-xs w-4">
+              <span
+                className="text-gray-400 text-xs w-4 hover:text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleRepo(repo.id);
+                }}
+              >
                 {expandedRepos.has(repo.id) ? '▾' : '▸'}
               </span>
               <span className="text-yellow-400 text-sm">📁</span>
-              <span className="flex-1 text-sm text-gray-200 truncate">{repo.name}</span>
+              <span className={`flex-1 text-sm truncate ${
+                selectedRepositoryId === repo.id && !selectedWorkspaceId
+                  ? 'text-blue-400'
+                  : 'text-gray-200'
+              }`}>{repo.name}</span>
               <span className="text-xs text-gray-500">
                 {repo.sourceType === 'cloned' ? '🔗' : '📂'}
               </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditRepository(repo);
+                }}
+                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 px-1"
+                title="Edit repository"
+              >
+                ✎
+              </button>
               <button
                 onClick={(e) => handleDeleteRepoClick(e, repo)}
                 className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1"

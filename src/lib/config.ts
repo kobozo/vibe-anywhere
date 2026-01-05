@@ -39,6 +39,9 @@ const envSchema = z.object({
   PROXMOX_MEMORY_MB: z.string().default('2048').transform(Number),
   PROXMOX_CORES: z.string().default('2').transform(Number),
   PROXMOX_CLAUDE_CONFIG_PATH: z.string().optional(), // Path to host .claude dir for LXC mount
+  PROXMOX_TEMPLATE_VMID: z.string().default('150').transform(Number),
+  PROXMOX_VMID_MIN: z.string().default('200').transform(Number),
+  PROXMOX_VMID_MAX: z.string().default('299').transform(Number),
 
   // Anthropic API (passed to containers)
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -160,6 +163,11 @@ export const config = {
       memoryMb: cfg.PROXMOX_MEMORY_MB,
       cores: cfg.PROXMOX_CORES,
       claudeConfigPath: cfg.PROXMOX_CLAUDE_CONFIG_PATH,
+      templateVmid: cfg.PROXMOX_TEMPLATE_VMID,
+      vmidRange: {
+        min: cfg.PROXMOX_VMID_MIN,
+        max: cfg.PROXMOX_VMID_MAX,
+      },
     };
   },
 };

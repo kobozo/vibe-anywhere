@@ -19,6 +19,13 @@ export interface AgentEvents {
   onTabBufferRequest: (data: { tabId: string; lines: number }) => void;
   onFileUpload: (data: { requestId: string; tabId?: string; filename: string; data: string; mimeType: string }) => void;
   onError: (error: Error) => void;
+  // Git events
+  onGitStatus: (data: { requestId: string }) => void;
+  onGitDiff: (data: { requestId: string; staged?: boolean; files?: string[] }) => void;
+  onGitStage: (data: { requestId: string; files: string[] }) => void;
+  onGitUnstage: (data: { requestId: string; files: string[] }) => void;
+  onGitCommit: (data: { requestId: string; message: string }) => void;
+  onGitDiscard: (data: { requestId: string; files: string[] }) => void;
 }
 
 export class AgentWebSocket {
@@ -141,6 +148,31 @@ export class AgentWebSocket {
 
     this.socket.on('file:upload', (data) => {
       this.events.onFileUpload(data);
+    });
+
+    // Git events
+    this.socket.on('git:status', (data) => {
+      this.events.onGitStatus(data);
+    });
+
+    this.socket.on('git:diff', (data) => {
+      this.events.onGitDiff(data);
+    });
+
+    this.socket.on('git:stage', (data) => {
+      this.events.onGitStage(data);
+    });
+
+    this.socket.on('git:unstage', (data) => {
+      this.events.onGitUnstage(data);
+    });
+
+    this.socket.on('git:commit', (data) => {
+      this.events.onGitCommit(data);
+    });
+
+    this.socket.on('git:discard', (data) => {
+      this.events.onGitDiscard(data);
     });
 
     this.socket.on('error', (error) => {
@@ -279,6 +311,60 @@ export class AgentWebSocket {
     if (!this.socket?.connected) return;
 
     this.socket.emit('file:uploaded', { requestId, success, filePath, error });
+  }
+
+  /**
+   * Send git status response
+   */
+  sendGitStatus(requestId: string, success: boolean, data?: unknown, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:status:response', { requestId, success, data, error });
+  }
+
+  /**
+   * Send git diff response
+   */
+  sendGitDiff(requestId: string, success: boolean, data?: unknown, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:diff:response', { requestId, success, data, error });
+  }
+
+  /**
+   * Send git stage response
+   */
+  sendGitStage(requestId: string, success: boolean, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:stage:response', { requestId, success, error });
+  }
+
+  /**
+   * Send git unstage response
+   */
+  sendGitUnstage(requestId: string, success: boolean, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:unstage:response', { requestId, success, error });
+  }
+
+  /**
+   * Send git commit response
+   */
+  sendGitCommit(requestId: string, success: boolean, data?: unknown, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:commit:response', { requestId, success, data, error });
+  }
+
+  /**
+   * Send git discard response
+   */
+  sendGitDiscard(requestId: string, success: boolean, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:discard:response', { requestId, success, error });
   }
 
   /**

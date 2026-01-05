@@ -26,11 +26,12 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.2.0';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.3.0';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
   private socketToWorkspace: Map<string, string> = new Map();
+  private updatingAgents: Set<string> = new Set(); // Track agents being updated
 
   /**
    * Register a new agent connection
@@ -94,6 +95,17 @@ class AgentRegistry {
     try {
       const broadcaster = getWorkspaceStateBroadcaster();
       broadcaster.broadcastAgentStatus(workspaceId, true, version);
+
+      // Check if this agent just came back from an update
+      if (this.updatingAgents.has(workspaceId)) {
+        const needsUpdate = this.shouldUpdate(version, EXPECTED_AGENT_VERSION);
+        if (!needsUpdate) {
+          // Agent successfully updated
+          console.log(`Agent ${workspaceId} successfully updated to ${version}`);
+          this.updatingAgents.delete(workspaceId);
+          broadcaster.broadcastAgentUpdating(workspaceId, false);
+        }
+      }
     } catch (e) {
       // Broadcaster might not be initialized yet
     }
@@ -235,10 +247,32 @@ class AgentRegistry {
    * Request agent to update
    */
   requestUpdate(workspaceId: string, bundleUrl: string): boolean {
-    return this.emit(workspaceId, 'agent:update', {
+    const sent = this.emit(workspaceId, 'agent:update', {
       version: EXPECTED_AGENT_VERSION,
       bundleUrl,
     });
+
+    if (sent) {
+      // Track this workspace as updating
+      this.updatingAgents.add(workspaceId);
+
+      // Broadcast updating status
+      try {
+        const broadcaster = getWorkspaceStateBroadcaster();
+        broadcaster.broadcastAgentUpdating(workspaceId, true);
+      } catch (e) {
+        // Broadcaster might not be initialized yet
+      }
+    }
+
+    return sent;
+  }
+
+  /**
+   * Check if an agent is currently updating
+   */
+  isUpdating(workspaceId: string): boolean {
+    return this.updatingAgents.has(workspaceId);
   }
 
   /**
@@ -260,6 +294,48 @@ class AgentRegistry {
       data,
       mimeType,
     });
+  }
+
+  /**
+   * Request git status from the agent
+   */
+  gitStatus(workspaceId: string, requestId: string): boolean {
+    return this.emit(workspaceId, 'git:status', { requestId });
+  }
+
+  /**
+   * Request git diff from the agent
+   */
+  gitDiff(workspaceId: string, requestId: string, options?: { staged?: boolean; files?: string[] }): boolean {
+    return this.emit(workspaceId, 'git:diff', { requestId, ...options });
+  }
+
+  /**
+   * Request to stage files via the agent
+   */
+  gitStage(workspaceId: string, requestId: string, files: string[]): boolean {
+    return this.emit(workspaceId, 'git:stage', { requestId, files });
+  }
+
+  /**
+   * Request to unstage files via the agent
+   */
+  gitUnstage(workspaceId: string, requestId: string, files: string[]): boolean {
+    return this.emit(workspaceId, 'git:unstage', { requestId, files });
+  }
+
+  /**
+   * Request to commit changes via the agent
+   */
+  gitCommit(workspaceId: string, requestId: string, message: string): boolean {
+    return this.emit(workspaceId, 'git:commit', { requestId, message });
+  }
+
+  /**
+   * Request to discard changes via the agent
+   */
+  gitDiscard(workspaceId: string, requestId: string, files: string[]): boolean {
+    return this.emit(workspaceId, 'git:discard', { requestId, files });
   }
 
   /**

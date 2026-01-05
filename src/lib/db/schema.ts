@@ -62,6 +62,13 @@ export const portForwardProtocolEnum = pgEnum('port_forward_protocol', [
   'tcp',
 ]);
 
+export const templateStatusEnum = pgEnum('template_status', [
+  'pending',
+  'provisioning',
+  'ready',
+  'error',
+]);
+
 // Users table
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -72,12 +79,33 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Proxmox Templates table - LXC templates with different tech stacks
+export const proxmoxTemplates = pgTable('proxmox_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  vmid: integer('vmid').unique(), // Actual Proxmox VMID (null until created)
+  node: text('node'), // Proxmox node
+  storage: text('storage'), // Storage used
+  status: templateStatusEnum('status').default('pending').notNull(),
+  techStacks: jsonb('tech_stacks').$type<string[]>().default([]),
+  isDefault: boolean('is_default').default(false).notNull(),
+  errorMessage: text('error_message'), // Error details if status is 'error'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Repositories table - top-level entity
 export const repositories = pgTable('repositories', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
+  templateId: uuid('template_id'), // FK to proxmoxTemplates (constraint in DB, relation defined below)
+  sshKeyId: uuid('ssh_key_id'), // FK to sshKeys - the SSH key to use for this repository
   name: text('name').notNull(),
   description: text('description'),
   path: text('path').notNull(), // Path relative to APP_HOME_DIR/repositories/ or symlink name
@@ -85,6 +113,7 @@ export const repositories = pgTable('repositories', {
   sourceType: repoSourceTypeEnum('source_type').default('local').notNull(),
   cloneUrl: text('clone_url'), // Original URL if cloned
   defaultBranch: text('default_branch').default('main'),
+  techStack: jsonb('tech_stack').$type<string[]>().default([]), // Tech stack IDs to install on workspaces (override template)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -161,9 +190,9 @@ export const tabTemplates = pgTable('tab_templates', {
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
-  name: text('name').notNull(), // Display name: "Claude", "LazyGit", etc.
+  name: text('name').notNull(), // Display name: "Claude", "Terminal", etc.
   icon: text('icon').default('terminal'), // Icon identifier
-  command: text('command').notNull(), // Command to run: "claude", "lazygit", etc.
+  command: text('command').notNull(), // Command to run: "claude", "/bin/bash", etc.
   args: jsonb('args').$type<string[]>().default([]), // Command arguments
   description: text('description'), // Optional description
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
@@ -253,6 +282,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   repositories: many(repositories),
   sshKeys: many(sshKeys),
   tabTemplates: many(tabTemplates),
+  proxmoxTemplates: many(proxmoxTemplates),
   sessions: many(sessions), // Legacy
 }));
 
@@ -268,8 +298,24 @@ export const repositoriesRelations = relations(repositories, ({ one, many }) => 
     fields: [repositories.userId],
     references: [users.id],
   }),
+  template: one(proxmoxTemplates, {
+    fields: [repositories.templateId],
+    references: [proxmoxTemplates.id],
+  }),
+  sshKey: one(sshKeys, {
+    fields: [repositories.sshKeyId],
+    references: [sshKeys.id],
+  }),
   workspaces: many(workspaces),
   sshKeys: many(sshKeys),
+}));
+
+export const proxmoxTemplatesRelations = relations(proxmoxTemplates, ({ one, many }) => ({
+  user: one(users, {
+    fields: [proxmoxTemplates.userId],
+    references: [users.id],
+  }),
+  repositories: many(repositories),
 }));
 
 export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
@@ -365,6 +411,11 @@ export type NewTabLog = typeof tabLogs.$inferInsert;
 // Tab Templates
 export type TabTemplate = typeof tabTemplates.$inferSelect;
 export type NewTabTemplate = typeof tabTemplates.$inferInsert;
+
+// Proxmox Templates
+export type ProxmoxTemplate = typeof proxmoxTemplates.$inferSelect;
+export type NewProxmoxTemplate = typeof proxmoxTemplates.$inferInsert;
+export type TemplateStatus = (typeof templateStatusEnum.enumValues)[number];
 
 // Legacy (Sessions)
 export type Session = typeof sessions.$inferSelect;

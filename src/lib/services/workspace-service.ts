@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { workspaces, type Workspace, type NewWorkspace, type WorkspaceStatus, type ContainerStatus, type ContainerBackend } from '@/lib/db/schema';
 import { getRepositoryService, RepositoryService } from './repository-service';
 import { getSSHKeyService } from './ssh-key-service';
+import { getSettingsService } from './settings-service';
+import { getTemplateService } from './template-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { config } from '@/lib/config';
@@ -311,6 +313,9 @@ export class WorkspaceService {
     }
 
     // Check if container already exists and is running
+    // Save old containerId for potential reuse when recreating (Proxmox)
+    const oldContainerId = workspace.containerId;
+
     if (workspace.containerId) {
       const info = await this.containerBackend.getContainerInfo(workspace.containerId);
       if (info?.status === 'running') {
@@ -346,10 +351,22 @@ export class WorkspaceService {
 
     // Create container with backend-appropriate config
     const backendType = this.containerBackend.backendType;
+    // For Proxmox, reuse the old VMID when recreating instead of allocating a new one
+    const reuseVmid = backendType === 'proxmox' && oldContainerId ? parseInt(oldContainerId, 10) : undefined;
+
+    // Get template VMID for Proxmox - prefer repository's template, fall back to config
+    let proxmoxTemplateVmid: number | undefined;
+    if (backendType === 'proxmox') {
+      const templateService = getTemplateService();
+      const templateVmid = await templateService.getTemplateVmidForRepository(workspace.repositoryId);
+      proxmoxTemplateVmid = templateVmid ?? config.proxmox.templateVmid;
+    }
+
     const containerId = await this.containerBackend.createContainer(workspaceId, {
       image: backendType === 'docker' ? config.docker.claudeImage : undefined,
-      templateId: backendType === 'proxmox' ? config.proxmox.templateVmid : undefined,
+      templateId: proxmoxTemplateVmid,
       workspacePath,
+      reuseVmid,
     });
 
     // IMPORTANT: Save containerId to DB immediately to prevent race conditions
@@ -379,31 +396,24 @@ export class WorkspaceService {
       try {
         const repo = await this.repositoryService.getRepository(workspace.repositoryId);
         if (repo) {
-          // Get SSH key for git operations (try repo keys first, then user keys)
+          // Get the SSH key linked to this repository (via repo.sshKeyId)
+          // This is the ONLY key that should be synced to containers
           const sshKeyService = getSSHKeyService();
-          let keys = await sshKeyService.listRepositoryKeys(repo.id);
           let sshKeyContent: string | undefined;
 
-          // If no repo-specific keys, try to get user's keys
-          if (keys.length === 0 && repo.userId) {
-            keys = await sshKeyService.listUserKeys(repo.userId);
-          }
-
-          // Try to decrypt each key until we find one that works
-          for (const key of keys) {
+          // Use repo.sshKeyId - the key selected during clone/setup
+          if (repo.sshKeyId) {
             try {
-              sshKeyContent = await sshKeyService.getDecryptedPrivateKey(key.id);
-              console.log(`Using SSH key '${key.name}' for git operations`);
-              break;
+              const key = await sshKeyService.getKey(repo.sshKeyId);
+              if (key) {
+                sshKeyContent = await sshKeyService.getDecryptedPrivateKey(key.id);
+                console.log(`Using repository SSH key '${key.name}' for git operations`);
+              }
             } catch (error) {
-              // Key might have been encrypted with a different AUTH_SECRET
-              console.warn(`Could not decrypt SSH key '${key.name}': ${error instanceof Error ? error.message : 'Unknown error'}`);
-              // Continue to try next key
+              console.warn(`Could not decrypt repository SSH key: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
-          }
-
-          if (!sshKeyContent && keys.length > 0) {
-            console.warn(`None of the ${keys.length} SSH keys could be decrypted. Git operations may fail.`);
+          } else {
+            console.log('No SSH key configured for this repository. Git push/pull may not work for private repos.');
           }
 
           // Get remote URL for git setup
@@ -442,6 +452,40 @@ export class WorkspaceService {
 
           if (remoteUrl) {
             console.log(`Container workspace has remote: ${remoteUrl}`);
+          }
+
+          // Install missing tech stacks (if repository has tech stack requirements)
+          if (repo.techStack && repo.techStack.length > 0) {
+            try {
+              // Get template's pre-installed tech stacks from repository's template
+              const templateService = getTemplateService();
+              const repoTemplate = await templateService.getTemplateForRepository(repo.id);
+              const templateTechStacks = repoTemplate?.techStacks || [];
+
+              // Calculate which stacks are missing (repo needs but template doesn't have)
+              const missingStacks = repo.techStack.filter(
+                (stackId: string) => !templateTechStacks.includes(stackId)
+              );
+
+              if (missingStacks.length > 0) {
+                console.log(`Installing missing tech stacks: ${missingStacks.join(', ')}`);
+
+                // Install missing stacks
+                const techStackBackend = this.containerBackend as {
+                  installTechStacks?: (containerId: string, techStackIds: string[]) => Promise<void>;
+                };
+
+                if (techStackBackend.installTechStacks) {
+                  await techStackBackend.installTechStacks(containerId, missingStacks);
+                  console.log('Tech stacks installed successfully');
+                }
+              } else {
+                console.log('All required tech stacks already in template, no installation needed');
+              }
+            } catch (techStackError) {
+              console.error('Failed to install tech stacks:', techStackError);
+              // Continue - tech stack install failure is non-fatal
+            }
           }
         }
       } catch (error) {

@@ -280,14 +280,18 @@ export class ProxmoxClient {
       net0?: string;
       sshPublicKeys: string;
       rootPassword?: string;
+      vlanTag?: number;     // Optional VLAN tag override
+      features?: string;    // Optional features (e.g., 'nesting=1')
     }
   ): Promise<string> {
     const cfg = config.proxmox;
 
     // Build network configuration
+    // Use provided vlanTag, fall back to config
+    const vlanTag = options.vlanTag ?? cfg.vlanTag;
     let net0 = options.net0 || `name=eth0,bridge=${cfg.bridge},ip=dhcp`;
-    if (cfg.vlanTag) {
-      net0 += `,tag=${cfg.vlanTag}`;
+    if (vlanTag) {
+      net0 += `,tag=${vlanTag}`;
     }
 
     const response = await this.proxmox.nodes.$(this.node).lxc.$post({
@@ -299,7 +303,7 @@ export class ProxmoxClient {
       memory: options.memory || cfg.memoryMb,
       cores: options.cores || cfg.cores,
       net0,
-      features: 'nesting=1',
+      features: options.features || undefined,  // Only set if specified (for Docker nesting)
       unprivileged: true,
       start: false,
       'ssh-public-keys': options.sshPublicKeys,

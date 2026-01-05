@@ -8,6 +8,7 @@ import { AgentWebSocket } from './websocket.js';
 import { TmuxManager } from './tmux-manager.js';
 import { OutputBufferManager } from './output-buffer.js';
 import { selfUpdate } from './updater.js';
+import { GitHandler } from './git-handler.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -33,6 +34,7 @@ console.log(`Session Hub URL: ${config.sessionHubUrl}`);
 
 // Initialize components
 const bufferManager = new OutputBufferManager(config.bufferSize);
+const gitHandler = new GitHandler('/workspace');
 
 const tmuxManager = new TmuxManager(
   config.workspaceId,
@@ -193,6 +195,100 @@ const wsClient = new AgentWebSocket(config, {
         data.requestId,
         false,
         undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  // Git event handlers
+  onGitStatus: async (data) => {
+    console.log(`Git status request: ${data.requestId}`);
+    try {
+      const status = await gitHandler.getStatus();
+      wsClient.sendGitStatus(data.requestId, true, status);
+    } catch (error) {
+      console.error('Git status failed:', error);
+      wsClient.sendGitStatus(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onGitDiff: async (data) => {
+    console.log(`Git diff request: ${data.requestId}, staged: ${data.staged}`);
+    try {
+      const diff = await gitHandler.getDiff({ staged: data.staged, files: data.files });
+      wsClient.sendGitDiff(data.requestId, true, diff);
+    } catch (error) {
+      console.error('Git diff failed:', error);
+      wsClient.sendGitDiff(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onGitStage: async (data) => {
+    console.log(`Git stage request: ${data.requestId}, files: ${data.files.length}`);
+    try {
+      await gitHandler.stageFiles(data.files);
+      wsClient.sendGitStage(data.requestId, true);
+    } catch (error) {
+      console.error('Git stage failed:', error);
+      wsClient.sendGitStage(
+        data.requestId,
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onGitUnstage: async (data) => {
+    console.log(`Git unstage request: ${data.requestId}, files: ${data.files.length}`);
+    try {
+      await gitHandler.unstageFiles(data.files);
+      wsClient.sendGitUnstage(data.requestId, true);
+    } catch (error) {
+      console.error('Git unstage failed:', error);
+      wsClient.sendGitUnstage(
+        data.requestId,
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onGitCommit: async (data) => {
+    console.log(`Git commit request: ${data.requestId}`);
+    try {
+      const result = await gitHandler.commit(data.message);
+      wsClient.sendGitCommit(data.requestId, true, result);
+    } catch (error) {
+      console.error('Git commit failed:', error);
+      wsClient.sendGitCommit(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onGitDiscard: async (data) => {
+    console.log(`Git discard request: ${data.requestId}, files: ${data.files.length}`);
+    try {
+      await gitHandler.discardChanges(data.files);
+      wsClient.sendGitDiscard(data.requestId, true);
+    } catch (error) {
+      console.error('Git discard failed:', error);
+      wsClient.sendGitDiscard(
+        data.requestId,
+        false,
         error instanceof Error ? error.message : String(error)
       );
     }

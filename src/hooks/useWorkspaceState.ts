@@ -12,7 +12,10 @@ interface WorkspaceStateUpdate {
   containerIp?: string | null;
   agentConnected?: boolean;
   agentVersion?: string | null;
+  agentUpdating?: boolean;
 }
+
+export type { WorkspaceStateUpdate };
 
 interface UseWorkspaceStateOptions {
   /**

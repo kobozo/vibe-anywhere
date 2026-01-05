@@ -28,6 +28,13 @@ interface PendingUpload {
 }
 const pendingUploads: Map<string, PendingUpload> = new Map();
 
+// Track pending git operations for relay between browser and agent
+interface PendingGitOperation {
+  socket: AuthenticatedSocket;
+  timeoutId: NodeJS.Timeout;
+}
+const pendingGitOperations: Map<string, PendingGitOperation> = new Map();
+
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
@@ -118,6 +125,157 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
         }
       } catch (error) {
         console.error('Error resizing terminal:', error);
+      }
+    });
+
+    // Handle git operations from browser
+    socket.on('git:status', async (data: { requestId: string; workspaceId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('git:status:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingGitOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingGitOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.gitStatus(data.workspaceId, data.requestId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingGitOperations.delete(data.requestId);
+          socket.emit('git:status:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('git:status:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Git status failed',
+        });
+      }
+    });
+
+    socket.on('git:diff', async (data: { requestId: string; workspaceId: string; staged?: boolean; files?: string[] }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('git:diff:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingGitOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingGitOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.gitDiff(data.workspaceId, data.requestId, { staged: data.staged, files: data.files });
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingGitOperations.delete(data.requestId);
+          socket.emit('git:diff:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('git:diff:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Git diff failed',
+        });
+      }
+    });
+
+    socket.on('git:stage', async (data: { requestId: string; workspaceId: string; files: string[] }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('git:stage:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingGitOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingGitOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.gitStage(data.workspaceId, data.requestId, data.files);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingGitOperations.delete(data.requestId);
+          socket.emit('git:stage:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('git:stage:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Git stage failed',
+        });
+      }
+    });
+
+    socket.on('git:unstage', async (data: { requestId: string; workspaceId: string; files: string[] }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('git:unstage:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingGitOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingGitOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.gitUnstage(data.workspaceId, data.requestId, data.files);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingGitOperations.delete(data.requestId);
+          socket.emit('git:unstage:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('git:unstage:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Git unstage failed',
+        });
+      }
+    });
+
+    socket.on('git:commit', async (data: { requestId: string; workspaceId: string; message: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('git:commit:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingGitOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingGitOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.gitCommit(data.workspaceId, data.requestId, data.message);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingGitOperations.delete(data.requestId);
+          socket.emit('git:commit:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('git:commit:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Git commit failed',
+        });
+      }
+    });
+
+    socket.on('git:discard', async (data: { requestId: string; workspaceId: string; files: string[] }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('git:discard:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingGitOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingGitOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.gitDiscard(data.workspaceId, data.requestId, data.files);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingGitOperations.delete(data.requestId);
+          socket.emit('git:discard:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('git:discard:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Git discard failed',
+        });
       }
     });
 
@@ -313,6 +471,61 @@ function setupAgentNamespace(io: SocketServer): void {
         clearTimeout(pending.timeoutId);
         pending.socket.emit('file:uploaded', data);
         pendingUploads.delete(data.requestId);
+      }
+    });
+
+    // Handle git response from agent (relay back to browser)
+    socket.on('git:status:response', (data: { requestId: string; success: boolean; data?: unknown; error?: string }) => {
+      const pending = pendingGitOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('git:status:response', data);
+        pendingGitOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('git:diff:response', (data: { requestId: string; success: boolean; data?: unknown; error?: string }) => {
+      const pending = pendingGitOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('git:diff:response', data);
+        pendingGitOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('git:stage:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingGitOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('git:stage:response', data);
+        pendingGitOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('git:unstage:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingGitOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('git:unstage:response', data);
+        pendingGitOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('git:commit:response', (data: { requestId: string; success: boolean; data?: unknown; error?: string }) => {
+      const pending = pendingGitOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('git:commit:response', data);
+        pendingGitOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('git:discard:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingGitOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('git:discard:response', data);
+        pendingGitOperations.delete(data.requestId);
       }
     });
 

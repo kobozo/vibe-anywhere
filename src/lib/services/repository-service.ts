@@ -11,6 +11,8 @@ export interface CreateLocalRepoInput {
   name: string;
   description?: string;
   originalPath: string; // Path to existing local repo
+  techStack?: string[]; // Tech stack IDs for this repository
+  templateId?: string; // Proxmox template to use for workspaces
 }
 
 export interface CloneRepoInput {
@@ -18,6 +20,8 @@ export interface CloneRepoInput {
   description?: string;
   cloneUrl: string;
   sshKeyId?: string; // Optional SSH key for private repos
+  techStack?: string[]; // Tech stack IDs for this repository
+  templateId?: string; // Proxmox template to use for workspaces
 }
 
 export interface DirectoryEntry {
@@ -133,6 +137,8 @@ export class RepositoryService {
         originalPath: input.originalPath,
         sourceType: 'local',
         defaultBranch,
+        techStack: input.techStack || [],
+        templateId: input.templateId || null,
       })
       .returning();
 
@@ -218,6 +224,9 @@ export class RepositoryService {
         sourceType: 'cloned',
         cloneUrl: input.cloneUrl,
         defaultBranch,
+        techStack: input.techStack || [],
+        templateId: input.templateId || null,
+        sshKeyId: input.sshKeyId || null,
       })
       .returning();
 
@@ -305,7 +314,10 @@ export class RepositoryService {
   /**
    * Update repository metadata
    */
-  async updateRepository(repoId: string, updates: { name?: string; description?: string }): Promise<Repository> {
+  async updateRepository(
+    repoId: string,
+    updates: { name?: string; description?: string; templateId?: string | null; techStack?: string[] }
+  ): Promise<Repository> {
     const [updated] = await db
       .update(repositories)
       .set({

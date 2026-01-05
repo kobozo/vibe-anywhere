@@ -11,6 +11,8 @@ import { eq } from 'drizzle-orm';
 export const SETTINGS_KEYS = {
   PROXMOX_TEMPLATE: 'proxmox.template',
   PROXMOX_VMID_CONFIG: 'proxmox.vmidConfig',
+  PROXMOX_SETTINGS: 'proxmox.settings',
+  PROXMOX_TEMPLATE_CONFIG: 'proxmox.templateConfig',
 } as const;
 
 // Default starting VMID for Proxmox containers
@@ -28,6 +30,24 @@ export interface ProxmoxTemplateSettings {
 export interface ProxmoxVmidConfig {
   startingVmid: number;
   nextWorkspaceVmid: number;  // Next available VMID for workspaces
+}
+
+/**
+ * General Proxmox settings (VLAN, defaults for new containers)
+ */
+export interface ProxmoxSettings {
+  vlanTag?: number;           // Default VLAN tag for containers
+  defaultStorage?: string;    // Default storage ID
+  defaultMemory?: number;     // Default memory in MB
+  defaultCpuCores?: number;   // Default CPU cores
+}
+
+/**
+ * Template configuration (tech stacks and custom script)
+ */
+export interface ProxmoxTemplateConfig {
+  techStacks: string[];           // Array of tech stack IDs to pre-install
+  customPostInstallScript?: string; // Custom bash script to run after provisioning
 }
 
 class SettingsService {
@@ -160,6 +180,68 @@ class SettingsService {
    */
   async clearProxmoxTemplateSettings(): Promise<void> {
     await this.delete(SETTINGS_KEYS.PROXMOX_TEMPLATE);
+  }
+
+  // ============================================
+  // Proxmox General Settings
+  // ============================================
+
+  /**
+   * Get Proxmox general settings
+   */
+  async getProxmoxSettings(): Promise<ProxmoxSettings> {
+    const settings = await this.get<ProxmoxSettings>(SETTINGS_KEYS.PROXMOX_SETTINGS);
+    return settings ?? {};
+  }
+
+  /**
+   * Save Proxmox general settings
+   */
+  async saveProxmoxSettings(settings: ProxmoxSettings): Promise<void> {
+    await this.set(
+      SETTINGS_KEYS.PROXMOX_SETTINGS,
+      settings,
+      'Proxmox general settings (VLAN, defaults)'
+    );
+  }
+
+  /**
+   * Get VLAN tag from settings (falls back to undefined if not set)
+   */
+  async getVlanTag(): Promise<number | undefined> {
+    const settings = await this.getProxmoxSettings();
+    return settings.vlanTag;
+  }
+
+  // ============================================
+  // Proxmox Template Configuration
+  // ============================================
+
+  /**
+   * Get template configuration (tech stacks and custom script)
+   */
+  async getTemplateConfig(): Promise<ProxmoxTemplateConfig> {
+    const config = await this.get<ProxmoxTemplateConfig>(SETTINGS_KEYS.PROXMOX_TEMPLATE_CONFIG);
+    return config ?? { techStacks: [] };
+  }
+
+  /**
+   * Save template configuration
+   */
+  async saveTemplateConfig(config: ProxmoxTemplateConfig): Promise<void> {
+    await this.set(
+      SETTINGS_KEYS.PROXMOX_TEMPLATE_CONFIG,
+      config,
+      'Proxmox template configuration (tech stacks, post-install script)'
+    );
+  }
+
+  /**
+   * Get the list of tech stacks pre-installed in the template
+   */
+  async getTemplateTechStacks(): Promise<string[]> {
+    const config = await this.getTemplateConfig();
+    return config.techStacks;
   }
 }
 

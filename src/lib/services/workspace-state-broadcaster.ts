@@ -13,6 +13,7 @@ interface WorkspaceStateUpdate {
   containerIp?: string | null;
   agentConnected?: boolean;
   agentVersion?: string | null;
+  agentUpdating?: boolean;
 }
 
 class WorkspaceStateBroadcaster {
@@ -68,6 +69,16 @@ class WorkspaceStateBroadcaster {
       workspaceId,
       agentConnected: connected,
       agentVersion: version,
+    });
+  }
+
+  /**
+   * Broadcast agent updating status
+   */
+  broadcastAgentUpdating(workspaceId: string, updating: boolean): void {
+    this.broadcastWorkspaceUpdate({
+      workspaceId,
+      agentUpdating: updating,
     });
   }
 }

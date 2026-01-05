@@ -1,6 +1,5 @@
 # Claude Code CLI Instance Container
 # This Dockerfile creates an isolated environment for running Claude Code
-# with lazygit, lazydocker, and other development tools
 
 FROM node:22-bookworm
 
@@ -14,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Docker CLI (for lazydocker to communicate with host docker)
+# Install Docker CLI (for container management)
 RUN install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && chmod a+r /etc/apt/keyrings/docker.gpg \
@@ -22,19 +21,6 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     && apt-get update \
     && apt-get install -y docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
-
-# Install lazygit
-RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": *"v\K[^"]*') \
-    && curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" \
-    && tar xf lazygit.tar.gz lazygit \
-    && install lazygit -D -t /usr/local/bin/ \
-    && rm lazygit.tar.gz lazygit
-
-# Install lazydocker
-RUN curl -Lo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_$(curl -s https://api.github.com/repos/jesseduffield/lazydocker/releases/latest | grep -Po '"tag_name": *"v\K[^"]*')_Linux_x86_64.tar.gz" \
-    && tar xf lazydocker.tar.gz lazydocker \
-    && install lazydocker -D -t /usr/local/bin/ \
-    && rm lazydocker.tar.gz lazydocker
 
 # Configure git
 RUN git config --global init.defaultBranch main \

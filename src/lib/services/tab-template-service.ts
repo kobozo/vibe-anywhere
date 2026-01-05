@@ -15,33 +15,13 @@ export const DEFAULT_TEMPLATES: Omit<NewTabTemplate, 'userId'>[] = [
     isBuiltIn: true,
   },
   {
-    name: 'LazyGit',
-    icon: 'git',
-    command: 'lazygit',
-    args: [],
-    description: 'Terminal UI for git commands',
-    exitOnClose: true, // Exit when LazyGit exits
-    sortOrder: 1,
-    isBuiltIn: true,
-  },
-  {
-    name: 'LazyDocker',
-    icon: 'docker',
-    command: 'lazydocker',
-    args: [],
-    description: 'Terminal UI for Docker',
-    exitOnClose: true, // Exit when LazyDocker exits
-    sortOrder: 2,
-    isBuiltIn: true,
-  },
-  {
     name: 'Terminal',
     icon: 'terminal',
     command: '/bin/bash',
     args: [],
     description: 'Free terminal session',
     exitOnClose: false, // Terminal stays open
-    sortOrder: 3,
+    sortOrder: 1,
     isBuiltIn: true,
   },
 ];

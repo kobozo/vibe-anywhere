@@ -49,8 +49,17 @@ export function useRepositories() {
   }, [token]);
 
   const createLocalRepository = useCallback(
-    async (name: string, originalPath: string, description?: string) => {
+    async (name: string, originalPath: string, description?: string, techStack?: string[], templateId?: string) => {
       if (!token) throw new Error('Not authenticated');
+
+      const body: Record<string, unknown> = {
+        type: 'local',
+        name,
+        originalPath,
+      };
+      if (description) body.description = description;
+      if (techStack && techStack.length > 0) body.techStack = techStack;
+      if (templateId) body.templateId = templateId;
 
       const response = await fetch('/api/repositories', {
         method: 'POST',
@@ -58,12 +67,7 @@ export function useRepositories() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          type: 'local',
-          name,
-          originalPath,
-          description,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -79,7 +83,7 @@ export function useRepositories() {
   );
 
   const cloneRepository = useCallback(
-    async (name: string, cloneUrl: string, description?: string, sshKeyId?: string) => {
+    async (name: string, cloneUrl: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string) => {
       if (!token) throw new Error('Not authenticated');
 
       const body: Record<string, unknown> = {
@@ -89,6 +93,8 @@ export function useRepositories() {
       };
       if (description) body.description = description;
       if (sshKeyId) body.sshKeyId = sshKeyId;
+      if (techStack && techStack.length > 0) body.techStack = techStack;
+      if (templateId) body.templateId = templateId;
 
       const response = await fetch('/api/repositories', {
         method: 'POST',

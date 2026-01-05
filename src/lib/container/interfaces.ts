@@ -15,6 +15,7 @@ export interface ContainerConfig {
   env?: Record<string, string>;
   memoryLimit?: string;        // e.g., "2g", "512m"
   cpuLimit?: number;           // CPU cores
+  reuseVmid?: number;          // Reuse this VMID when recreating (Proxmox only)
 }
 
 /**
@@ -121,6 +122,15 @@ export interface IContainerBackend {
    * Called before stopping to save any changes
    */
   syncWorkspaceBack?(containerId: string, remotePath: string, localPath: string): Promise<void>;
+
+  /**
+   * Install tech stacks in a running container (Proxmox only)
+   * Called after container starts to install any required tech stacks
+   * that are not pre-installed in the template
+   * @param containerId - Container ID (VMID as string)
+   * @param techStackIds - Array of tech stack IDs to install (e.g., ['nodejs', 'python'])
+   */
+  installTechStacks?(containerId: string, techStackIds: string[]): Promise<void>;
 }
 
 /**

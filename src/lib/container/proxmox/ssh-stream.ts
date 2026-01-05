@@ -326,10 +326,13 @@ export async function syncWorkspaceToContainer(
     username?: string;
     privateKeyPath?: string;
     delete?: boolean;  // Delete files in dest that don't exist in source
+    chownUser?: string;  // User to chown files to after sync
   } = {}
 ): Promise<void> {
   const cfg = config.proxmox;
   const username = options.username || cfg.sshUser || 'root';
+  // The workspace user - files should be owned by this user (default: kobozo)
+  const chownUser = options.chownUser || 'kobozo';
 
   // Find SSH private key
   let privateKeyPath = options.privateKeyPath || cfg.sshPrivateKeyPath;
@@ -387,10 +390,51 @@ export async function syncWorkspaceToContainer(
       stderr += data.toString();
     });
 
-    rsync.on('close', (code) => {
+    rsync.on('close', async (code) => {
       if (code === 0) {
         console.log(`Workspace sync completed successfully`);
-        resolve();
+
+        // Chown the workspace to the target user
+        try {
+          console.log(`Setting ownership of ${remotePath} to ${chownUser}...`);
+          const chownCmd = `chown -R ${chownUser}:${chownUser} ${remotePath}`;
+          const sshArgs = [
+            '-i', privateKeyPath!,
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            `${username}@${containerIp}`,
+            chownCmd,
+          ];
+
+          await new Promise<void>((chownResolve, chownReject) => {
+            const ssh = spawn('ssh', sshArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+            let chownStderr = '';
+
+            ssh.stderr.on('data', (data) => {
+              chownStderr += data.toString();
+            });
+
+            ssh.on('close', (chownCode) => {
+              if (chownCode === 0) {
+                console.log(`Ownership set to ${chownUser} successfully`);
+                chownResolve();
+              } else {
+                console.error(`chown failed with code ${chownCode}: ${chownStderr}`);
+                chownReject(new Error(`chown failed with code ${chownCode}: ${chownStderr}`));
+              }
+            });
+
+            ssh.on('error', (err) => {
+              chownReject(new Error(`Failed to run chown: ${err.message}`));
+            });
+          });
+
+          resolve();
+        } catch (chownErr) {
+          // Log but don't fail the sync - permissions might still work
+          console.error('Warning: Failed to set ownership:', chownErr);
+          resolve();
+        }
       } else {
         console.error(`rsync failed with code ${code}: ${stderr}`);
         reject(new Error(`rsync failed with code ${code}: ${stderr}`));

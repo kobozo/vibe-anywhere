@@ -47,7 +47,7 @@ export class ContainerService {
       HostConfig: {
         Binds: [
           `${workspacePath}:/workspace`,
-          '/var/run/docker.sock:/var/run/docker.sock', // Mount docker socket for lazydocker
+          '/var/run/docker.sock:/var/run/docker.sock', // Mount docker socket for Docker access
           `${this.hostClaudeConfigPath}:/home/node/.claude`, // Share Claude auth from host
         ],
         Memory: this.parseMemoryLimit(memoryLimit || config.docker.memoryLimit),

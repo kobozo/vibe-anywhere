@@ -31,11 +31,13 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { vmid, storage, node, force } = body as {
+  const { vmid, storage, node, force, techStacks, customPostInstallScript } = body as {
     vmid?: number;
     storage?: string;
     node?: string;
     force?: boolean;
+    techStacks?: string[];
+    customPostInstallScript?: string;
   };
 
   const templateManager = getProxmoxTemplateManager();
@@ -66,6 +68,12 @@ export async function POST(request: NextRequest) {
         // status.vmid always has a value (the configured starting VMID or existing template VMID)
         const templateVmid = vmid || status.vmid;
 
+        if (templateVmid === null) {
+          sendEvent('error', { message: 'No VMID provided and no configured starting VMID found' });
+          controller.close();
+          return;
+        }
+
         // If template exists and force is true, delete it first
         if (status.exists && force) {
           sendEvent('progress', { step: 'delete', progress: 0, message: 'Deleting existing template...' });
@@ -81,6 +89,8 @@ export async function POST(request: NextRequest) {
         await templateManager.createTemplate(templateVmid, {
           storage,
           node: node || status.selectedNode || undefined,
+          techStacks: techStacks || [],
+          customPostInstallScript,
           onProgress: (progress) => {
             sendEvent('progress', progress);
           },

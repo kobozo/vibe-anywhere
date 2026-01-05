@@ -121,7 +121,9 @@ apt-get install -y \
     gnupg \
     lsb-release \
     wget \
-    build-essential
+    build-essential \
+    vim \
+    jq
 
 echo "Installing Node.js 22..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -135,14 +137,23 @@ npm install -g @anthropic-ai/claude-code
 
 echo "Claude version: $(claude --version)"
 
-echo "Installing lazygit..."
-LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po "\"tag_name\": *\"v\K[^\"]*")
-curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
-tar xf lazygit.tar.gz lazygit
-install lazygit -D -t /usr/local/bin/
-rm lazygit.tar.gz lazygit
+echo "Installing Docker..."
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io
+systemctl enable docker
 
-echo "lazygit version: $(lazygit --version)"
+echo "Docker version: $(docker --version)"
+
+echo "Installing GitHub CLI..."
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+apt-get update
+apt-get install -y gh
+
+echo "GitHub CLI version: $(gh --version | head -1)"
 
 echo "Installing tmux for session persistence..."
 apt-get install -y tmux
@@ -209,6 +220,15 @@ git config --global init.defaultBranch main
 git config --global user.email "claude@session-hub.local"
 git config --global user.name "Claude Code"
 git config --global --add safe.directory /workspace
+
+echo "Configuring GitHub CLI to use SSH..."
+gh config set git_protocol ssh --host github.com
+# Also configure for kobozo user if exists
+if id kobozo &>/dev/null; then
+    su - kobozo -c "gh config set git_protocol ssh --host github.com"
+    # Add kobozo to docker group
+    usermod -aG docker kobozo
+fi
 
 echo "Creating workspace directory..."
 mkdir -p /workspace

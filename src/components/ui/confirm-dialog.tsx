@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   confirmVariant?: 'danger' | 'warning' | 'default';
   onConfirm: () => void;
   onCancel: () => void;
+  isLoading?: boolean;
 }
 
 export function ConfirmDialog({
@@ -22,6 +23,7 @@ export function ConfirmDialog({
   confirmVariant = 'default',
   onConfirm,
   onCancel,
+  isLoading = false,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -72,15 +74,17 @@ export function ConfirmDialog({
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition-colors"
+            disabled={isLoading}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 text-white rounded transition-colors ${confirmButtonClass}`}
+            disabled={isLoading}
+            className={`px-4 py-2 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmButtonClass}`}
           >
-            {confirmLabel}
+            {isLoading ? 'Loading...' : confirmLabel}
           </button>
         </div>
       </div>

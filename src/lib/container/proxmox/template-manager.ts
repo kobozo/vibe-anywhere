@@ -7,26 +7,30 @@ import { config } from '@/lib/config';
 import { ProxmoxClient, getProxmoxClient } from './client';
 import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } from './task-poller';
 import { execSSHCommand } from './ssh-stream';
-import { getSettingsService, type ProxmoxTemplateSettings } from '@/lib/services/settings-service';
+import { getSettingsService, type ProxmoxTemplateSettings, type ProxmoxTemplateConfig } from '@/lib/services/settings-service';
+import { generateInstallScript, requiresNesting, getTechStacks } from './tech-stacks';
 import * as fs from 'fs';
 
 // Default Debian template to use
 const DEFAULT_OS_TEMPLATE = 'debian-12-standard';
 
-// Provisioning script to run inside the container
-const PROVISIONING_SCRIPT = `
+/**
+ * Core provisioning script - Essential packages only
+ * Tech stacks (Node.js, Python, etc.) are installed separately based on configuration
+ */
+const CORE_PROVISIONING_SCRIPT = `
 set -e
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "=== Starting template provisioning ==="
+echo "=== Starting core template provisioning ==="
 
 # Update package lists
-echo "[1/10] Updating package lists..."
+echo "[1/8] Updating package lists..."
 apt-get update
 
-# Install base packages
-echo "[2/10] Installing base packages..."
+# Install base packages (essential for all workspaces)
+echo "[2/8] Installing base packages..."
 apt-get install -y \\
     curl \\
     git \\
@@ -37,34 +41,21 @@ apt-get install -y \\
     lsb-release \\
     wget \\
     build-essential \\
-    rsync
+    rsync \\
+    vim \\
+    jq
 
-# Install Node.js 22
-echo "[3/10] Installing Node.js 22..."
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
-echo "Node.js version: $(node --version)"
-echo "npm version: $(npm --version)"
-
-# Install Claude Code CLI
-echo "[4/10] Installing Claude Code CLI..."
-npm install -g @anthropic-ai/claude-code
-echo "Claude version: $(claude --version || echo 'installed')"
-
-# Install lazygit (optional, non-fatal if fails)
-echo "[5/10] Installing lazygit..."
-LAZYGIT_VERSION="0.44.1"
-if curl -fsSL -o /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v\${LAZYGIT_VERSION}/lazygit_\${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"; then
-    tar xf /tmp/lazygit.tar.gz -C /tmp lazygit
-    install /tmp/lazygit -D -t /usr/local/bin/
-    rm -f /tmp/lazygit.tar.gz /tmp/lazygit
-    echo "lazygit installed"
-else
-    echo "Warning: lazygit installation failed (non-fatal)"
-fi
+# Install GitHub CLI
+echo "[3/8] Installing GitHub CLI..."
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+apt-get update
+apt-get install -y gh
+echo "GitHub CLI version: \$(gh --version | head -1)"
 
 # Install tmux
-echo "[6/10] Installing tmux..."
+echo "[4/8] Installing tmux..."
 apt-get install -y tmux
 
 # Configure tmux
@@ -90,7 +81,7 @@ TMUXEOF
 chmod 644 /etc/tmux.conf
 
 # Create kobozo user for running Claude sessions
-echo "[7/10] Creating kobozo user..."
+echo "[5/8] Creating kobozo user..."
 if ! id kobozo &>/dev/null; then
     useradd -m -s /bin/bash kobozo
     echo "kobozo:SessionHub2024!" | chpasswd
@@ -100,13 +91,13 @@ if ! id kobozo &>/dev/null; then
 fi
 
 # Create workspace directory
-echo "[8/10] Creating workspace directory..."
+echo "[6/8] Creating workspace directory..."
 mkdir -p /workspace
 chown kobozo:kobozo /workspace
 chmod 755 /workspace
 
-# Setup Session Hub agent
-echo "[9/10] Setting up Session Hub agent..."
+# Setup Session Hub agent directory
+echo "[7/8] Setting up Session Hub agent..."
 mkdir -p /opt/session-hub-agent
 chown -R kobozo:kobozo /opt/session-hub-agent
 
@@ -134,8 +125,8 @@ EOF
 systemctl daemon-reload
 systemctl enable session-hub-agent
 
-# Configure SSH
-echo "[10/10] Configuring SSH and git..."
+# Configure SSH and git
+echo "[8/8] Configuring SSH and git..."
 systemctl enable ssh
 
 # Configure git globally
@@ -143,12 +134,17 @@ git config --global init.defaultBranch main
 git config --global user.email "claude@session-hub.local"
 git config --global user.name "Claude Code"
 git config --global --add safe.directory /workspace
+git config --global --add safe.directory '*'
 
 # Configure git for kobozo user
 su - kobozo -c "git config --global init.defaultBranch main"
 su - kobozo -c "git config --global user.email 'claude@session-hub.local'"
 su - kobozo -c "git config --global user.name 'Claude Code'"
 su - kobozo -c "git config --global --add safe.directory /workspace"
+su - kobozo -c "git config --global --add safe.directory '*'"
+
+# Configure GitHub CLI to use SSH (will use SSH keys synced to workspace)
+su - kobozo -c "gh config set git_protocol ssh --host github.com"
 
 # Create Claude config directories
 mkdir -p /root/.claude
@@ -157,11 +153,29 @@ mkdir -p /home/kobozo/.claude
 chown kobozo:kobozo /home/kobozo/.claude
 chmod 700 /home/kobozo/.claude
 
-# Cleanup
+echo "=== Core template provisioning complete ==="
+`;
+
+/**
+ * Claude CLI installation script (always required for Session Hub)
+ * Requires Node.js to be installed first
+ */
+const CLAUDE_CLI_INSTALL_SCRIPT = `
+set -e
+echo "=== Installing Claude Code CLI ==="
+npm install -g @anthropic-ai/claude-code
+echo "Claude version: \$(claude --version || echo 'installed')"
+echo "=== Claude Code CLI installed ==="
+`;
+
+/**
+ * Cleanup script to run after all installations
+ */
+const CLEANUP_SCRIPT = `
+echo "=== Cleaning up ==="
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-
-echo "=== Template provisioning complete ==="
+echo "=== Cleanup complete ==="
 `;
 
 export interface NodeInfo {
@@ -177,6 +191,8 @@ export interface TemplateStatus {
   sshKeyConfigured: boolean;
   nodes: string[];
   selectedNode: string | null;
+  techStacks: string[];  // Pre-installed tech stack IDs
+  customPostInstallScript?: string;
 }
 
 export interface CreateTemplateProgress {
@@ -249,6 +265,8 @@ export class ProxmoxTemplateManager {
     const existingTemplateVmid = await settingsService.getProxmoxTemplateVmid();
     // Get the configured starting VMID for display
     const configuredVmid = await settingsService.getTemplateVmid();
+    // Get template configuration (tech stacks, post-install script)
+    const templateConfig = await settingsService.getTemplateConfig();
 
     if (!existingTemplateVmid) {
       // No template created yet - show the configured starting VMID
@@ -259,6 +277,8 @@ export class ProxmoxTemplateManager {
         sshKeyConfigured: false,
         nodes: nodeInfo.allNodes,
         selectedNode: nodeInfo.node,
+        techStacks: templateConfig.techStacks,
+        customPostInstallScript: templateConfig.customPostInstallScript,
       };
     }
 
@@ -273,6 +293,8 @@ export class ProxmoxTemplateManager {
         sshKeyConfigured: true, // If template exists, assume SSH is configured
         nodes: nodeInfo.allNodes,
         selectedNode: nodeInfo.node,
+        techStacks: templateConfig.techStacks,
+        customPostInstallScript: templateConfig.customPostInstallScript,
       };
     } catch {
       // Template record exists in DB but not in Proxmox - clear the stale record
@@ -284,6 +306,8 @@ export class ProxmoxTemplateManager {
         sshKeyConfigured: false,
         nodes: nodeInfo.allNodes,
         selectedNode: nodeInfo.node,
+        techStacks: templateConfig.techStacks,
+        customPostInstallScript: templateConfig.customPostInstallScript,
       };
     }
   }
@@ -359,13 +383,26 @@ export class ProxmoxTemplateManager {
   async createTemplate(
     vmid: number,
     options: {
+      name?: string;
       storage?: string;
       node?: string;
+      techStacks?: string[];
+      customPostInstallScript?: string;
       onProgress?: ProgressCallback;
     } = {}
   ): Promise<void> {
-    const { storage, onProgress } = options;
-    const storageId = storage || config.proxmox.storage || 'local-lvm';
+    const { name, storage, onProgress, techStacks = [], customPostInstallScript } = options;
+    const settingsService = getSettingsService();
+
+    // Get settings from database
+    const proxmoxSettings = await settingsService.getProxmoxSettings();
+    const storageId = storage || proxmoxSettings.defaultStorage || config.proxmox.storage || 'local-lvm';
+    const memory = proxmoxSettings.defaultMemory || config.proxmox.memoryMb || 2048;
+    const cores = proxmoxSettings.defaultCpuCores || config.proxmox.cores || 2;
+    const vlanTag = proxmoxSettings.vlanTag ?? config.proxmox.vlanTag;
+
+    // Check if any selected tech stack requires nesting (e.g., Docker)
+    const needsNesting = requiresNesting(techStacks);
 
     const progress = (step: string, pct: number, msg: string) => {
       console.log(`[${pct}%] ${step}: ${msg}`);
@@ -386,14 +423,22 @@ export class ProxmoxTemplateManager {
 
     // Step 3: Create container with SSH keys
     progress('create', 20, 'Creating container...');
+    // Generate hostname from name (sanitize for valid hostname)
+    const hostname = (name || 'session-hub-template')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 63) || 'session-hub-template';
     const upid = await this.client.createLxcWithSSHKeys(vmid, osTemplate, {
-      hostname: 'session-hub-template',
-      description: 'Session Hub Claude instance template',
+      hostname,
+      description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
       storage: storageId,
-      memory: config.proxmox.memoryMb || 2048,
-      cores: config.proxmox.cores || 2,
+      memory,
+      cores,
       sshPublicKeys: sshPublicKey,
       rootPassword: 'SessionHub2024!',
+      vlanTag,
+      features: needsNesting ? 'nesting=1' : undefined,
     });
 
     await pollTaskUntilComplete(this.client, upid, {
@@ -415,7 +460,7 @@ export class ProxmoxTemplateManager {
     // Step 6: Provision the container via SSH
     progress('provision', 45, 'Provisioning container (this may take several minutes)...');
     try {
-      await this.provisionContainer(containerIp, (msg) => {
+      await this.provisionContainer(containerIp, techStacks, customPostInstallScript, (msg) => {
         progress('provision', 70, msg);
       });
     } catch (error) {
@@ -446,14 +491,19 @@ export class ProxmoxTemplateManager {
     progress('template', 95, 'Converting to template...');
     await this.client.convertToTemplate(vmid);
 
-    // Step 9: Save template settings to database
+    // Step 9: Save template settings to database (including tech stacks)
     progress('save', 98, 'Saving template configuration...');
-    const settingsService = getSettingsService();
     await settingsService.saveProxmoxTemplateSettings({
       vmid,
       node: options.node || this.client.getNodeName(),
       storage: storageId,
       createdAt: new Date().toISOString(),
+    });
+
+    // Save template config (tech stacks and custom script)
+    await settingsService.saveTemplateConfig({
+      techStacks,
+      customPostInstallScript,
     });
 
     progress('complete', 100, 'Template created successfully!');
@@ -464,6 +514,8 @@ export class ProxmoxTemplateManager {
    */
   private async provisionContainer(
     containerIp: string,
+    techStacks: string[] = [],
+    customPostInstallScript?: string,
     onProgress?: (message: string) => void
   ): Promise<void> {
     const sshUser = 'root';
@@ -484,50 +536,143 @@ export class ProxmoxTemplateManager {
       }
     }
 
-    // Run provisioning script
-    onProgress?.('Running provisioning script...');
-    const result = await execSSHCommand(
+    // Step 1: Run core provisioning script
+    onProgress?.('Running core provisioning...');
+    let result = await execSSHCommand(
       { host: containerIp, username: sshUser },
-      ['bash', '-c', PROVISIONING_SCRIPT],
+      ['bash', '-c', CORE_PROVISIONING_SCRIPT],
       { workingDir: '/' }
     );
 
     if (result.exitCode !== 0) {
-      console.error('Provisioning stderr:', result.stderr);
-      throw new Error(`Provisioning failed with exit code ${result.exitCode}`);
+      console.error('Core provisioning stderr:', result.stderr);
+      throw new Error(`Core provisioning failed with exit code ${result.exitCode}`);
     }
+
+    // Step 2: Install selected tech stacks
+    if (techStacks.length > 0) {
+      onProgress?.(`Installing tech stacks: ${techStacks.join(', ')}...`);
+      const techStackScript = generateInstallScript(techStacks);
+
+      result = await execSSHCommand(
+        { host: containerIp, username: sshUser },
+        ['bash', '-c', techStackScript],
+        { workingDir: '/' }
+      );
+
+      if (result.exitCode !== 0) {
+        console.error('Tech stack installation stderr:', result.stderr);
+        throw new Error(`Tech stack installation failed with exit code ${result.exitCode}`);
+      }
+
+      // If Node.js was installed, also install Claude CLI
+      if (techStacks.includes('nodejs')) {
+        onProgress?.('Installing Claude Code CLI...');
+        result = await execSSHCommand(
+          { host: containerIp, username: sshUser },
+          ['bash', '-c', CLAUDE_CLI_INSTALL_SCRIPT],
+          { workingDir: '/' }
+        );
+
+        if (result.exitCode !== 0) {
+          console.error('Claude CLI installation stderr:', result.stderr);
+          throw new Error(`Claude CLI installation failed with exit code ${result.exitCode}`);
+        }
+      }
+
+      // If Docker was installed, add kobozo to docker group
+      if (techStacks.includes('docker')) {
+        onProgress?.('Configuring Docker for kobozo user...');
+        await execSSHCommand(
+          { host: containerIp, username: sshUser },
+          ['bash', '-c', 'usermod -aG docker kobozo || true'],
+          { workingDir: '/' }
+        );
+      }
+    }
+
+    // Step 3: Run custom post-install script if provided
+    if (customPostInstallScript && customPostInstallScript.trim()) {
+      onProgress?.('Running custom post-install script...');
+      result = await execSSHCommand(
+        { host: containerIp, username: sshUser },
+        ['bash', '-c', customPostInstallScript],
+        { workingDir: '/' }
+      );
+
+      if (result.exitCode !== 0) {
+        console.error('Custom script stderr:', result.stderr);
+        throw new Error(`Custom post-install script failed with exit code ${result.exitCode}`);
+      }
+    }
+
+    // Step 4: Cleanup
+    onProgress?.('Cleaning up...');
+    await execSSHCommand(
+      { host: containerIp, username: sshUser },
+      ['bash', '-c', CLEANUP_SCRIPT],
+      { workingDir: '/' }
+    );
 
     onProgress?.('Provisioning complete');
   }
 
   /**
-   * Delete an existing template
+   * Delete an existing template (legacy method - also clears old settings)
    */
   async deleteTemplate(vmid: number): Promise<void> {
+    await this.deleteProxmoxTemplate(vmid);
+
+    // Clear the settings from database (legacy single-template system)
+    const settingsService = getSettingsService();
+    await settingsService.clearProxmoxTemplateSettings();
+  }
+
+  /**
+   * Delete a template from Proxmox only (does not touch database settings)
+   * Used by the multi-template system where database records are managed separately
+   */
+  async deleteProxmoxTemplate(vmid: number): Promise<void> {
+    console.log(`Attempting to delete Proxmox template VMID ${vmid}...`);
+
+    // Try to stop the container if it's running
     try {
       const status = await this.client.getLxcStatus(vmid);
+      console.log(`Template ${vmid} status: ${status.status}`);
       if (status.status !== 'stopped') {
+        console.log(`Stopping template ${vmid}...`);
         const stopUpid = await this.client.stopLxc(vmid);
         await pollTaskUntilComplete(this.client, stopUpid, { timeoutMs: 60000 });
       }
-    } catch {
-      // Container might not exist, continue with deletion attempt
+    } catch (error) {
+      // Container might not exist or be in a state where it can't be stopped
+      console.log(`Could not get/stop template ${vmid} status:`, error);
     }
 
+    // Try to delete the container
     try {
+      console.log(`Deleting template ${vmid} from Proxmox...`);
       const deleteUpid = await this.client.deleteLxc(vmid, true);
       await pollTaskUntilComplete(this.client, deleteUpid, { timeoutMs: 60000 });
+      console.log(`Successfully deleted template ${vmid} from Proxmox`);
     } catch (error) {
-      // If container doesn't exist, that's fine
+      // If container doesn't exist or is already deleted, that's fine
       const errorMsg = error instanceof Error ? error.message : String(error);
-      if (!errorMsg.includes('does not exist') && !errorMsg.includes('not found')) {
+      const isNotFoundError =
+        errorMsg.toLowerCase().includes('does not exist') ||
+        errorMsg.toLowerCase().includes('not found') ||
+        errorMsg.toLowerCase().includes('no such') ||
+        errorMsg.includes('500') || // Sometimes Proxmox returns 500 for missing containers
+        errorMsg.includes('Configuration file') && errorMsg.includes('does not exist');
+
+      if (isNotFoundError) {
+        console.log(`Template ${vmid} not found in Proxmox (already deleted?)`);
+      } else {
+        // Re-throw other errors
+        console.error(`Error deleting template ${vmid}:`, error);
         throw error;
       }
     }
-
-    // Clear the settings from database
-    const settingsService = getSettingsService();
-    await settingsService.clearProxmoxTemplateSettings();
   }
 }
 

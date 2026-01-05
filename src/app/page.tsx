@@ -4,13 +4,19 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuthState, AuthProvider, useAuth } from '@/hooks/useAuth';
 import { useRepositories } from '@/hooks/useRepositories';
+import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
+import { useTemplates, type ProvisionProgress } from '@/hooks/useTemplates';
 import { RepositoryTree } from '@/components/repositories/repository-tree';
 import { AddRepositoryDialog } from '@/components/repositories/add-repository-dialog';
+import { EditRepositoryDialog } from '@/components/repositories/edit-repository-dialog';
 import { CreateWorkspaceDialog } from '@/components/workspaces/create-workspace-dialog';
 import { TabBar } from '@/components/tabs/tab-bar';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
-import type { Repository, Workspace } from '@/lib/db/schema';
+import { GitPanel } from '@/components/git';
+import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
+import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
+import type { Repository, Workspace, ProxmoxTemplate } from '@/lib/db/schema';
 import type { TabInfo } from '@/hooks/useTabs';
 
 // Dynamic import with SSR disabled - xterm.js uses browser-only APIs
@@ -38,6 +44,18 @@ function Dashboard() {
     fetchRepositories,
   } = useRepositories();
 
+  // Templates hook
+  const {
+    templates,
+    isLoading: templatesLoading,
+    fetchTemplates,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
+    provisionTemplate,
+    recreateTemplate,
+  } = useTemplates();
+
   // Fetch repositories on mount
   useEffect(() => {
     if (user) {
@@ -57,15 +75,49 @@ function Dashboard() {
   const [workspaceRepoId, setWorkspaceRepoId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Edit repository state
+  const [editingRepository, setEditingRepository] = useState<Repository | null>(null);
+  const [isEditRepoLoading, setIsEditRepoLoading] = useState(false);
+
+  // Template dialog state
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ProxmoxTemplate | null>(null);
+  const [isTemplateDialogLoading, setIsTemplateDialogLoading] = useState(false);
+
+  // Template details modal state (for viewing status, errors, actions)
+  const [selectedTemplate, setSelectedTemplate] = useState<ProxmoxTemplate | null>(null);
+  const [provisionProgress, setProvisionProgress] = useState<ProvisionProgress | null>(null);
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [provisionError, setProvisionError] = useState<string | null>(null);
+
   // Terminal state
   const [isTerminalConnected, setIsTerminalConnected] = useState(false);
   const deleteTabRef = useRef<((tabId: string) => Promise<void>) | null>(null);
+  const workspaceTabsRef = useRef<TabInfo[]>([]);
 
-  const handleSelectWorkspace = useCallback((workspace: Workspace, repository: Repository) => {
+  const handleSelectWorkspace = useCallback((workspace: Workspace | null, repository: Repository) => {
     setSelectedRepository(repository);
     setSelectedWorkspace(workspace);
     setSelectedTab(null); // Will be auto-selected by TabBar
   }, []);
+
+  // Handle container destruction - clear tabs when container is destroyed
+  const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
+    if (selectedWorkspace && update.workspaceId === selectedWorkspace.id) {
+      // If container was destroyed (status changed to 'none'), clear tabs
+      if (update.containerStatus === 'none') {
+        setSelectedTab(null);
+        // Deselect workspace to show repository dashboard
+        setSelectedWorkspace(null);
+      }
+    }
+  }, [selectedWorkspace]);
+
+  // Subscribe to workspace state updates for the selected workspace
+  useWorkspaceState({
+    workspaceIds: selectedWorkspace ? [selectedWorkspace.id] : undefined,
+    onUpdate: handleWorkspaceUpdate,
+  });
 
   const handleAddWorkspace = useCallback((repositoryId: string) => {
     setWorkspaceRepoId(repositoryId);
@@ -99,10 +151,10 @@ function Dashboard() {
     }
   }, [workspaceRepoId, fetchRepositories]);
 
-  const handleAddLocalRepo = useCallback(async (name: string, path: string, description?: string) => {
+  const handleAddLocalRepo = useCallback(async (name: string, path: string, description?: string, techStack?: string[], templateId?: string) => {
     setActionLoading(true);
     try {
-      await createLocalRepository(name, path, description);
+      await createLocalRepository(name, path, description, techStack, templateId);
       await fetchRepositories(); // Refresh to ensure sidebar updates
       setIsAddRepoOpen(false);
     } finally {
@@ -110,16 +162,170 @@ function Dashboard() {
     }
   }, [createLocalRepository, fetchRepositories]);
 
-  const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string) => {
+  const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string) => {
     setActionLoading(true);
     try {
-      await cloneRepository(name, url, description, sshKeyId);
+      await cloneRepository(name, url, description, sshKeyId, techStack, templateId);
       await fetchRepositories(); // Refresh to ensure sidebar updates
       setIsAddRepoOpen(false);
     } finally {
       setActionLoading(false);
     }
   }, [cloneRepository, fetchRepositories]);
+
+  // Edit repository handlers
+  const handleEditRepository = useCallback((repository: Repository) => {
+    setEditingRepository(repository);
+  }, []);
+
+  const handleSaveRepository = useCallback(async (updates: {
+    name?: string;
+    description?: string;
+    templateId?: string | null;
+  }) => {
+    if (!editingRepository) return;
+
+    setIsEditRepoLoading(true);
+    try {
+      const response = await fetch(`/api/repositories/${editingRepository.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error?.message || 'Failed to update repository');
+      }
+
+      await fetchRepositories();
+      setEditingRepository(null);
+    } finally {
+      setIsEditRepoLoading(false);
+    }
+  }, [editingRepository, fetchRepositories]);
+
+  // Template handlers - create and auto-provision
+  const handleCreateTemplate = useCallback(async (input: {
+    name: string;
+    description?: string;
+    techStacks?: string[];
+    isDefault?: boolean;
+  }) => {
+    setIsTemplateDialogLoading(true);
+    try {
+      const template = await createTemplate(input);
+      setIsTemplateDialogOpen(false);
+      setEditingTemplate(null);
+
+      // Auto-start provisioning
+      setSelectedTemplate(template);
+      setProvisionProgress(null);
+      setProvisionError(null);
+      setIsProvisioning(true);
+
+      try {
+        await provisionTemplate(template.id, undefined, (progress) => {
+          setProvisionProgress(progress);
+        });
+        await fetchTemplates();
+        // Close modal on success
+        setSelectedTemplate(null);
+        setProvisionProgress(null);
+      } catch (err) {
+        setProvisionError(err instanceof Error ? err.message : 'Provisioning failed');
+        await fetchTemplates(); // Refresh to show error status
+      } finally {
+        setIsProvisioning(false);
+      }
+
+      return template;
+    } finally {
+      setIsTemplateDialogLoading(false);
+    }
+  }, [createTemplate, provisionTemplate, fetchTemplates]);
+
+  const handleUpdateTemplate = useCallback(async (id: string, updates: {
+    name?: string;
+    description?: string;
+    isDefault?: boolean;
+  }) => {
+    setIsTemplateDialogLoading(true);
+    try {
+      await updateTemplate(id, updates);
+      setIsTemplateDialogOpen(false);
+      setEditingTemplate(null);
+    } finally {
+      setIsTemplateDialogLoading(false);
+    }
+  }, [updateTemplate]);
+
+  // Open template details modal
+  const handleSelectTemplate = useCallback((template: ProxmoxTemplate) => {
+    setSelectedTemplate(template);
+    setProvisionProgress(null);
+    setProvisionError(null);
+  }, []);
+
+  // Open edit dialog from details modal
+  const handleEditTemplateFromDetails = useCallback((template: ProxmoxTemplate) => {
+    setSelectedTemplate(null); // Close details modal
+    setEditingTemplate(template);
+    setIsTemplateDialogOpen(true);
+  }, []);
+
+  const handleProvisionTemplate = useCallback(async (template: ProxmoxTemplate) => {
+    // Keep details modal open and show progress there
+    setSelectedTemplate(template);
+    setProvisionProgress(null);
+    setProvisionError(null);
+    setIsProvisioning(true);
+    try {
+      await provisionTemplate(template.id, undefined, (progress) => {
+        setProvisionProgress(progress);
+      });
+      await fetchTemplates();
+      // Close modal on success
+      setSelectedTemplate(null);
+      setProvisionProgress(null);
+    } catch (err) {
+      setProvisionError(err instanceof Error ? err.message : 'Provisioning failed');
+      await fetchTemplates(); // Refresh to show error status
+    } finally {
+      setIsProvisioning(false);
+    }
+  }, [provisionTemplate, fetchTemplates]);
+
+  const handleRecreateTemplate = useCallback(async (template: ProxmoxTemplate) => {
+    // Keep details modal open and show progress there
+    setSelectedTemplate(template);
+    setProvisionProgress(null);
+    setProvisionError(null);
+    setIsProvisioning(true);
+    try {
+      await recreateTemplate(template.id, (progress) => {
+        setProvisionProgress(progress);
+      });
+      await fetchTemplates();
+      // Close modal on success
+      setSelectedTemplate(null);
+      setProvisionProgress(null);
+    } catch (err) {
+      setProvisionError(err instanceof Error ? err.message : 'Recreation failed');
+      await fetchTemplates(); // Refresh to show error status
+    } finally {
+      setIsProvisioning(false);
+    }
+  }, [recreateTemplate, fetchTemplates]);
+
+  const handleDeleteTemplate = useCallback(async (templateId: string) => {
+    await deleteTemplate(templateId);
+    setSelectedTemplate(null); // Close modal after delete
+    await fetchRepositories(); // Refresh to update any repos that had this template
+  }, [deleteTemplate, fetchRepositories]);
 
   if (authLoading) {
     return (
@@ -183,17 +389,30 @@ function Dashboard() {
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar - Repository tree */}
+        {/* Sidebar - Repository tree + Templates */}
         <aside className="w-72 border-r border-gray-700 flex-shrink-0 overflow-hidden flex flex-col">
-          <RepositoryTree
-            onSelectWorkspace={handleSelectWorkspace}
-            selectedWorkspaceId={selectedWorkspace?.id}
-            onAddRepository={() => setIsAddRepoOpen(true)}
-            onAddWorkspace={handleAddWorkspace}
-            repositories={repositories}
-            isLoading={reposLoading}
-            error={reposError}
-            onDeleteRepository={deleteRepository}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <RepositoryTree
+              onSelectWorkspace={handleSelectWorkspace}
+              selectedWorkspaceId={selectedWorkspace?.id}
+              selectedRepositoryId={selectedRepository?.id}
+              onAddRepository={() => setIsAddRepoOpen(true)}
+              onAddWorkspace={handleAddWorkspace}
+              onEditRepository={handleEditRepository}
+              repositories={repositories}
+              isLoading={reposLoading}
+              error={reposError}
+              onDeleteRepository={deleteRepository}
+            />
+          </div>
+          <TemplateSection
+            templates={templates}
+            isLoading={templatesLoading}
+            onAddTemplate={() => {
+              setEditingTemplate(null);
+              setIsTemplateDialogOpen(true);
+            }}
+            onSelectTemplate={handleSelectTemplate}
           />
         </aside>
 
@@ -206,19 +425,30 @@ function Dashboard() {
                 workspaceId={selectedWorkspace.id}
                 selectedTabId={selectedTab?.id || null}
                 onSelectTab={setSelectedTab}
+                onTabsChange={(tabs) => { workspaceTabsRef.current = tabs; }}
                 onExposeDeleteTab={(fn) => { deleteTabRef.current = fn; }}
               />
 
-              {/* Terminal area */}
+              {/* Terminal/Git area */}
               <div className="flex-1 p-4 min-h-0">
-                {selectedTab && selectedTab.status === 'running' ? (
+                {selectedTab && selectedTab.tabType === 'git' ? (
+                  // Git panel - no terminal needed
+                  <GitPanel workspaceId={selectedWorkspace.id} />
+                ) : selectedTab && selectedTab.status === 'running' ? (
                   <Terminal
                     tabId={selectedTab.id}
                     onConnectionChange={setIsTerminalConnected}
                     onEnd={() => {
                       setIsTerminalConnected(false);
-                      // Close the tab when session ends
+                      // Close the tab when session ends and switch to previous tab
                       if (selectedTab && deleteTabRef.current) {
+                        const tabs = workspaceTabsRef.current;
+                        const currentIndex = tabs.findIndex(t => t.id === selectedTab.id);
+                        // Select the tab before this one, or the next one, or null
+                        const nextTab = currentIndex > 0
+                          ? tabs[currentIndex - 1]
+                          : tabs[currentIndex + 1] || null;
+                        setSelectedTab(nextTab);
                         deleteTabRef.current(selectedTab.id).catch(console.error);
                       }
                     }}
@@ -248,12 +478,15 @@ function Dashboard() {
                 )}
               </div>
             </>
+          ) : selectedRepository ? (
+            // Show repository dashboard when repo is selected but no workspace
+            <RepositoryDashboard repository={selectedRepository} />
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500">
               <div className="text-center">
-                <p className="text-lg">No workspace selected</p>
+                <p className="text-lg">No repository selected</p>
                 <p className="text-sm mt-2">
-                  Select a workspace from the sidebar or create a new one
+                  Select a repository from the sidebar or add a new one
                 </p>
               </div>
             </div>
@@ -268,6 +501,7 @@ function Dashboard() {
         onAddLocal={handleAddLocalRepo}
         onClone={handleCloneRepo}
         isLoading={actionLoading}
+        templates={templates}
       />
 
       <CreateWorkspaceDialog
@@ -284,6 +518,54 @@ function Dashboard() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* Edit Repository Dialog */}
+      <EditRepositoryDialog
+        isOpen={!!editingRepository}
+        onClose={() => setEditingRepository(null)}
+        repository={editingRepository}
+        templates={templates}
+        onSave={handleSaveRepository}
+        isLoading={isEditRepoLoading}
+      />
+
+      {/* Template Dialog (Create/Edit) */}
+      <TemplateDialog
+        isOpen={isTemplateDialogOpen}
+        onClose={() => {
+          setIsTemplateDialogOpen(false);
+          setEditingTemplate(null);
+        }}
+        template={editingTemplate}
+        onSave={async (input) => {
+          if (editingTemplate) {
+            await handleUpdateTemplate(editingTemplate.id, input);
+          } else {
+            await handleCreateTemplate(input);
+          }
+        }}
+        isLoading={isTemplateDialogLoading}
+      />
+
+      {/* Template Details Modal */}
+      <TemplateDetailsModal
+        isOpen={!!selectedTemplate}
+        template={selectedTemplate}
+        onClose={() => {
+          if (!isProvisioning) {
+            setSelectedTemplate(null);
+            setProvisionProgress(null);
+            setProvisionError(null);
+          }
+        }}
+        onEdit={handleEditTemplateFromDetails}
+        onProvision={handleProvisionTemplate}
+        onRecreate={handleRecreateTemplate}
+        onDelete={handleDeleteTemplate}
+        isProvisioning={isProvisioning}
+        provisionProgress={provisionProgress}
+        provisionError={provisionError}
       />
     </div>
   );

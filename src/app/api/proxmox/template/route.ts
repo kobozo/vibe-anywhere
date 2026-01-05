@@ -88,6 +88,13 @@ export async function POST(request: NextRequest) {
     // status.vmid always has a value (the configured starting VMID or existing template VMID)
     const templateVmid = vmid || status.vmid;
 
+    if (templateVmid === null) {
+      return NextResponse.json(
+        { error: 'No VMID provided and no configured starting VMID found' },
+        { status: 400 }
+      );
+    }
+
     // If template exists and force is true, delete it first
     if (status.exists && force) {
       await templateManager.deleteTemplate(templateVmid);
