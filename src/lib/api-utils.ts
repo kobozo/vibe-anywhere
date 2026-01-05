@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthService } from '@/lib/services';
 import type { User } from '@/lib/db';
-import type { ApiError } from '@/types/api';
+import type { ApiError as ApiErrorType } from '@/types/api';
 
 /**
  * Extract and validate auth token from request
@@ -29,7 +29,7 @@ export async function requireAuth(request: NextRequest): Promise<User> {
  * Create a JSON error response
  */
 export function errorResponse(code: string, message: string, status = 400, details?: unknown): NextResponse {
-  const error: ApiError = { code, message };
+  const error: ApiErrorType = { code, message };
   if (details) {
     error.details = details;
   }
@@ -59,6 +59,14 @@ export class ApiRequestError extends Error {
 
   toResponse(): NextResponse {
     return errorResponse(this.code, this.message, this.status, this.details);
+  }
+}
+
+// Alias for backwards compatibility with code that uses (status, message) signature
+export class ApiError extends ApiRequestError {
+  constructor(status: number, message: string, details?: unknown) {
+    super(message, 'API_ERROR', status, details);
+    this.name = 'ApiError';
   }
 }
 

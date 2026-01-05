@@ -1,0 +1,53 @@
+# Session Hub - Development Override
+# This file is automatically loaded by docker-compose in development
+#
+# Features:
+#   - Uses Dockerfile.dev for hot-reloading
+#   - Mounts source code as volume
+#   - Exposes debug port 9229
+#   - Sets NODE_ENV=development
+#
+# For production, use: docker compose -f docker-compose.yml up -d
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: session-hub-dev
+    environment:
+      NODE_ENV: development
+      APP_HOME_DIR: /data
+      WORKTREE_BASE_PATH: /data/.worktrees
+    ports:
+      - "${PORT:-3000}:3000"
+      - "9229:9229"  # Node.js debugger
+    volumes:
+      # Mount source code for hot-reloading
+      - .:/app:rw
+
+      # Preserve node_modules from container (don't override with host)
+      - /app/node_modules
+
+      # Mount .next build cache for faster rebuilds
+      - .next-cache:/app/.next
+
+      # Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+
+      # App data directory (cloned repos, worktrees, SSH keys)
+      - ${HOST_DATA_PATH:-session-hub-data}:/data:rw
+
+      # Git repositories from host (for local/symlinked repos)
+      - ${HOST_REPO_PATH:-./repos}:/repos:rw
+
+      # SSH keys (optional)
+      - ${HOST_SSH_PATH:-~/.ssh}:/home/sessionhub/.ssh:ro
+    # Remove health check in dev for faster startup
+    healthcheck:
+      disable: true
+
+# Development-specific volumes
+volumes:
+  .next-cache:
+    name: session-hub-next-cache

@@ -1,0 +1,40 @@
+# Session Hub - Development Dockerfile
+# Optimized for hot-reloading and debugging
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install build dependencies for native modules and dev tools
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    linux-headers \
+    git \
+    openssh-client \
+    docker-cli \
+    && rm -rf /var/cache/apk/*
+
+# Copy package files first for better layer caching
+COPY package.json package-lock.json* ./
+
+# Install all dependencies including dev
+RUN npm ci
+
+# Copy source code (will be overridden by volume mount in dev)
+COPY . .
+
+# Set development environment
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+# Expose ports
+# 3000 - Next.js app
+# 9229 - Node.js debugger
+EXPOSE 3000 9229
+
+# Start with tsx watch for hot reloading
+CMD ["npm", "run", "dev"]

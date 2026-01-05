@@ -518,7 +518,7 @@ SSHCONFIG
           }
         });
 
-        channel.on('error', (err) => {
+        channel.on('error', (err: Error) => {
           if (!resolved) {
             resolved = true;
             clearTimeout(timeout);

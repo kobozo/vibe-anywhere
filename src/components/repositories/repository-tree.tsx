@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useRepositories } from '@/hooks/useRepositories';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -12,6 +11,10 @@ interface RepositoryTreeProps {
   selectedWorkspaceId?: string | null;
   onAddRepository: () => void;
   onAddWorkspace: (repositoryId: string) => void;
+  repositories: Repository[];
+  isLoading: boolean;
+  error: Error | null;
+  onDeleteRepository: (repoId: string) => Promise<void>;
 }
 
 export function RepositoryTree({
@@ -19,14 +22,11 @@ export function RepositoryTree({
   selectedWorkspaceId,
   onAddRepository,
   onAddWorkspace,
+  repositories,
+  isLoading,
+  error,
+  onDeleteRepository,
 }: RepositoryTreeProps) {
-  const {
-    repositories,
-    isLoading,
-    error,
-    fetchRepositories,
-    deleteRepository,
-  } = useRepositories();
 
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set());
   const [workspacesByRepo, setWorkspacesByRepo] = useState<Record<string, Workspace[]>>({});
@@ -81,10 +81,6 @@ export function RepositoryTree({
     onUpdate: handleWorkspaceUpdate,
   });
 
-  useEffect(() => {
-    fetchRepositories();
-  }, [fetchRepositories]);
-
   // Auto-expand repositories when they have the selected workspace
   useEffect(() => {
     if (selectedWorkspaceId) {
@@ -136,7 +132,7 @@ export function RepositoryTree({
 
   const confirmDeleteRepo = async () => {
     if (!repoToDelete) return;
-    await deleteRepository(repoToDelete.id);
+    await onDeleteRepository(repoToDelete.id);
     setRepoToDelete(null);
   };
 

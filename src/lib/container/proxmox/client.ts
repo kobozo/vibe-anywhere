@@ -265,24 +265,140 @@ export class ProxmoxClient {
   }
 
   /**
-   * Execute a command in an LXC container via the Proxmox API
-   * Note: This is a synchronous execution, not interactive
+   * Create a new LXC container with SSH public keys for authentication
+   * This is used for creating templates with pre-configured SSH access
    */
-  async execInLxc(vmid: number, command: string[]): Promise<string> {
+  async createLxcWithSSHKeys(
+    vmid: number,
+    ostemplate: string,
+    options: {
+      hostname?: string;
+      description?: string;
+      storage?: string;
+      memory?: number;
+      cores?: number;
+      net0?: string;
+      sshPublicKeys: string;
+      rootPassword?: string;
+    }
+  ): Promise<string> {
+    const cfg = config.proxmox;
+
+    // Build network configuration
+    let net0 = options.net0 || `name=eth0,bridge=${cfg.bridge},ip=dhcp`;
+    if (cfg.vlanTag) {
+      net0 += `,tag=${cfg.vlanTag}`;
+    }
+
+    const response = await this.proxmox.nodes.$(this.node).lxc.$post({
+      vmid,
+      ostemplate,
+      hostname: options.hostname,
+      description: options.description,
+      storage: options.storage || cfg.storage,
+      memory: options.memory || cfg.memoryMb,
+      cores: options.cores || cfg.cores,
+      net0,
+      features: 'nesting=1',
+      unprivileged: true,
+      start: false,
+      'ssh-public-keys': options.sshPublicKeys,
+      password: options.rootPassword,
+    });
+
+    return response;
+  }
+
+  /**
+   * Convert an LXC container to a template
+   * The container must be stopped first
+   */
+  async convertToTemplate(vmid: number): Promise<void> {
+    await this.proxmox.nodes.$(this.node).lxc.$(vmid).template.$post();
+  }
+
+  /**
+   * List available appliance templates
+   */
+  async listAppliances(): Promise<Array<{
+    template: string;
+    package: string;
+    headline: string;
+    description: string;
+    os: string;
+    section: string;
+    version: string;
+  }>> {
     try {
-      // The Proxmox API exec endpoint
-      // Note: This uses virt-customize style exec which may not be available on all setups
-      const response = await this.proxmox.nodes.$(this.node).lxc.$(vmid).status.current.$get();
-
-      // If container is running, we can try to use SSH instead
-      // For now, this is a placeholder - the actual implementation depends on Proxmox version
-      console.log(`Exec in container ${vmid}: ${command.join(' ')}`);
-
-      // Return empty string as this is best-effort
-      return '';
+      const result = await this.proxmox.nodes.$(this.node).aplinfo.$get();
+      // Map the API response to our expected format
+      return (result || []).map((item: Record<string, unknown>) => ({
+        template: String(item.template || ''),
+        package: String(item.package || ''),
+        headline: String(item.headline || ''),
+        description: String(item.description || ''),
+        os: String(item.os || ''),
+        section: String(item.section || ''),
+        version: String(item.version || ''),
+      }));
     } catch (error) {
-      console.warn(`Failed to exec in container ${vmid}:`, error);
-      throw error;
+      console.warn('Failed to list appliances:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Download an appliance template to storage
+   * Returns UPID for tracking the download task
+   */
+  async downloadAppliance(template: string, storage?: string): Promise<string> {
+    const storageId = storage || config.proxmox.storage || 'local';
+    return await this.proxmox.nodes.$(this.node).aplinfo.$post({
+      storage: storageId,
+      template,
+    });
+  }
+
+  /**
+   * Check if a specific appliance template exists in storage
+   */
+  async applianceTemplateExists(templateName: string, storage?: string): Promise<boolean> {
+    const storageId = storage || config.proxmox.storage || 'local';
+    try {
+      // List content in storage looking for vztmpl (container templates)
+      const content = await this.proxmox.nodes.$(this.node).storage.$(storageId).content.$get({
+        content: 'vztmpl',
+      });
+
+      // Check if any template matches the name
+      return content.some((item: { volid?: string }) =>
+        item.volid?.includes(templateName)
+      );
+    } catch (error) {
+      console.warn(`Failed to check template existence in ${storageId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get the full template path for creating containers
+   * Returns format: "storage:vztmpl/template-name.tar.zst"
+   */
+  async getApplianceTemplatePath(templateName: string, storage?: string): Promise<string | null> {
+    const storageId = storage || config.proxmox.storage || 'local';
+    try {
+      const content = await this.proxmox.nodes.$(this.node).storage.$(storageId).content.$get({
+        content: 'vztmpl',
+      });
+
+      const template = content.find((item: { volid?: string }) =>
+        item.volid?.includes(templateName)
+      );
+
+      return template?.volid || null;
+    } catch (error) {
+      console.warn(`Failed to get template path for ${templateName}:`, error);
+      return null;
     }
   }
 }

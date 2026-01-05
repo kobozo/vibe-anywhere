@@ -31,14 +31,11 @@ const envSchema = z.object({
   PROXMOX_TOKEN_ID: z.string().optional(),      // e.g., 'root@pam!session-hub'
   PROXMOX_TOKEN_SECRET: z.string().optional(),
   PROXMOX_NODE: z.string().optional(),          // e.g., 'pve'
-  PROXMOX_TEMPLATE_VMID: z.string().optional().transform(v => v ? Number(v) : undefined),
   PROXMOX_STORAGE: z.string().default('local-lvm'),
   PROXMOX_BRIDGE: z.string().default('vmbr0'),
   PROXMOX_VLAN_TAG: z.string().optional().transform(v => v ? Number(v) : undefined),
   PROXMOX_SSH_USER: z.string().default('kobozo'),
   PROXMOX_SSH_PRIVATE_KEY_PATH: z.string().optional(),
-  PROXMOX_VMID_MIN: z.string().default('200').transform(Number),
-  PROXMOX_VMID_MAX: z.string().default('299').transform(Number),
   PROXMOX_MEMORY_MB: z.string().default('2048').transform(Number),
   PROXMOX_CORES: z.string().default('2').transform(Number),
   PROXMOX_CLAUDE_CONFIG_PATH: z.string().optional(), // Path to host .claude dir for LXC mount
@@ -155,16 +152,11 @@ export const config = {
       tokenId: cfg.PROXMOX_TOKEN_ID,
       tokenSecret: cfg.PROXMOX_TOKEN_SECRET,
       node: cfg.PROXMOX_NODE,
-      templateVmid: cfg.PROXMOX_TEMPLATE_VMID,
       storage: cfg.PROXMOX_STORAGE,
       bridge: cfg.PROXMOX_BRIDGE,
       vlanTag: cfg.PROXMOX_VLAN_TAG,
       sshUser: cfg.PROXMOX_SSH_USER,
       sshPrivateKeyPath: cfg.PROXMOX_SSH_PRIVATE_KEY_PATH,
-      vmidRange: {
-        min: cfg.PROXMOX_VMID_MIN,
-        max: cfg.PROXMOX_VMID_MAX,
-      },
       memoryMb: cfg.PROXMOX_MEMORY_MB,
       cores: cfg.PROXMOX_CORES,
       claudeConfigPath: cfg.PROXMOX_CLAUDE_CONFIG_PATH,

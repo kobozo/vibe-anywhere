@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuthState, AuthProvider, useAuth } from '@/hooks/useAuth';
 import { useRepositories } from '@/hooks/useRepositories';
@@ -27,12 +27,23 @@ const Terminal = dynamic(
 );
 
 function Dashboard() {
-  const { isAuthenticated, isLoading, logout, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const {
+    repositories,
+    isLoading: reposLoading,
+    error: reposError,
     createLocalRepository,
     cloneRepository,
+    deleteRepository,
     fetchRepositories,
   } = useRepositories();
+
+  // Fetch repositories on mount
+  useEffect(() => {
+    if (user) {
+      fetchRepositories();
+    }
+  }, [user, fetchRepositories]);
 
   // Selection state
   const [selectedRepository, setSelectedRepository] = useState<Repository | null>(null);
@@ -48,6 +59,7 @@ function Dashboard() {
 
   // Terminal state
   const [isTerminalConnected, setIsTerminalConnected] = useState(false);
+  const deleteTabRef = useRef<((tabId: string) => Promise<void>) | null>(null);
 
   const handleSelectWorkspace = useCallback((workspace: Workspace, repository: Repository) => {
     setSelectedRepository(repository);
@@ -91,23 +103,25 @@ function Dashboard() {
     setActionLoading(true);
     try {
       await createLocalRepository(name, path, description);
+      await fetchRepositories(); // Refresh to ensure sidebar updates
       setIsAddRepoOpen(false);
     } finally {
       setActionLoading(false);
     }
-  }, [createLocalRepository]);
+  }, [createLocalRepository, fetchRepositories]);
 
   const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string) => {
     setActionLoading(true);
     try {
       await cloneRepository(name, url, description, sshKeyId);
+      await fetchRepositories(); // Refresh to ensure sidebar updates
       setIsAddRepoOpen(false);
     } finally {
       setActionLoading(false);
     }
-  }, [cloneRepository]);
+  }, [cloneRepository, fetchRepositories]);
 
-  if (isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-gray-400">Loading...</div>
@@ -176,6 +190,10 @@ function Dashboard() {
             selectedWorkspaceId={selectedWorkspace?.id}
             onAddRepository={() => setIsAddRepoOpen(true)}
             onAddWorkspace={handleAddWorkspace}
+            repositories={repositories}
+            isLoading={reposLoading}
+            error={reposError}
+            onDeleteRepository={deleteRepository}
           />
         </aside>
 
@@ -188,6 +206,7 @@ function Dashboard() {
                 workspaceId={selectedWorkspace.id}
                 selectedTabId={selectedTab?.id || null}
                 onSelectTab={setSelectedTab}
+                onExposeDeleteTab={(fn) => { deleteTabRef.current = fn; }}
               />
 
               {/* Terminal area */}
@@ -198,6 +217,10 @@ function Dashboard() {
                     onConnectionChange={setIsTerminalConnected}
                     onEnd={() => {
                       setIsTerminalConnected(false);
+                      // Close the tab when session ends
+                      if (selectedTab && deleteTabRef.current) {
+                        deleteTabRef.current(selectedTab.id).catch(console.error);
+                      }
                     }}
                   />
                 ) : selectedTab ? (

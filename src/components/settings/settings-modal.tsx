@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useTabTemplates, TabTemplate } from '@/hooks/useTabTemplates';
 import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
+import { ProxmoxTemplate } from './proxmox-template';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type SettingsTab = 'templates' | 'ssh-keys';
+type SettingsTab = 'templates' | 'ssh-keys' | 'proxmox';
 
 const ICON_OPTIONS = [
   { value: 'bot', label: 'Bot', emoji: '\u{1F916}' },
@@ -148,6 +149,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 : 'text-gray-400 hover:text-white'}`}
           >
             SSH Keys
+          </button>
+          <button
+            onClick={() => setActiveTab('proxmox')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'proxmox'
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-gray-400 hover:text-white'}`}
+          >
+            Proxmox
           </button>
         </div>
 
@@ -381,6 +391,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Proxmox */}
+          {activeTab === 'proxmox' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-400">
+                Manage the Proxmox LXC template used for creating workspaces.
+              </p>
+              <ProxmoxTemplate />
             </div>
           )}
         </div>

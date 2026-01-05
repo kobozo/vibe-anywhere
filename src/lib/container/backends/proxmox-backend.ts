@@ -12,6 +12,7 @@ import type {
 import { getProxmoxClient, ProxmoxClient } from '../proxmox/client';
 import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } from '../proxmox/task-poller';
 import { createSSHStream, execSSHCommand, syncWorkspaceToContainer, syncWorkspaceFromContainer, syncSSHKeyToContainer, cloneRepoInContainer, setupContainerSSHAccess } from '../proxmox/ssh-stream';
+import { getSettingsService } from '@/lib/services/settings-service';
 
 /**
  * Proxmox LXC container backend implementation
@@ -34,15 +35,16 @@ export class ProxmoxBackend implements IContainerBackend {
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
     const cfg = config.proxmox;
     const { workspacePath, env = {}, memoryLimit, cpuLimit } = containerConfig;
+    const settingsService = getSettingsService();
 
-    // Use template VMID from config or container config
-    const templateVmid = containerConfig.templateId || cfg.templateVmid;
+    // Get template VMID from settings (database)
+    const templateVmid = await settingsService.getProxmoxTemplateVmid();
     if (!templateVmid) {
-      throw new Error('No template VMID configured. Set PROXMOX_TEMPLATE_VMID or provide templateId.');
+      throw new Error('No template configured. Create a template in Settings first.');
     }
 
-    // Get next available VMID
-    const newVmid = await this.client.getNextVmid();
+    // Allocate next sequential VMID from settings
+    const newVmid = await settingsService.allocateWorkspaceVmid();
     console.log(`Creating LXC container ${newVmid} from template ${templateVmid} for workspace ${workspaceId}`);
 
     // Clone the template
@@ -318,7 +320,18 @@ export class ProxmoxBackend implements IContainerBackend {
    * Check if the template exists
    */
   async imageExists(): Promise<boolean> {
-    return this.client.templateExists();
+    const settingsService = getSettingsService();
+    const templateVmid = await settingsService.getProxmoxTemplateVmid();
+    if (!templateVmid) {
+      return false;
+    }
+
+    try {
+      const status = await this.client.getLxcStatus(templateVmid);
+      return !!status;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -327,10 +340,8 @@ export class ProxmoxBackend implements IContainerBackend {
   async ensureImage(): Promise<void> {
     const exists = await this.imageExists();
     if (!exists) {
-      const templateVmid = config.proxmox.templateVmid;
       throw new Error(
-        `Proxmox LXC template ${templateVmid} not found. ` +
-        `Create it using 'scripts/setup-proxmox-template.sh ${templateVmid}'`
+        'No Proxmox LXC template found. Create a template in Settings > Proxmox Template first.'
       );
     }
   }

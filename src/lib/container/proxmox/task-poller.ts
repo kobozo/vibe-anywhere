@@ -110,20 +110,12 @@ export async function waitForContainerIp(
         }
       }
 
-      // If we've waited a while and still no IP, try triggering DHCP
+      // If we've waited a while and still no IP, just log it
+      // DHCP triggering via exec is not supported in pure API mode
       const elapsed = Date.now() - startTime;
       if (triggerDhcp && !dhcpTriggered && elapsed > 15000) {
-        console.log(`Container ${vmid} has no IP after ${elapsed}ms, triggering DHCP...`);
-        try {
-          // Try to run dhclient via Proxmox API exec
-          await client.execInLxc(vmid, ['dhclient', interfaceName]);
-          dhcpTriggered = true;
-          console.log(`DHCP triggered for container ${vmid}`);
-        } catch (e) {
-          // dhclient might not be available or might fail, continue polling
-          console.warn(`Could not trigger DHCP for container ${vmid}:`, e);
-          dhcpTriggered = true; // Don't retry
-        }
+        console.log(`Container ${vmid} has no IP after ${elapsed}ms, waiting for DHCP...`);
+        dhcpTriggered = true; // Don't log again
       }
 
       await sleep(pollIntervalMs);

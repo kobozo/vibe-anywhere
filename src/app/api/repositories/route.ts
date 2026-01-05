@@ -15,11 +15,16 @@ const createLocalRepoSchema = z.object({
   originalPath: z.string().min(1, 'Path is required'),
 });
 
+// Git URL pattern: supports both HTTPS and SSH URLs
+// HTTPS: https://github.com/user/repo.git
+// SSH: git@github.com:user/repo.git or ssh://git@github.com/user/repo.git
+const gitUrlPattern = /^(https?:\/\/[^\s]+|git@[^\s:]+:[^\s]+|ssh:\/\/[^\s]+)$/;
+
 const cloneRepoSchema = z.object({
   type: z.literal('clone'),
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional(),
-  cloneUrl: z.string().url('Invalid URL'),
+  cloneUrl: z.string().min(1, 'Clone URL is required').regex(gitUrlPattern, 'Invalid git URL. Use HTTPS or SSH format.'),
   sshKeyId: z.string().uuid().optional(),
 });
 

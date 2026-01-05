@@ -65,8 +65,7 @@ class ContainerStatusSyncService {
    */
   private async syncAllContainers(): Promise<void> {
     if (this.isRunning) {
-      console.log('Container status sync already in progress, skipping');
-      return;
+      return; // Already running, skip
     }
 
     this.isRunning = true;
@@ -83,11 +82,12 @@ class ContainerStatusSyncService {
           )
         );
 
-      console.log(`Container status sync: checking ${workspacesWithContainers.length} workspaces`);
-
       if (workspacesWithContainers.length === 0) {
         return;
       }
+
+      // Only log when there are workspaces to check (reduce noise)
+      // console.log(`Container status sync: checking ${workspacesWithContainers.length} workspaces`);
 
       const broadcaster = getWorkspaceStateBroadcaster();
       const agentRegistry = getAgentRegistry();
@@ -141,16 +141,14 @@ class ContainerStatusSyncService {
     const containerIdChanged = newContainerId !== workspace.containerId;
     const ipChanged = newContainerIp !== workspace.containerIp;
 
-    console.log(`  Workspace ${workspace.id}: backend=${newStatus}, db=${workspace.containerStatus}, changed=${statusChanged}`);
-
     if (!statusChanged && !containerIdChanged && !ipChanged) {
       return; // No changes
     }
 
+    // Only log actual changes
     console.log(
-      `Container status changed for workspace ${workspace.id}: ` +
-      `${workspace.containerStatus} -> ${newStatus} ` +
-      `(containerId: ${workspace.containerId} -> ${newContainerId})`
+      `Container status changed: workspace ${workspace.id.slice(0, 8)}... ` +
+      `${workspace.containerStatus} -> ${newStatus}`
     );
 
     // Update database

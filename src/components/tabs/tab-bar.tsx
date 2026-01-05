@@ -10,6 +10,7 @@ interface TabBarProps {
   selectedTabId: string | null;
   onSelectTab: (tab: TabInfo | null) => void;
   onTabsChange?: (tabs: TabInfo[]) => void;
+  onExposeDeleteTab?: (deleteTab: (tabId: string) => Promise<void>) => void;
 }
 
 export function TabBar({
@@ -17,6 +18,7 @@ export function TabBar({
   selectedTabId,
   onSelectTab,
   onTabsChange,
+  onExposeDeleteTab,
 }: TabBarProps) {
   const {
     tabs,
@@ -41,6 +43,11 @@ export function TabBar({
   useEffect(() => {
     onTabsChange?.(tabs);
   }, [tabs, onTabsChange]);
+
+  // Expose deleteTab function to parent
+  useEffect(() => {
+    onExposeDeleteTab?.(deleteTab);
+  }, [deleteTab, onExposeDeleteTab]);
 
   // Auto-select first running tab or first tab when tabs change
   useEffect(() => {

@@ -46,3 +46,9 @@ next-env.d.ts
 # Misc
 .vercel
 *.pem
+
+# Docker development overrides (allow local customization)
+# docker-compose.override.yml is committed as a template
+# Use docker-compose.local.yml for personal overrides
+docker-compose.local.yml
+.next-cache

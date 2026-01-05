@@ -65,18 +65,16 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
   });
 
   io.on('connection', (socket: AuthenticatedSocket) => {
-    console.log(`Client connected: ${socket.id}, userId: ${socket.userId}`);
+    // Debug only: console.log(`Client connected: ${socket.id}`);
 
     const tabStreamManager = getTabStreamManager();
 
     // Handle tab attachment (new v2 API with persistent streams)
     socket.on('tab:attach', async (data: { tabId: string }) => {
-      console.log(`Received tab:attach from ${socket.id} for tabId: ${data.tabId}`);
       try {
         await handleTabAttach(socket, data.tabId);
-        console.log(`Successfully attached ${socket.id} to tab ${data.tabId}`);
       } catch (error) {
-        console.error('Error attaching to tab:', error);
+        console.error(`Tab attach error [${data.tabId}]:`, error instanceof Error ? error.message : error);
         socket.emit('error', { message: error instanceof Error ? error.message : 'Failed to attach to tab' });
       }
     });
@@ -125,7 +123,6 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
     // Handle file upload (for clipboard image paste)
     socket.on('file:upload', async (data: { requestId: string; filename: string; data: string; mimeType: string }) => {
-      console.log(`File upload request from ${socket.id}: ${data.filename} (${data.mimeType})`);
       try {
         if (!socket.tabId) {
           socket.emit('file:uploaded', { requestId: data.requestId, success: false, error: 'No tab attached' });
@@ -172,7 +169,6 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
     // Handle disconnect - DON'T close streams, just detach
     socket.on('disconnect', () => {
-      console.log(`Client disconnected: ${socket.id}`);
 
       // Detach from all tab streams (keeps streams running)
       tabStreamManager.detachFromAll(socket);
@@ -198,6 +194,10 @@ interface AgentSocket extends Socket {
   agentVersion?: string;
 }
 
+// Track failed registration attempts to avoid log spam
+const failedRegistrations = new Map<string, { count: number; lastLog: number }>();
+const FAILED_LOG_INTERVAL = 60000; // Log at most once per minute per workspace
+
 /**
  * Set up the /agent namespace for sidecar agents
  */
@@ -207,21 +207,30 @@ function setupAgentNamespace(io: SocketServer): void {
   const tabStreamManager = getTabStreamManager();
 
   agentNs.on('connection', (socket: AgentSocket) => {
-    console.log(`Agent socket connected: ${socket.id}`);
-
     // Handle agent registration
     socket.on('agent:register', async (data: { workspaceId: string; token: string; version: string }) => {
-      console.log(`Agent registration request from ${socket.id} for workspace ${data.workspaceId}`);
-
       try {
         const result = await agentRegistry.register(socket, data.workspaceId, data.token, data.version);
 
         if (!result.success) {
-          console.log(`Agent registration failed: ${result.error}`);
+          // Rate-limit failed registration logs
+          const now = Date.now();
+          const tracker = failedRegistrations.get(data.workspaceId);
+          if (!tracker || now - tracker.lastLog > FAILED_LOG_INTERVAL) {
+            const count = tracker ? tracker.count + 1 : 1;
+            console.log(`Agent registration failed for workspace ${data.workspaceId}: ${result.error} (${count} attempts)`);
+            failedRegistrations.set(data.workspaceId, { count, lastLog: now });
+          } else {
+            tracker.count++;
+          }
           socket.emit('agent:registered', { success: false, error: result.error });
           socket.disconnect(true);
           return;
         }
+
+        // Clear failed registration tracker on success
+        failedRegistrations.delete(data.workspaceId);
+        console.log(`Agent registered for workspace ${data.workspaceId} (v${data.version})`);
 
         socket.workspaceId = data.workspaceId;
         socket.agentVersion = data.version;
@@ -299,7 +308,6 @@ function setupAgentNamespace(io: SocketServer): void {
 
     // Handle file uploaded response from agent (relay back to browser)
     socket.on('file:uploaded', (data: { requestId: string; success: boolean; filePath?: string; error?: string }) => {
-      console.log(`File upload result for ${data.requestId}: ${data.success ? 'success' : 'failed'}`);
       const pending = pendingUploads.get(data.requestId);
       if (pending) {
         clearTimeout(pending.timeoutId);
@@ -310,7 +318,6 @@ function setupAgentNamespace(io: SocketServer): void {
 
     // Handle disconnect
     socket.on('disconnect', async () => {
-      console.log(`Agent socket disconnected: ${socket.id}`);
       await agentRegistry.unregister(socket);
     });
   });

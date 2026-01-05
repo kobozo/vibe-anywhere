@@ -189,6 +189,16 @@ export const portForwards = pgTable('port_forwards', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Application settings - key-value store for app configuration
+export const appSettings = pgTable('app_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: text('key').unique().notNull(),
+  value: jsonb('value').$type<unknown>().notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============================================
 // LEGACY: Sessions table (kept for migration)
 // ============================================
@@ -355,6 +365,10 @@ export type NewSessionLog = typeof sessionLogs.$inferInsert;
 export type PortForward = typeof portForwards.$inferSelect;
 export type NewPortForward = typeof portForwards.$inferInsert;
 export type PortForwardProtocol = (typeof portForwardProtocolEnum.enumValues)[number];
+
+// App Settings
+export type AppSetting = typeof appSettings.$inferSelect;
+export type NewAppSetting = typeof appSettings.$inferInsert;
 
 // Shared enums
 export type SessionStatus = (typeof sessionStatusEnum.enumValues)[number];
