@@ -14,6 +14,7 @@ export interface TabTemplate {
   exitOnClose: boolean;
   sortOrder: number;
   isBuiltIn: boolean;
+  requiredTechStack: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +57,7 @@ export function useTabTemplates() {
       args?: string[];
       description?: string;
       exitOnClose?: boolean;
+      requiredTechStack?: string | null;
     }) => {
       if (!token) throw new Error('Not authenticated');
 
@@ -89,6 +91,7 @@ export function useTabTemplates() {
         command: string;
         args: string[];
         description: string;
+        requiredTechStack: string | null;
       }>
     ) => {
       if (!token) throw new Error('Not authenticated');

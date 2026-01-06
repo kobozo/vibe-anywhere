@@ -76,6 +76,7 @@ function Dashboard() {
   const [selectedRepository, setSelectedRepository] = useState<Repository | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
   const [selectedTab, setSelectedTab] = useState<TabInfo | null>(null);
+  const [workspaceTechStacks, setWorkspaceTechStacks] = useState<string[]>([]);
 
   // Dialog state
   const [isAddRepoOpen, setIsAddRepoOpen] = useState(false);
@@ -154,6 +155,27 @@ function Dashboard() {
       fetchGroups();
     }
   }, [selectedWorkspace?.id, fetchGroups]);
+
+  // Fetch workspace template tech stacks for tab filtering
+  useEffect(() => {
+    if (!selectedWorkspace?.id) {
+      setWorkspaceTechStacks([]);
+      return;
+    }
+    fetch(`/api/workspaces/${selectedWorkspace.id}/template`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.data?.template) {
+          setWorkspaceTechStacks([
+            ...(data.data.template.inheritedTechStacks || []),
+            ...(data.data.template.techStacks || []),
+          ]);
+        }
+      })
+      .catch(() => setWorkspaceTechStacks([]));
+  }, [selectedWorkspace?.id]);
 
   // Tab group handlers
   const handleCreateGroup = useCallback(async (name: string, tabIds: string[], layout: import('@/lib/db/schema').TabGroupLayout) => {
@@ -615,6 +637,7 @@ function Dashboard() {
                 onExposeDeleteTab={(fn) => { deleteTabRef.current = fn; }}
                 whisperEnabled={whisperEnabled}
                 onVoiceTranscription={handleVoiceTranscription}
+                workspaceTechStacks={workspaceTechStacks}
                 // Tab group props
                 groups={groups}
                 groupedTabIds={groupedTabIds}

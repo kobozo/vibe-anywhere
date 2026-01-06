@@ -1,35 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTabTemplates, TabTemplate } from '@/hooks/useTabTemplates';
+import { getTemplateIcon } from '@/components/icons/ai-icons';
 
 interface CreateTabDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string, templateId: string, args?: string[]) => Promise<void>;
   isLoading: boolean;
+  workspaceTechStacks?: string[];
 }
-
-const ICON_EMOJI: Record<string, string> = {
-  bot: '\u{1F916}',
-  git: '\u{1F500}',
-  docker: '\u{1F433}',
-  terminal: '\u{1F4BB}',
-  code: '\u{1F4DD}',
-  tool: '\u{1F527}',
-};
 
 export function CreateTabDialog({
   isOpen,
   onClose,
   onCreate,
   isLoading,
+  workspaceTechStacks = [],
 }: CreateTabDialogProps) {
   const { templates, fetchTemplates, isLoading: templatesLoading } = useTabTemplates();
   const [selectedTemplate, setSelectedTemplate] = useState<TabTemplate | null>(null);
   const [tabName, setTabName] = useState('');
   const [claudeArgs, setClaudeArgs] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Filter templates based on workspace tech stacks
+  // Show template if: requiredTechStack is null OR requiredTechStack is in workspaceTechStacks
+  const filteredTemplates = useMemo(() => {
+    return templates.filter((template) => {
+      if (!template.requiredTechStack) return true;
+      return workspaceTechStacks.includes(template.requiredTechStack);
+    });
+  }, [templates, workspaceTechStacks]);
 
   useEffect(() => {
     if (isOpen) {
@@ -60,9 +63,9 @@ export function CreateTabDialog({
     setError(null);
 
     try {
-      // Parse Claude args if provided
+      // Parse extra args if provided (for AI assistants)
       let args: string[] | undefined;
-      if (selectedTemplate.command === 'claude' && claudeArgs.trim()) {
+      if (selectedTemplate.requiredTechStack && claudeArgs.trim()) {
         args = claudeArgs.split(/\s+/).filter(Boolean);
       }
 
@@ -73,9 +76,8 @@ export function CreateTabDialog({
     }
   };
 
-  const getIconEmoji = (icon: string) => ICON_EMOJI[icon] || '\u{1F4BB}';
-
-  const isClaude = selectedTemplate?.command === 'claude';
+  // Check if selected template is an AI assistant (for showing extra args input)
+  const isAIAssistant = selectedTemplate?.requiredTechStack !== null && selectedTemplate?.requiredTechStack !== undefined;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -101,32 +103,36 @@ export function CreateTabDialog({
             <label className="block text-sm text-foreground mb-2">Tab Type</label>
             {templatesLoading && templates.length === 0 ? (
               <div className="text-foreground-tertiary text-sm">Loading templates...</div>
+            ) : filteredTemplates.length === 0 ? (
+              <div className="text-foreground-tertiary text-sm">No templates available for this workspace&apos;s tech stack</div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {templates.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTemplate(template);
-                      if (!tabName || tabName === selectedTemplate?.name) {
-                        setTabName(template.name);
-                      }
-                    }}
-                    className={`flex items-center gap-3 p-3 rounded border transition-colors text-left
-                      ${selectedTemplate?.id === template.id
-                        ? 'border-primary bg-primary/20'
-                        : 'border-border-secondary bg-background-tertiary/50 hover:bg-background-tertiary'}`}
-                  >
-                    <span className="text-2xl">{getIconEmoji(template.icon)}</span>
-                    <div>
-                      <div className="text-sm font-medium text-foreground">{template.name}</div>
-                      {template.description && (
-                        <div className="text-xs text-foreground-secondary">{template.description}</div>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                {filteredTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate(template);
+                        if (!tabName || tabName === selectedTemplate?.name) {
+                          setTabName(template.name);
+                        }
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded border transition-colors text-left
+                        ${selectedTemplate?.id === template.id
+                          ? 'border-primary bg-primary/20'
+                          : 'border-border-secondary bg-background-tertiary/50 hover:bg-background-tertiary'}`}
+                    >
+                      <div className="w-6 h-6 flex-shrink-0">
+                        {getTemplateIcon(template.icon, template.isBuiltIn, 'w-6 h-6 text-foreground')}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-foreground">{template.name}</div>
+                        {template.description && (
+                          <div className="text-xs text-foreground-secondary">{template.description}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
               </div>
             )}
           </div>
@@ -143,11 +149,11 @@ export function CreateTabDialog({
             />
           </div>
 
-          {/* Claude-specific options */}
-          {isClaude && (
+          {/* AI assistant extra arguments */}
+          {isAIAssistant && (
             <div>
               <label className="block text-sm text-foreground mb-1">
-                Claude Arguments <span className="text-foreground-tertiary">(optional)</span>
+                Arguments <span className="text-foreground-tertiary">(optional)</span>
               </label>
               <input
                 type="text"
@@ -157,7 +163,7 @@ export function CreateTabDialog({
                 className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary font-mono text-sm"
               />
               <p className="text-xs text-foreground-tertiary mt-1">
-                Additional arguments to pass to the Claude CLI
+                Additional arguments to pass to {selectedTemplate?.name}
               </p>
             </div>
           )}

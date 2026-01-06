@@ -6,6 +6,9 @@ import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
 import { ProxmoxSettings } from './proxmox-settings';
 import { VoiceSettings } from './voice-settings';
 import { ThemeSettings } from './theme-settings';
+import { getTemplateIcon } from '@/components/icons/ai-icons';
+import { MATERIAL_ICONS, getMaterialIcon } from '@/components/icons/material-icons';
+import { getStacksByCategory, type TechStack } from '@/lib/container/proxmox/tech-stacks';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,14 +18,8 @@ interface SettingsModalProps {
 
 type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'proxmox' | 'voice';
 
-const ICON_OPTIONS = [
-  { value: 'bot', label: 'Bot', emoji: '\u{1F916}' },
-  { value: 'git', label: 'Git', emoji: '\u{1F500}' },
-  { value: 'docker', label: 'Docker', emoji: '\u{1F433}' },
-  { value: 'terminal', label: 'Terminal', emoji: '\u{1F4BB}' },
-  { value: 'code', label: 'Code', emoji: '\u{1F4DD}' },
-  { value: 'tool', label: 'Tool', emoji: '\u{1F527}' },
-];
+// Get AI assistant tech stacks for the dropdown
+const AI_TECH_STACKS: TechStack[] = getStacksByCategory('ai-assistant');
 
 export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('theme');
@@ -30,7 +27,14 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
   // Tab Templates
   const { templates, fetchTemplates, createTemplate, deleteTemplate, isLoading: templatesLoading } = useTabTemplates();
   const [showAddTemplate, setShowAddTemplate] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({ name: '', command: '', icon: 'terminal', description: '', exitOnClose: true });
+  const [newTemplate, setNewTemplate] = useState({
+    name: '',
+    command: '',
+    icon: 'terminal',
+    description: '',
+    exitOnClose: true,
+    requiredTechStack: '' as string | null, // Empty string means no filter
+  });
 
   // SSH Keys
   const { keys, fetchKeys, generateKey, deleteKey, setDefaultKey, isLoading: keysLoading } = useSSHKeys();
@@ -60,8 +64,9 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
         icon: newTemplate.icon,
         description: newTemplate.description || undefined,
         exitOnClose: newTemplate.exitOnClose,
+        requiredTechStack: newTemplate.requiredTechStack || null,
       });
-      setNewTemplate({ name: '', command: '', icon: 'terminal', description: '', exitOnClose: true });
+      setNewTemplate({ name: '', command: '', icon: 'terminal', description: '', exitOnClose: true, requiredTechStack: '' });
       setShowAddTemplate(false);
     } catch (error) {
       console.error('Failed to create template:', error);
@@ -119,9 +124,6 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
     }
   };
 
-  const getIconEmoji = (icon: string) => {
-    return ICON_OPTIONS.find(o => o.value === icon)?.emoji || '\u{1F4BB}';
-  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -219,17 +221,23 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                     </div>
                     <div>
                       <label className="block text-xs text-foreground-secondary mb-1">Icon</label>
-                      <select
-                        value={newTemplate.icon}
-                        onChange={(e) => setNewTemplate({ ...newTemplate, icon: e.target.value })}
-                        className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
-                      >
-                        {ICON_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.emoji} {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const IconComponent = getMaterialIcon(newTemplate.icon);
+                          return <IconComponent className="w-5 h-5 text-foreground" />;
+                        })()}
+                        <select
+                          value={newTemplate.icon}
+                          onChange={(e) => setNewTemplate({ ...newTemplate, icon: e.target.value })}
+                          className="flex-1 px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
+                        >
+                          {MATERIAL_ICONS.map((icon) => (
+                            <option key={icon.value} value={icon.value}>
+                              {icon.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -251,6 +259,26 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                       placeholder="What does this tool do?"
                       className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-foreground-secondary mb-1">
+                      Required Tech Stack <span className="text-foreground-tertiary">(optional)</span>
+                    </label>
+                    <select
+                      value={newTemplate.requiredTechStack ?? ''}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, requiredTechStack: e.target.value || null })}
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
+                    >
+                      <option value="">Always show (no filter)</option>
+                      {AI_TECH_STACKS.map((stack) => (
+                        <option key={stack.id} value={stack.id}>
+                          {stack.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-foreground-tertiary mt-1">
+                      Only show this template when the selected AI is in the workspace tech stack
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -283,40 +311,47 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
               ) : (
                 <div className="space-y-2">
                   {templates.map((template) => (
-                    <div
-                      key={template.id}
-                      className="flex items-center gap-3 p-3 bg-background-tertiary/30 rounded group"
-                    >
-                      <span className="text-xl">{getIconEmoji(template.icon)}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-foreground font-medium">{template.name}</span>
-                          {template.isBuiltIn && (
-                            <span className="text-xs px-1.5 py-0.5 bg-background-input text-foreground-secondary rounded">
-                              built-in
-                            </span>
-                          )}
-                          {template.exitOnClose && (
-                            <span className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary rounded">
-                              exit on close
-                            </span>
+                      <div
+                        key={template.id}
+                        className="flex items-center gap-3 p-3 bg-background-tertiary/30 rounded group"
+                      >
+                        <div className="w-6 h-6 flex-shrink-0">
+                          {getTemplateIcon(template.icon, template.isBuiltIn, 'w-6 h-6 text-foreground')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm text-foreground font-medium">{template.name}</span>
+                            {template.isBuiltIn && (
+                              <span className="text-xs px-1.5 py-0.5 bg-background-input text-foreground-secondary rounded">
+                                built-in
+                              </span>
+                            )}
+                            {template.exitOnClose && (
+                              <span className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary rounded">
+                                exit on close
+                              </span>
+                            )}
+                            {template.requiredTechStack && (
+                              <span className="text-xs px-1.5 py-0.5 bg-warning/20 text-warning rounded">
+                                requires: {template.requiredTechStack}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-foreground-tertiary truncate">{template.command}</div>
+                          {template.description && (
+                            <div className="text-xs text-foreground-secondary mt-0.5">{template.description}</div>
                           )}
                         </div>
-                        <div className="text-xs text-foreground-tertiary truncate">{template.command}</div>
-                        {template.description && (
-                          <div className="text-xs text-foreground-secondary mt-0.5">{template.description}</div>
+                        {!template.isBuiltIn && (
+                          <button
+                            onClick={() => handleDeleteTemplate(template)}
+                            className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-2"
+                          >
+                            &times;
+                          </button>
                         )}
                       </div>
-                      {!template.isBuiltIn && (
-                        <button
-                          onClick={() => handleDeleteTemplate(template)}
-                          className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-2"
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { ImageAddon } from '@xterm/addon-image';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/lib/theme';
@@ -67,9 +68,11 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
 
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const imageAddon = new ImageAddon();
 
     xterm.loadAddon(fitAddon);
     xterm.loadAddon(webLinksAddon);
+    xterm.loadAddon(imageAddon);
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
@@ -192,11 +195,23 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
       }
     };
 
+    // Handle file upload response
+    const handleFileUploaded = (data: { requestId: string; success: boolean; filePath?: string; error?: string }) => {
+      if (xtermRef.current) {
+        if (data.success) {
+          xtermRef.current.write(`\r\n\x1b[32m[Image: ${data.filePath}]\x1b[0m\r\n`);
+        } else {
+          xtermRef.current.write(`\r\n\x1b[31m[Upload failed: ${data.error}]\x1b[0m\r\n`);
+        }
+      }
+    };
+
     socket.on('terminal:output', handleOutput);
     socket.on('terminal:buffer', handleBuffer);
     socket.on('tab:attached', handleAttached);
     socket.on('terminal:end', handleEnd);
     socket.on('error', handleError);
+    socket.on('file:uploaded', handleFileUploaded);
 
     return () => {
       socket.off('terminal:output', handleOutput);
@@ -204,6 +219,7 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
       socket.off('tab:attached', handleAttached);
       socket.off('terminal:end', handleEnd);
       socket.off('error', handleError);
+      socket.off('file:uploaded', handleFileUploaded);
     };
   }, [socket, tabId, onEnd]);
 
@@ -229,66 +245,119 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
     };
   }, [socket]);
 
-  // Handle clipboard paste events (for image pasting)
-  // Uploads image to container and uses tmux native paste-buffer
+  // Handle Ctrl+V paste with image support
+  // Uses xterm's attachCustomKeyEventHandler to intercept BEFORE xterm sends to PTY
   useEffect(() => {
-    if (!socket || !terminalRef.current) return;
+    if (!socket || !xtermRef.current) return;
 
-    const container = terminalRef.current;
+    const xterm = xtermRef.current;
 
-    const handlePaste = async (e: ClipboardEvent) => {
+    // Helper function to upload image
+    const handleImageUpload = async (blob: Blob, mimeType: string) => {
+      try {
+        // Convert blob to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        const requestId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const filename = `clipboard-image.${mimeType.split('/')[1]}`;
+
+        // Show uploading feedback
+        xterm.write('\r\n\x1b[33m[Uploading image...]\x1b[0m');
+
+        // Send to server
+        socket.emit('file:upload', {
+          requestId,
+          filename,
+          data: base64,
+          mimeType,
+        });
+      } catch (error) {
+        console.error('Image paste error:', error);
+        xterm.write(`\r\n\x1b[31m[Paste error: ${error instanceof Error ? error.message : 'Unknown error'}]\x1b[0m\r\n`);
+      }
+    };
+
+    // Intercept Ctrl+V before xterm handles it
+    const keyEventHandler = (event: KeyboardEvent): boolean => {
+      // Check for Ctrl+V (or Cmd+V on Mac)
+      if (event.type === 'keydown' && (event.ctrlKey || event.metaKey) && event.key === 'v') {
+        // Check if Clipboard API is available (requires HTTPS or localhost)
+        if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+          // Read clipboard and check for images
+          navigator.clipboard.read().then(async (items) => {
+            for (const item of items) {
+              const imageType = item.types.find(t => t.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                handleImageUpload(blob, imageType);
+                return; // Image found and handled
+              }
+            }
+            // No image found - do normal text paste
+            navigator.clipboard.readText().then(text => {
+              if (text) {
+                xterm.paste(text);
+              }
+            }).catch(() => {});
+          }).catch(() => {
+            // Fallback: try text paste on clipboard read error
+            navigator.clipboard.readText().then(text => {
+              if (text) {
+                xterm.paste(text);
+              }
+            }).catch(() => {});
+          });
+          return false; // Prevent xterm from handling Ctrl+V
+        }
+        // Clipboard API not available (HTTP non-localhost) - let xterm handle it
+        // and rely on paste event fallback
+        return true;
+      }
+      return true; // Let xterm handle other keys
+    };
+
+    xterm.attachCustomKeyEventHandler(keyEventHandler);
+
+    // Fallback paste event listener for HTTP non-localhost
+    // (where navigator.clipboard.read() is not available)
+    const handlePasteEvent = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
-      // Check for image in clipboard
-      for (const item of items) {
+      for (const item of Array.from(items)) {
         if (item.type.startsWith('image/')) {
           e.preventDefault();
-
-          const file = item.getAsFile();
-          if (!file) continue;
-
-          try {
-            // Read file as base64
-            const base64 = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result as string;
-                // Remove data URL prefix (e.g., "data:image/png;base64,")
-                const base64Data = result.split(',')[1];
-                resolve(base64Data);
-              };
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            });
-
-            const requestId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-            const filename = file.name || `clipboard-image.${item.type.split('/')[1]}`;
-
-            // Send to server - agent will save file and use tmux native paste
-            socket.emit('file:upload', {
-              requestId,
-              filename,
-              data: base64,
-              mimeType: item.type,
-            });
-
-          } catch (error) {
-            console.error('Image paste error:', error);
-            if (xtermRef.current) {
-              xtermRef.current.write(`\r\n\x1b[31m[Paste error: ${error instanceof Error ? error.message : 'Unknown error'}]\x1b[0m\r\n`);
-            }
+          e.stopPropagation();
+          const blob = item.getAsFile();
+          if (blob) {
+            handleImageUpload(blob, item.type);
           }
-
-          return; // Only handle first image
+          return;
         }
       }
     };
 
-    container.addEventListener('paste', handlePaste);
+    // Add paste listener to terminal container for fallback
+    const container = xterm.element;
+    if (container) {
+      container.addEventListener('paste', handlePasteEvent);
+    }
 
     return () => {
-      container.removeEventListener('paste', handlePaste);
+      // Reset key handler on cleanup
+      xterm.attachCustomKeyEventHandler(() => true);
+      if (container) {
+        container.removeEventListener('paste', handlePasteEvent);
+      }
     };
   }, [socket]);
 

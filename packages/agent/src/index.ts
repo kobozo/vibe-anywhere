@@ -14,7 +14,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Directory for clipboard-pasted files (images, etc.)
-const CLIPBOARD_DIR = '/tmp/clipboard-uploads';
+// Use workspace directory so Claude Code can access the files
+const CLIPBOARD_DIR = '/workspace/.images';
 
 // Ensure clipboard upload directory exists
 try {
@@ -165,29 +166,43 @@ const wsClient = new AgentWebSocket(config, {
       fs.writeFileSync(filePath, buffer);
       console.log(`File saved: ${filePath} (${buffer.length} bytes)`);
 
-      // Use tmux native paste if we have the tab info
-      if (data.tabId && tmuxManager.hasActiveWindow(data.tabId)) {
+      // Send inline image preview via iTerm2 IIP escape sequence
+      // This will be rendered by xterm.js ImageAddon in the browser
+      if (data.tabId && data.mimeType.startsWith('image/')) {
+        const iipEscape = `\x1b]1337;File=inline=1:${data.data}\x07`;
+        wsClient.sendOutput(data.tabId, iipEscape);
+      }
+
+      // Use tmux send-keys to type the file path at cursor position
+      // This allows the user to add context before/after the path
+      const hasWindow = data.tabId && tmuxManager.hasActiveWindow(data.tabId);
+      console.log(`[file:upload] tabId=${data.tabId}, hasActiveWindow=${hasWindow}`);
+
+      if (hasWindow) {
         try {
-          // Set tmux buffer with the file path
           const { exec } = await import('child_process');
           const { promisify } = await import('util');
           const execAsync = promisify(exec);
 
-          // Set the tmux buffer to the file path
-          await execAsync(`tmux set-buffer -- "${filePath}"`);
-
           // Get the window index for this tab
           const windows = tmuxManager.getWindowStatus();
+          console.log(`[file:upload] Windows: ${JSON.stringify(windows)}`);
           const window = windows.find(w => w.tabId === data.tabId);
           if (window) {
-            // Paste the buffer into the specific window using tmux native paste
+            // Type the file path using send-keys -l (literal mode)
             const sessionName = `sh-${config.workspaceId}`;
-            await execAsync(`tmux paste-buffer -t ${sessionName}:${window.windowIndex}`);
-            console.log(`Pasted file path via tmux into window ${window.windowIndex}`);
+            const cmd = `tmux send-keys -t ${sessionName}:${window.windowIndex} -l '${filePath}'`;
+            console.log(`[file:upload] Executing: ${cmd}`);
+            await execAsync(cmd);
+            console.log(`Typed file path via tmux into window ${window.windowIndex}`);
+          } else {
+            console.log(`[file:upload] No window found for tabId ${data.tabId}`);
           }
         } catch (tmuxError) {
-          console.warn('Failed to use tmux paste, path saved to file:', tmuxError);
+          console.warn('Failed to type path via tmux, path saved to file:', tmuxError);
         }
+      } else {
+        console.log(`[file:upload] Skipping send-keys: no active window for tabId ${data.tabId}`);
       }
 
       wsClient.sendFileUploaded(data.requestId, true, filePath);

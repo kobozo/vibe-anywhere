@@ -210,6 +210,7 @@ export const tabTemplates = pgTable('tab_templates', {
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
   sortOrder: integer('sort_order').default(0).notNull(),
   isBuiltIn: boolean('is_built_in').default(false).notNull(), // For default templates
+  requiredTechStack: text('required_tech_stack'), // Tech stack ID required to show this template (nullable)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

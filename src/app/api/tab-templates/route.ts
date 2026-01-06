@@ -15,6 +15,7 @@ const createTemplateSchema = z.object({
   args: z.array(z.string()).optional(),
   description: z.string().max(200).optional(),
   exitOnClose: z.boolean().optional(),
+  requiredTechStack: z.string().nullable().optional(),
 });
 
 /**
