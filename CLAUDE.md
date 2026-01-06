@@ -37,6 +37,27 @@ Session Hub is a web application for running persistent Claude Code CLI instance
 - Run `npm run db:migrate` to apply migrations
 - Commit migration files (`drizzle/*.sql`) to version control
 
+### Agent Changes (packages/agent)
+Every change to the agent requires a version bump. The server detects outdated agents and prompts users to update.
+
+**Semantic Versioning (MAJOR.MINOR.PATCH):**
+| Type | When to use | Example |
+|------|-------------|---------|
+| **MAJOR** | Breaking changes, protocol changes, incompatible API | Agent can't communicate with older server |
+| **MINOR** | New features, new capabilities, backward compatible | Added new command support, new event handlers |
+| **PATCH** | Bug fixes, small improvements, no new features | Fixed command display, performance tweaks |
+
+**Files to update:**
+1. `packages/agent/package.json` - bump `version` field
+2. `src/lib/services/agent-registry.ts` - update `EXPECTED_AGENT_VERSION`
+
+**After changes:**
+```bash
+cd packages/agent && npm run bundle
+```
+
+This creates `agent-bundle.tar.gz` which is served to containers for updates.
+
 ## Architecture
 
 ```
@@ -170,4 +191,4 @@ The Proxmox LXC template contains:
 - SSH enabled for rsync sync operations
 
 ---
-*Last updated: 2026-01-05*
+*Last updated: 2026-01-06*

@@ -145,8 +145,17 @@ export class TmuxManager {
 
     const windowName = `tab_${tabId}`;
 
-    // Create the tmux window (don't specify index, let tmux pick next available)
-    // Start in /workspace directory
+    // Helper to detect if command is just a shell (tmux already provides one)
+    const isShellOnly = (cmd: string[]): boolean => {
+      if (cmd.length === 0) return true;
+      if (cmd.length === 1) {
+        const c = cmd[0];
+        return c === '/bin/bash' || c === '/bin/sh' || c === 'bash' || c === 'sh' || c === '/bin/zsh' || c === 'zsh';
+      }
+      return false;
+    };
+
+    // Create the tmux window with shell (for proper PTY allocation)
     await exec(
       `tmux new-window -t ${this.sessionName} -n ${windowName} -c /workspace`
     );
@@ -177,21 +186,13 @@ export class TmuxManager {
     // Start output capture
     this.startOutputCapture(tabId, windowIndex);
 
-    // Helper to detect if command is just a shell (tmux already provides one)
-    const isShellOnly = (cmd: string[]): boolean => {
-      if (cmd.length === 0) return true;
-      if (cmd.length === 1) {
-        const c = cmd[0];
-        return c === '/bin/bash' || c === '/bin/sh' || c === 'bash' || c === 'sh' || c === '/bin/zsh' || c === 'zsh';
-      }
-      return false;
-    };
-
     // Send the command to execute (skip if it's just a shell - tmux already starts one)
+    // Prepend 'clear && ' to hide the shell prompt and command from being visible
     if (command.length > 0 && !isShellOnly(command)) {
       const cmdString = command.join(' ');
-      // Use tmux send-keys to execute the command
-      await exec(`tmux send-keys -t ${this.sessionName}:${windowIndex} '${cmdString.replace(/'/g, "'\\''")}' Enter`);
+      const escapedCmd = cmdString.replace(/'/g, "'\\''");
+      // Clear screen first, then run command - user only sees command output
+      await exec(`tmux send-keys -t ${this.sessionName}:${windowIndex} 'clear && ${escapedCmd}' Enter`);
     }
 
     console.log(`Created window ${windowIndex} for tab ${tabId} with command: ${command.join(' ')}`);
