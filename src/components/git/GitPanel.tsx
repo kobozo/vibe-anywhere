@@ -1,16 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import { useGitPanel } from '@/hooks/useGitPanel';
 import { GitStatusHeader } from './GitStatusHeader';
 import { FileList } from './FileList';
 import { DiffViewer } from './DiffViewer';
 import { CommitForm } from './CommitForm';
+import { GitHooksModal } from './GitHooksModal';
 
 interface GitPanelProps {
   workspaceId: string;
 }
 
 export function GitPanel({ workspaceId }: GitPanelProps) {
+  const [hooksModalOpen, setHooksModalOpen] = useState(false);
+
   const {
     status,
     selectedFile,
@@ -44,6 +48,7 @@ export function GitPanel({ workspaceId }: GitPanelProps) {
         isLoading={isLoading}
         lastRefresh={lastRefresh}
         onRefresh={refresh}
+        onOpenHooks={() => setHooksModalOpen(true)}
       />
 
       {/* Error display */}
@@ -100,6 +105,13 @@ export function GitPanel({ workspaceId }: GitPanelProps) {
           </div>
         </div>
       </div>
+
+      {/* Git Hooks Modal */}
+      <GitHooksModal
+        workspaceId={workspaceId}
+        isOpen={hooksModalOpen}
+        onClose={() => setHooksModalOpen(false)}
+      />
     </div>
   );
 }

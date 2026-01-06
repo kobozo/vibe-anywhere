@@ -28,14 +28,6 @@ interface EnvVar {
   inherited?: boolean;
 }
 
-interface GitHook {
-  name: string;
-  exists: boolean;
-  executable: boolean;
-  size: number;
-  isSample: boolean;
-}
-
 interface DashboardPanelProps {
   workspace: Workspace;
   repository: Repository | null;
@@ -54,12 +46,9 @@ export function DashboardPanel({
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [templateInfo, setTemplateInfo] = useState<TemplateInfo | null>(null);
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
-  const [gitHooks, setGitHooks] = useState<GitHook[]>([]);
-  const [gitHooksAvailable, setGitHooksAvailable] = useState(false);
   const [agentLoading, setAgentLoading] = useState(true);
   const [templateLoading, setTemplateLoading] = useState(true);
   const [envLoading, setEnvLoading] = useState(true);
-  const [hooksLoading, setHooksLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [envSyncMessage, setEnvSyncMessage] = useState<string | null>(null);
@@ -141,31 +130,6 @@ export function DashboardPanel({
     };
     fetchEnvVars();
   }, [repository?.id]);
-
-  // Fetch git hooks
-  useEffect(() => {
-    const fetchGitHooks = async () => {
-      if (workspace.containerStatus !== 'running') {
-        setHooksLoading(false);
-        return;
-      }
-      try {
-        const response = await fetch(`/api/workspaces/${workspace.id}/git-hooks`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-        });
-        if (response.ok) {
-          const { data } = await response.json();
-          setGitHooksAvailable(data.available);
-          setGitHooks(data.hooks || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch git hooks:', error);
-      } finally {
-        setHooksLoading(false);
-      }
-    };
-    fetchGitHooks();
-  }, [workspace.id, workspace.containerStatus]);
 
   const handleAgentUpdate = async () => {
     setUpdating(true);
@@ -515,57 +479,6 @@ export function DashboardPanel({
           </p>
         </div>
 
-        {/* Git Hooks Card (full width) */}
-        <div className="bg-background-secondary rounded-lg p-4 border border-border">
-          <h2 className="text-lg font-semibold text-foreground mb-3">Git Hooks</h2>
-          {hooksLoading ? (
-            <div className="text-sm text-foreground-secondary">Loading...</div>
-          ) : !gitHooksAvailable ? (
-            <p className="text-sm text-foreground-tertiary italic">
-              {workspace.containerStatus !== 'running'
-                ? 'Start the container to view git hooks'
-                : 'Git hooks not available'}
-            </p>
-          ) : gitHooks.length === 0 ? (
-            <p className="text-sm text-foreground-tertiary italic">No git hooks found</p>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {gitHooks.map((hook) => (
-                <div
-                  key={hook.name}
-                  className={`flex items-center gap-2 px-3 py-2 rounded border ${
-                    hook.exists && hook.executable
-                      ? 'bg-success/10 border-success/30'
-                      : hook.exists
-                      ? 'bg-warning/10 border-warning/30'
-                      : hook.isSample
-                      ? 'bg-background-tertiary/50 border-border-secondary'
-                      : 'bg-background-tertiary/30 border-border-secondary opacity-50'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${
-                    hook.exists && hook.executable
-                      ? 'bg-success'
-                      : hook.exists
-                      ? 'bg-warning'
-                      : 'bg-foreground-tertiary'
-                  }`} />
-                  <span className="text-sm text-foreground truncate">{hook.name}</span>
-                  {hook.exists && !hook.executable && (
-                    <span className="text-xs text-warning" title="Hook exists but is not executable">!</span>
-                  )}
-                  {hook.isSample && (
-                    <span className="text-xs text-foreground-tertiary">.sample</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <p className="mt-3 text-xs text-foreground-tertiary">
-            Git hooks are scripts that run automatically when certain git events occur.
-            Green indicates an active hook, yellow indicates a hook that exists but is not executable.
-          </p>
-        </div>
       </div>
     </div>
   );

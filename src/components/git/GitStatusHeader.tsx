@@ -8,6 +8,7 @@ interface GitStatusHeaderProps {
   isLoading: boolean;
   lastRefresh: Date | null;
   onRefresh: () => void;
+  onOpenHooks: () => void;
 }
 
 export function GitStatusHeader({
@@ -18,6 +19,7 @@ export function GitStatusHeader({
   isLoading,
   lastRefresh,
   onRefresh,
+  onOpenHooks,
 }: GitStatusHeaderProps) {
   const formatTime = (date: Date | null) => {
     if (!date) return 'Never';
@@ -57,11 +59,21 @@ export function GitStatusHeader({
         </div>
       </div>
 
-      {/* Refresh button and status */}
+      {/* Actions and status */}
       <div className="flex items-center gap-3">
         <span className="text-xs text-foreground-tertiary">
           Last updated: {formatTime(lastRefresh)}
         </span>
+        <button
+          onClick={onOpenHooks}
+          className="px-2 py-1 text-xs rounded border border-border hover:bg-background-tertiary text-foreground-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
+          title="Git Hooks"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Hooks
+        </button>
         <button
           onClick={onRefresh}
           disabled={isLoading}
