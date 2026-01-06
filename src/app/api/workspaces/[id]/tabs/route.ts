@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getRepositoryService, getWorkspaceService, getTabService } from '@/lib/services';
 import { getTabTemplateService } from '@/lib/services/tab-template-service';
-import { getTemplateService } from '@/lib/services/template-service';
 import {
   requireAuth,
   successResponse,
@@ -10,6 +9,7 @@ import {
   ValidationError,
   NotFoundError,
 } from '@/lib/api-utils';
+import type { TabType } from '@/lib/db/schema';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -18,6 +18,7 @@ interface RouteContext {
 const createTabSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   templateId: z.string().uuid().optional(),
+  tabType: z.enum(['dashboard', 'git', 'docker']).optional(), // For static tabs
   args: z.array(z.string()).optional(),
   command: z.array(z.string()).optional(),
   exitOnClose: z.boolean().optional(),
@@ -49,28 +50,8 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
 
   const tabService = getTabService();
 
-  // Ensure git tab exists for this workspace
-  await tabService.ensureGitTab(id);
-
-  // Ensure docker tab exists if Docker is in the tech stack (repository or template)
-  let hasDocker = false;
-  const repoTechStack = repository.techStack as string[] | null;
-
-  if (repoTechStack?.includes('docker')) {
-    hasDocker = true;
-  } else {
-    // Check template's effective tech stacks
-    const templateService = getTemplateService();
-    const template = await templateService.getTemplateForRepository(workspace.repositoryId);
-    if (template) {
-      const effectiveTechStacks = templateService.getEffectiveTechStacks(template);
-      hasDocker = effectiveTechStacks.includes('docker');
-    }
-  }
-
-  if (hasDocker) {
-    await tabService.ensureDockerTab(id);
-  }
+  // Static tabs (dashboard, git, docker) are now created on-demand via CreateTabDialog
+  // No longer auto-created here
 
   const tabs = await tabService.listTabs(id);
   const tabInfos = tabs.map((t) => tabService.toTabInfo(t));
@@ -106,6 +87,25 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     throw new NotFoundError('Workspace', id);
   }
 
+  const tabService = getTabService();
+
+  // Handle static tabs (dashboard, git, docker)
+  if (result.data.tabType) {
+    const staticTabType = result.data.tabType as TabType;
+
+    // Static tabs don't run commands, they render special panels
+    const tab = await tabService.createTab(id, {
+      name: result.data.name,
+      command: [], // Static tabs don't run commands
+      tabType: staticTabType,
+      icon: staticTabType, // Use tab type as icon identifier
+      isPinned: false, // No longer forced pinned
+      sortOrder: staticTabType === 'dashboard' ? -101 : staticTabType === 'git' ? -100 : -99,
+    });
+
+    return successResponse({ tab: tabService.toTabInfo(tab) }, 201);
+  }
+
   // Build the command from template if templateId provided
   let command: string[] | undefined = result.data.command;
   let exitOnClose: boolean | undefined = result.data.exitOnClose;
@@ -131,7 +131,6 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     icon = template.icon || undefined;
   }
 
-  const tabService = getTabService();
   const tab = await tabService.createTab(id, {
     name: result.data.name,
     command,

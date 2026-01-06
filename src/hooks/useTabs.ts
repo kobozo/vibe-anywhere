@@ -51,7 +51,13 @@ export function useTabs(workspaceId: string | null) {
   }, [token, workspaceId]);
 
   const createTab = useCallback(
-    async (name: string, templateId?: string, args?: string[], autoShutdownMinutes?: number) => {
+    async (
+      name: string,
+      templateId?: string | null,
+      args?: string[],
+      autoShutdownMinutes?: number,
+      tabType?: TabType
+    ) => {
       if (!token || !workspaceId) throw new Error('Not authenticated or no workspace selected');
 
       const response = await fetch(`/api/workspaces/${workspaceId}/tabs`, {
@@ -60,7 +66,13 @@ export function useTabs(workspaceId: string | null) {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, templateId, args, autoShutdownMinutes }),
+        body: JSON.stringify({
+          name,
+          templateId: templateId || undefined,
+          args,
+          autoShutdownMinutes,
+          tabType,
+        }),
       });
 
       if (!response.ok) {

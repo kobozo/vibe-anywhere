@@ -91,6 +91,11 @@ export function getTemplateIcon(
     return <TerminalIcon className={className} />;
   }
 
+  // Dashboard uses a bar chart emoji
+  if (iconKey === 'dashboard') {
+    return <span className={className}>{'\u{1F4CA}'}</span>;
+  }
+
   // Custom templates use Material Icons
   const MaterialIconComponent = getMaterialIcon(iconKey);
   return <MaterialIconComponent className={className} />;

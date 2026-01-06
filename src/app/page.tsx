@@ -19,6 +19,7 @@ import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { GitPanel } from '@/components/git';
 import { DockerPanel } from '@/components/docker';
+import { DashboardPanel } from '@/components/dashboard';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
 import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
@@ -803,6 +804,12 @@ function Dashboard() {
                       />
                     </div>
                   </>
+                ) : selectedTab && selectedTab.tabType === 'dashboard' ? (
+                  // Dashboard panel - workspace overview
+                  <DashboardPanel
+                    workspace={selectedWorkspace}
+                    repository={selectedRepository}
+                  />
                 ) : selectedTab && selectedTab.tabType === 'git' ? (
                   // Git panel - no terminal needed
                   <GitPanel workspaceId={selectedWorkspace.id} />

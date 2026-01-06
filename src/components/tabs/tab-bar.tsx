@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { VoiceButton, VoiceButtonRef } from '@/components/voice/voice-button';
 import { getTemplateIcon } from '@/components/icons/ai-icons';
 import type { TabGroupInfo } from '@/hooks/useTabGroups';
+import type { TabType } from '@/lib/db/schema';
 
 interface TabBarProps {
   workspaceId: string | null;
@@ -135,10 +136,15 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
     }
   }, [tabs, selectedTabId, activeGroupId, onSelectTab]);
 
-  const handleCreateTab = async (name: string, templateId: string, args?: string[]) => {
+  const handleCreateTab = async (
+    name: string,
+    templateId: string | null,
+    args?: string[],
+    tabType?: TabType
+  ) => {
     try {
       setActionLoading('create');
-      const tab = await createTab(name, templateId, args);
+      const tab = await createTab(name, templateId, args, undefined, tabType);
       onSelectTab(tab);
     } catch (error) {
       console.error('Failed to create tab:', error);
@@ -194,8 +200,8 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
       onSelectGroup?.(null);
     }
 
-    // Git and Docker tabs don't need starting - they're UI-only
-    if (tab.tabType === 'git' || tab.tabType === 'docker') {
+    // Static tabs (dashboard, git, docker) don't need starting - they're UI-only
+    if (tab.tabType === 'dashboard' || tab.tabType === 'git' || tab.tabType === 'docker') {
       onSelectTab(tab);
     } else if (tab.status === 'running') {
       onSelectTab(tab);
@@ -351,6 +357,10 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
               <span className="w-4 h-4 flex items-center justify-center">
                 {getTemplateIcon(tab.icon, true, 'w-4 h-4')}
               </span>
+            ) : tab.tabType === 'dashboard' ? (
+              <span className="w-4 h-4 flex items-center justify-center text-sm">
+                {'\u{1F4CA}'}
+              </span>
             ) : tab.tabType === 'git' ? (
               <Image
                 src="/icons/ai/github.png"
@@ -461,6 +471,9 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
         onCreate={handleCreateTab}
         isLoading={actionLoading === 'create'}
         workspaceTechStacks={workspaceTechStacks}
+        existingTabTypes={tabs
+          .filter((t) => ['dashboard', 'git', 'docker'].includes(t.tabType))
+          .map((t) => t.tabType)}
       />
 
       {/* Delete tab confirmation */}

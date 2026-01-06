@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { WorkspaceInfoPanel } from '@/components/ui/workspace-info-panel';
 
 interface RepositoryTreeProps {
   onSelectWorkspace: (workspace: Workspace | null, repository: Repository) => void;
@@ -22,6 +21,9 @@ interface RepositoryTreeProps {
   onWorkspacesRefreshed?: () => void;
   // Called when a workspace is removed (container destroyed or workspace deleted)
   onWorkspaceRemoved?: (workspaceId: string) => void;
+  // UI state persistence
+  initialExpandedRepos?: string[];
+  onExpandedReposChange?: (repoIds: string[]) => void;
 }
 
 export function RepositoryTree({
@@ -38,12 +40,14 @@ export function RepositoryTree({
   refreshWorkspacesForRepoId,
   onWorkspacesRefreshed,
   onWorkspaceRemoved,
+  initialExpandedRepos,
+  onExpandedReposChange,
 }: RepositoryTreeProps) {
 
-  const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set());
+  const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set(initialExpandedRepos || []));
+  const [isInitialized, setIsInitialized] = useState(false);
   const [workspacesByRepo, setWorkspacesByRepo] = useState<Record<string, Workspace[]>>({});
   const [loadingRepos, setLoadingRepos] = useState<Set<string>>(new Set());
-  const [infoPanelWorkspace, setInfoPanelWorkspace] = useState<Workspace | null>(null);
   const [restartingWorkspaces, setRestartingWorkspaces] = useState<Set<string>>(new Set());
   const [destroyingWorkspaces, setDestroyingWorkspaces] = useState<Set<string>>(new Set());
   const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
@@ -92,6 +96,21 @@ export function RepositoryTree({
     workspaceIds: allWorkspaceIds,
     onUpdate: handleWorkspaceUpdate,
   });
+
+  // Update expanded repos from initial props when loaded from localStorage
+  useEffect(() => {
+    if (initialExpandedRepos && !isInitialized) {
+      setExpandedRepos(new Set(initialExpandedRepos));
+      setIsInitialized(true);
+    }
+  }, [initialExpandedRepos, isInitialized]);
+
+  // Notify parent when expanded repos change (for persistence)
+  useEffect(() => {
+    if (isInitialized) {
+      onExpandedReposChange?.(Array.from(expandedRepos));
+    }
+  }, [expandedRepos, isInitialized, onExpandedReposChange]);
 
   // Auto-expand repositories when they have the selected workspace
   useEffect(() => {
@@ -396,16 +415,6 @@ export function RepositoryTree({
                         </span>
                         <span className="flex-1 text-sm truncate">{workspace.name}</span>
                         <span className="text-xs text-foreground-tertiary">{workspace.branchName}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInfoPanelWorkspace(workspace);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 text-foreground-secondary hover:text-foreground px-1"
-                          title="Workspace info"
-                        >
-                          ⓘ
-                        </button>
                       </div>
                     ))}
                     <button
@@ -455,17 +464,6 @@ export function RepositoryTree({
         onConfirm={confirmDestroyContainer}
         onCancel={() => setWorkspaceToDestroy(null)}
       />
-
-      {/* Workspace Info Panel */}
-      {infoPanelWorkspace && (
-        <WorkspaceInfoPanel
-          workspace={infoPanelWorkspace}
-          onClose={() => setInfoPanelWorkspace(null)}
-          onRestart={() => handleRestartContainer(infoPanelWorkspace)}
-          onDestroy={() => handleDestroyContainerClick(infoPanelWorkspace)}
-          onDelete={() => handleDeleteWorkspaceClick(infoPanelWorkspace)}
-        />
-      )}
     </div>
   );
 }
