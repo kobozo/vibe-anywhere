@@ -4,6 +4,7 @@ import { workspaces, type Workspace, type WorkspaceStatus, type ContainerStatus,
 import { getRepositoryService, RepositoryService } from './repository-service';
 import { getSSHKeyService } from './ssh-key-service';
 import { getTemplateService } from './template-service';
+import { getEnvVarService } from './env-var-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { gitCloneInContainer, getGitStatusInContainer, isRepoClonedInContainer, type GitStatusResult } from '@/lib/container/proxmox/ssh-stream';
@@ -435,6 +436,30 @@ export class WorkspaceService {
 
       // Ensure repo is cloned (uses helper which handles SSH keys and tech stacks)
       await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, containerId);
+
+      // Inject environment variables to container
+      try {
+        const envVarService = getEnvVarService();
+        const mergedEnvVars = await envVarService.getMergedEnvVars(
+          workspace.repositoryId,
+          workspace.templateId || repo.templateId
+        );
+
+        // Only inject if there are env vars to inject
+        if (Object.keys(mergedEnvVars).length > 0) {
+          const proxmoxBackend = this.containerBackend as {
+            injectEnvVars?: (containerId: string, envVars: Record<string, string>) => Promise<void>;
+          };
+
+          if (proxmoxBackend.injectEnvVars) {
+            await proxmoxBackend.injectEnvVars(containerId, mergedEnvVars);
+            console.log(`Injected ${Object.keys(mergedEnvVars).length} env vars into container ${containerId}`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to inject environment variables:', error);
+        // Don't fail the container startup, just log the error
+      }
 
       // Emit starting agent progress
       this.emitProgress(workspaceId, 'starting_agent');

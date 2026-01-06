@@ -190,5 +190,22 @@ The Proxmox LXC template contains:
 - Containers get DHCP IP on VLAN 2 (192.168.3.x)
 - SSH enabled for rsync sync operations
 
+## Troubleshooting
+
+### `.next` Permission Denied During Build
+If you see permission errors like `EACCES: permission denied, open '/home/devops/session-hub/.next/trace'`, the `.next` directory is owned by another user (likely root from a previous dev session).
+
+**Fix:**
+```bash
+# Restart the dev Docker container to reset permissions
+docker restart session-hub-dev
+
+# Or if you have sudo access:
+sudo rm -rf .next
+npm run build
+```
+
+**Prevention**: The dev container runs as `devops` user. If you ever run `npm run dev` or `npm run build` as root, it will create files owned by root.
+
 ---
 *Last updated: 2026-01-06*

@@ -703,6 +703,59 @@ EOF
   }
 
   /**
+   * Inject environment variables into a running container
+   * Writes to /etc/profile.d/session-hub-env.sh for persistence across shell sessions
+   */
+  async injectEnvVars(containerId: string, envVars: Record<string, string>): Promise<void> {
+    if (!envVars || Object.keys(envVars).length === 0) {
+      console.log(`No env vars to inject for container ${containerId}`);
+      return;
+    }
+
+    const client = await this.getClient();
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP from cache or wait for it
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    // Build the env file content
+    // Escape values for shell by wrapping in single quotes and escaping any single quotes
+    const envLines = Object.entries(envVars).map(([key, value]) => {
+      // Escape single quotes in value: replace ' with '\''
+      const escapedValue = value.replace(/'/g, "'\\''");
+      return `export ${key}='${escapedValue}'`;
+    });
+
+    const envContent = `# Session Hub Environment Variables
+# Auto-generated - do not edit manually
+${envLines.join('\n')}
+`;
+
+    console.log(`Injecting ${Object.keys(envVars).length} env vars into container ${vmid}`);
+
+    try {
+      await execSSHCommand(
+        { host: ip, username: 'root' },
+        ['bash', '-c', `
+          cat > /etc/profile.d/session-hub-env.sh << 'ENVEOF'
+${envContent}
+ENVEOF
+          chmod 644 /etc/profile.d/session-hub-env.sh
+        `],
+        { workingDir: '/' }
+      );
+      console.log(`Environment variables injected into container ${vmid}`);
+    } catch (error) {
+      console.error(`Failed to inject env vars into container ${vmid}:`, error);
+      throw new Error(`Env var injection failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Install tech stacks in a running container
    * Used to install required tech stacks that aren't pre-installed in the template
    */

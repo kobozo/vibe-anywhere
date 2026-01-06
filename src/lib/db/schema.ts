@@ -77,6 +77,13 @@ export const templateStatusEnum = pgEnum('template_status', [
   'error',
 ]);
 
+// Environment variable entry type for JSONB storage
+export interface EnvVarEntry {
+  value: string;      // Plain text or encrypted string
+  encrypted: boolean; // Whether value is encrypted at rest
+}
+export type EnvVarsJson = Record<string, EnvVarEntry>;
+
 // Users table
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -105,6 +112,7 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
   isDefault: boolean('is_default').default(false).notNull(),
   errorMessage: text('error_message'), // Error details if status is 'error'
   stagingContainerIp: text('staging_container_ip'), // IP address when in staging mode
+  envVars: jsonb('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -124,6 +132,7 @@ export const repositories = pgTable('repositories', {
   cloneDepth: integer('clone_depth'), // null = full clone, positive int = shallow clone depth
   defaultBranch: text('default_branch').default('main'),
   techStack: jsonb('tech_stack').$type<string[]>().default([]), // Tech stack IDs to install on workspaces (override template)
+  envVars: jsonb('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers (overrides template)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

@@ -14,6 +14,7 @@ import { CreateWorkspaceDialog } from '@/components/workspaces/create-workspace-
 import { TabBar, TabBarRef } from '@/components/tabs/tab-bar';
 import { useOpenAISettings } from '@/hooks/useOpenAISettings';
 import { useSocket } from '@/hooks/useSocket';
+import { useUIState } from '@/hooks/useUIState';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { GitPanel } from '@/components/git';
@@ -144,6 +145,17 @@ function Dashboard() {
   const { token } = useAuth();
   const { socket } = useSocket({ token });
 
+  // UI state persistence (for preserving view across page refresh)
+  const {
+    expandedRepos: persistedExpandedRepos,
+    selectedTabId: persistedSelectedTabId,
+    activeGroupId: persistedActiveGroupId,
+    isLoaded: uiStateLoaded,
+    setExpandedRepos: persistExpandedRepos,
+    setSelectedTabId: persistSelectedTabId,
+    setActiveGroupId: persistActiveGroupId,
+  } = useUIState();
+
   // Fetch whisper settings on mount
   useEffect(() => {
     fetchWhisperSettings();
@@ -155,6 +167,49 @@ function Dashboard() {
       fetchGroups();
     }
   }, [selectedWorkspace?.id, fetchGroups]);
+
+  // Persist selected tab ID when it changes
+  useEffect(() => {
+    if (uiStateLoaded) {
+      persistSelectedTabId(selectedTab?.id || null);
+    }
+  }, [selectedTab?.id, uiStateLoaded, persistSelectedTabId]);
+
+  // Persist active group ID when it changes
+  useEffect(() => {
+    if (uiStateLoaded) {
+      persistActiveGroupId(activeGroupId);
+    }
+  }, [activeGroupId, uiStateLoaded, persistActiveGroupId]);
+
+  // Track if we've restored the tab selection (to only do it once)
+  const [hasRestoredSelection, setHasRestoredSelection] = useState(false);
+
+  // Handle tabs change - store in ref and restore persisted selection
+  const handleTabsChange = useCallback((tabs: TabInfo[]) => {
+    workspaceTabsRef.current = tabs;
+
+    // Restore persisted tab selection on first load
+    if (!hasRestoredSelection && uiStateLoaded && tabs.length > 0) {
+      // Try to restore persisted tab
+      if (persistedSelectedTabId) {
+        const persistedTab = tabs.find(t => t.id === persistedSelectedTabId);
+        if (persistedTab) {
+          setSelectedTab(persistedTab);
+          setHasRestoredSelection(true);
+          return;
+        }
+      }
+      // Try to restore persisted group
+      if (persistedActiveGroupId && groups.some(g => g.id === persistedActiveGroupId)) {
+        setActiveGroupId(persistedActiveGroupId);
+        setHasRestoredSelection(true);
+        return;
+      }
+      // Mark as restored even if we couldn't find the persisted items
+      setHasRestoredSelection(true);
+    }
+  }, [hasRestoredSelection, uiStateLoaded, persistedSelectedTabId, persistedActiveGroupId, groups, setActiveGroupId]);
 
   // Fetch workspace template tech stacks for tab filtering
   useEffect(() => {
@@ -304,23 +359,43 @@ function Dashboard() {
     name?: string;
     description?: string;
     templateId?: string | null;
+    envVars?: Array<{ key: string; value: string; encrypted: boolean }>;
   }) => {
     if (!editingRepository) return;
 
     setIsEditRepoLoading(true);
     try {
+      // Save repository metadata
+      const { envVars, ...repoUpdates } = updates;
       const response = await fetch(`/api/repositories/${editingRepository.id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(repoUpdates),
       });
 
       if (!response.ok) {
         const { error } = await response.json();
         throw new Error(error?.message || 'Failed to update repository');
+      }
+
+      // Save env vars if provided
+      if (envVars) {
+        const envResponse = await fetch(`/api/repositories/${editingRepository.id}/env-vars`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ envVars }),
+        });
+
+        if (!envResponse.ok) {
+          const { error } = await envResponse.json();
+          throw new Error(error?.message || 'Failed to update environment variables');
+        }
       }
 
       await fetchRepositories();
@@ -610,6 +685,8 @@ function Dashboard() {
               refreshWorkspacesForRepoId={refreshWorkspacesForRepoId}
               onWorkspacesRefreshed={() => setRefreshWorkspacesForRepoId(null)}
               onWorkspaceRemoved={handleWorkspaceRemoved}
+              initialExpandedRepos={uiStateLoaded ? persistedExpandedRepos : undefined}
+              onExpandedReposChange={persistExpandedRepos}
             />
           </div>
           <TemplateSection
@@ -633,7 +710,7 @@ function Dashboard() {
                 workspaceId={selectedWorkspace.id}
                 selectedTabId={selectedTab?.id || null}
                 onSelectTab={setSelectedTab}
-                onTabsChange={(tabs) => { workspaceTabsRef.current = tabs; }}
+                onTabsChange={handleTabsChange}
                 onExposeDeleteTab={(fn) => { deleteTabRef.current = fn; }}
                 whisperEnabled={whisperEnabled}
                 onVoiceTranscription={handleVoiceTranscription}
