@@ -59,6 +59,7 @@ export function SplitViewPane({
       <div className="h-full w-full overflow-hidden">
         <Terminal
           tabId={tab.id}
+          workspaceId={workspaceId}
           onConnectionChange={onConnectionChange}
           onEnd={onEnd}
         />

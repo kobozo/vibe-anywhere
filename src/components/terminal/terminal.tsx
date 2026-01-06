@@ -8,15 +8,17 @@ import { ImageAddon } from '@xterm/addon-image';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/lib/theme';
+import { StatusBar } from './status-bar';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalProps {
   tabId: string;
+  workspaceId?: string;
   onConnectionChange?: (connected: boolean) => void;
   onEnd?: () => void;
 }
 
-export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
+export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -390,10 +392,18 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
 
   return (
     <div
-      className="h-full w-full min-h-0 rounded-lg overflow-hidden flex flex-col"
+      className="h-full w-full min-h-0 overflow-hidden flex flex-col"
       style={{ backgroundColor: theme.terminal.background }}
     >
       <div ref={terminalRef} className="flex-1 min-h-0" />
+      {workspaceId && (
+        <StatusBar
+          workspaceId={workspaceId}
+          tabId={tabId}
+          socket={socket}
+          isConnected={isConnected}
+        />
+      )}
     </div>
   );
 }

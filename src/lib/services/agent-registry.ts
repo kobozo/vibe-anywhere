@@ -27,7 +27,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.5.1';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.5.3';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -361,6 +361,13 @@ class AgentRegistry {
    */
   dockerLogs(workspaceId: string, requestId: string, containerId: string, tail?: number): boolean {
     return this.emit(workspaceId, 'docker:logs', { requestId, containerId, tail });
+  }
+
+  /**
+   * Request container stats from the agent
+   */
+  requestStats(workspaceId: string, requestId: string): boolean {
+    return this.emit(workspaceId, 'stats:request', { requestId });
   }
 
   /**

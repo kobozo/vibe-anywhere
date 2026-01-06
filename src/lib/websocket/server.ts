@@ -60,6 +60,13 @@ interface PendingDockerOperation {
 }
 const pendingDockerOperations: Map<string, PendingDockerOperation> = new Map();
 
+// Track pending stats operations for relay between browser and agent
+interface PendingStatsOperation {
+  socket: AuthenticatedSocket;
+  timeoutId: NodeJS.Timeout;
+}
+const pendingStatsOperations: Map<string, PendingStatsOperation> = new Map();
+
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
@@ -459,6 +466,32 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
+    // Container stats: Get CPU and memory usage
+    socket.on('stats:request', async (data: { requestId: string; workspaceId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('stats:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingStatsOperations.delete(data.requestId);
+        }, 10000);
+
+        pendingStatsOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.requestStats(data.workspaceId, data.requestId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingStatsOperations.delete(data.requestId);
+          socket.emit('stats:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('stats:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Stats request failed',
+        });
+      }
+    });
+
     // Handle file upload (for clipboard image paste)
     socket.on('file:upload', async (data: { requestId: string; filename: string; data: string; mimeType: string }) => {
       try {
@@ -757,6 +790,16 @@ function setupAgentNamespace(io: SocketServer): void {
         clearTimeout(pending.timeoutId);
         pending.socket.emit('docker:restart:response', data);
         pendingDockerOperations.delete(data.requestId);
+      }
+    });
+
+    // Stats response handler (relay from agent to browser)
+    socket.on('stats:response', (data: { requestId: string; success: boolean; stats?: unknown; error?: string }) => {
+      const pending = pendingStatsOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('stats:response', data);
+        pendingStatsOperations.delete(data.requestId);
       }
     });
 

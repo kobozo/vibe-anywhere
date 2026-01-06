@@ -721,6 +721,7 @@ function Dashboard() {
                 ) : selectedTab && selectedTab.status === 'running' ? (
                   <Terminal
                     tabId={selectedTab.id}
+                    workspaceId={selectedWorkspace.id}
                     onConnectionChange={setIsTerminalConnected}
                     onEnd={() => {
                       setIsTerminalConnected(false);

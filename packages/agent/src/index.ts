@@ -10,6 +10,7 @@ import { OutputBufferManager } from './output-buffer.js';
 import { selfUpdate } from './updater.js';
 import { GitHandler } from './git-handler.js';
 import { DockerHandler } from './docker-handler.js';
+import { StatsHandler } from './stats-handler.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -38,6 +39,7 @@ console.log(`Session Hub URL: ${config.sessionHubUrl}`);
 const bufferManager = new OutputBufferManager(config.bufferSize);
 const gitHandler = new GitHandler('/workspace');
 const dockerHandler = new DockerHandler();
+const statsHandler = new StatsHandler();
 
 const tmuxManager = new TmuxManager(
   config.workspaceId,
@@ -387,6 +389,22 @@ const wsClient = new AgentWebSocket(config, {
         data.requestId,
         'restart',
         false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  // Stats event handler
+  onStatsRequest: async (data) => {
+    try {
+      const stats = await statsHandler.getStats();
+      wsClient.sendStats(data.requestId, true, stats);
+    } catch (error) {
+      console.error('Stats request failed:', error);
+      wsClient.sendStats(
+        data.requestId,
+        false,
+        undefined,
         error instanceof Error ? error.message : String(error)
       );
     }

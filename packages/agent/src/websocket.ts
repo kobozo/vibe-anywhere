@@ -32,6 +32,8 @@ export interface AgentEvents {
   onDockerStart: (data: { requestId: string; containerId: string }) => void;
   onDockerStop: (data: { requestId: string; containerId: string }) => void;
   onDockerRestart: (data: { requestId: string; containerId: string }) => void;
+  // Stats events
+  onStatsRequest: (data: { requestId: string }) => void;
 }
 
 export class AgentWebSocket {
@@ -200,6 +202,11 @@ export class AgentWebSocket {
 
     this.socket.on('docker:restart', (data) => {
       this.events.onDockerRestart(data);
+    });
+
+    // Stats events
+    this.socket.on('stats:request', (data) => {
+      this.events.onStatsRequest(data);
     });
 
     this.socket.on('error', (error) => {
@@ -419,6 +426,15 @@ export class AgentWebSocket {
     if (!this.socket?.connected) return;
 
     this.socket.emit(`docker:${action}:response`, { requestId, success, error });
+  }
+
+  /**
+   * Send container stats response
+   */
+  sendStats(requestId: string, success: boolean, stats?: { cpu: number; memory: { used: number; total: number; percentage: number } }, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('stats:response', { requestId, success, stats, error });
   }
 
   /**
