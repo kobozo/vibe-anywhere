@@ -38,6 +38,7 @@ export interface ProxmoxTemplateSettings {
 export interface ProxmoxVmidConfig {
   startingVmid: number;
   nextWorkspaceVmid: number;  // Next available VMID for workspaces
+  maxVmid?: number;           // Maximum VMID for containers
 }
 
 /**
@@ -80,6 +81,15 @@ export interface ProxmoxSettings {
   defaultStorage?: string;    // Default storage ID
   defaultMemory?: number;     // Default memory in MB
   defaultCpuCores?: number;   // Default CPU cores
+
+  // SSH/Container access
+  sshUser?: string;           // SSH user for container access
+  sshPrivateKeyPath?: string; // Path to SSH private key
+  claudeConfigPath?: string;  // Path to Claude config
+
+  // VMID range
+  vmidMin?: number;           // Minimum VMID for containers
+  vmidMax?: number;           // Maximum VMID for containers
 }
 
 class SettingsService {

@@ -6,6 +6,7 @@ import { useAuthState, AuthProvider, useAuth } from '@/hooks/useAuth';
 import { useRepositories } from '@/hooks/useRepositories';
 import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
 import { useTemplates, type ProvisionProgress } from '@/hooks/useTemplates';
+import { useTabGroups } from '@/hooks/useTabGroups';
 import { RepositoryTree } from '@/components/repositories/repository-tree';
 import { AddRepositoryDialog } from '@/components/repositories/add-repository-dialog';
 import { EditRepositoryDialog } from '@/components/repositories/edit-repository-dialog';
@@ -19,6 +20,7 @@ import { GitPanel } from '@/components/git';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
 import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
+import { SplitViewContainer, CreateGroupDialog } from '@/components/split-view';
 import type { Repository, Workspace, ProxmoxTemplate } from '@/lib/db/schema';
 import type { TabInfo } from '@/hooks/useTabs';
 
@@ -112,6 +114,28 @@ function Dashboard() {
   const workspaceTabsRef = useRef<TabInfo[]>([]);
   const tabBarRef = useRef<TabBarRef>(null);
 
+  // Tab groups hook
+  const {
+    groups,
+    activeGroupId,
+    activeGroup,
+    setActiveGroupId,
+    multiSelectMode,
+    selectedTabIds: selectedTabIdsForGroup,
+    enterMultiSelectMode,
+    exitMultiSelectMode,
+    toggleTabSelection,
+    fetchGroups,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+    updatePaneSizes,
+    groupedTabIds,
+  } = useTabGroups(selectedWorkspace?.id || null);
+
+  // Create group dialog state
+  const [isCreateGroupDialogOpen, setIsCreateGroupDialogOpen] = useState(false);
+
   // Whisper/Voice state
   const { isConfigured: whisperEnabled, fetchSettings: fetchWhisperSettings } = useOpenAISettings();
   const { token } = useAuth();
@@ -121,6 +145,33 @@ function Dashboard() {
   useEffect(() => {
     fetchWhisperSettings();
   }, [fetchWhisperSettings]);
+
+  // Fetch tab groups when workspace changes
+  useEffect(() => {
+    if (selectedWorkspace?.id) {
+      fetchGroups();
+    }
+  }, [selectedWorkspace?.id, fetchGroups]);
+
+  // Tab group handlers
+  const handleCreateGroup = useCallback(async (name: string, tabIds: string[], layout: import('@/lib/db/schema').TabGroupLayout) => {
+    await createGroup(name, tabIds, layout);
+    setIsCreateGroupDialogOpen(false);
+  }, [createGroup]);
+
+  const handleUngroupTabs = useCallback(async (groupId: string) => {
+    await deleteGroup(groupId);
+  }, [deleteGroup]);
+
+  const handleRenameGroup = useCallback(async (groupId: string, newName: string) => {
+    await updateGroup(groupId, { name: newName });
+  }, [updateGroup]);
+
+  const handlePaneResize = useCallback(async (sizes: { tabId: string; sizePercent: number }[]) => {
+    if (activeGroupId) {
+      await updatePaneSizes(activeGroupId, sizes);
+    }
+  }, [activeGroupId, updatePaneSizes]);
 
   // Handle voice transcription - send to active terminal
   const handleVoiceTranscription = useCallback((text: string) => {
@@ -148,7 +199,8 @@ function Dashboard() {
     setSelectedRepository(repository);
     setSelectedWorkspace(workspace);
     setSelectedTab(null); // Will be auto-selected by TabBar
-  }, []);
+    setActiveGroupId(null); // Clear active group when switching workspace
+  }, [setActiveGroupId]);
 
   // Handle container destruction - clear tabs when container is destroyed
   const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
@@ -561,11 +613,45 @@ function Dashboard() {
                 onExposeDeleteTab={(fn) => { deleteTabRef.current = fn; }}
                 whisperEnabled={whisperEnabled}
                 onVoiceTranscription={handleVoiceTranscription}
+                // Tab group props
+                groups={groups}
+                groupedTabIds={groupedTabIds}
+                activeGroupId={activeGroupId}
+                onSelectGroup={setActiveGroupId}
+                onUngroupTabs={handleUngroupTabs}
+                onRenameGroup={handleRenameGroup}
+                // Multi-select props
+                multiSelectMode={multiSelectMode}
+                selectedTabIdsForGroup={selectedTabIdsForGroup}
+                onToggleTabSelection={toggleTabSelection}
+                onEnterMultiSelectMode={enterMultiSelectMode}
+                onExitMultiSelectMode={exitMultiSelectMode}
+                onCreateGroupClick={() => setIsCreateGroupDialogOpen(true)}
               />
 
-              {/* Terminal/Git area */}
+              {/* Terminal/Git/Split View area */}
               <div className="flex-1 p-4 min-h-0">
-                {selectedTab && selectedTab.tabType === 'git' ? (
+                {activeGroupId && activeGroup ? (
+                  // Split view for tab group
+                  <SplitViewContainer
+                    group={activeGroup}
+                    tabs={workspaceTabsRef.current}
+                    workspaceId={selectedWorkspace.id}
+                    onPaneResize={handlePaneResize}
+                    onConnectionChange={(tabId, connected) => {
+                      // Track connection for the first running tab in group
+                      if (activeGroup.members[0]?.tabId === tabId) {
+                        setIsTerminalConnected(connected);
+                      }
+                    }}
+                    onTabEnd={(tabId) => {
+                      // Handle tab end within split view
+                      if (deleteTabRef.current) {
+                        deleteTabRef.current(tabId).catch(console.error);
+                      }
+                    }}
+                  />
+                ) : selectedTab && selectedTab.tabType === 'git' ? (
                   // Git panel - no terminal needed
                   <GitPanel workspaceId={selectedWorkspace.id} />
                 ) : selectedTab && selectedTab.status === 'running' ? (
@@ -718,6 +804,18 @@ function Dashboard() {
         onClose={() => setStagingTemplateId(null)}
         onFinalize={handleFinalizeTemplate}
         isFinalizing={isFinalizing}
+      />
+
+      {/* Create Tab Group Dialog */}
+      <CreateGroupDialog
+        isOpen={isCreateGroupDialogOpen}
+        onClose={() => {
+          setIsCreateGroupDialogOpen(false);
+          exitMultiSelectMode();
+        }}
+        selectedTabIds={selectedTabIdsForGroup}
+        tabs={workspaceTabsRef.current}
+        onCreate={handleCreateGroup}
       />
     </div>
   );

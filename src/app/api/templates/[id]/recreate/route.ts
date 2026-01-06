@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
 import { getProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
 import { getTemplateService } from '@/lib/services/template-service';
+import { getSettingsService } from '@/lib/services/settings-service';
 import { requireAuth } from '@/lib/api-utils';
 
 /**
@@ -69,6 +70,7 @@ export async function POST(
   }
 
   const templateManager = getProxmoxTemplateManager();
+  const settingsService = getSettingsService();
 
   // Check SSH key availability
   const sshPublicKey = templateManager.getSSHPublicKey();
@@ -79,11 +81,24 @@ export async function POST(
     );
   }
 
+  // Get default storage from settings
+  const proxmoxSettings = await settingsService.getProxmoxSettings();
+  const defaultStorage = proxmoxSettings.defaultStorage || config.proxmox.storage || 'local-lvm';
+
+  // Get parent VMID if this template is based on another
+  let parentVmid: number | undefined;
+  if (template.parentTemplateId) {
+    const parentVmidResult = await templateService.getParentVmid(id);
+    if (parentVmidResult) {
+      parentVmid = parentVmidResult;
+    }
+  }
+
   // Create a readable stream for SSE
   const encoder = new TextEncoder();
   const templateVmid = template.vmid;
   const targetNode = template.node || undefined;
-  const targetStorage = template.storage || 'local';
+  const targetStorage = template.storage || defaultStorage;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -98,7 +113,7 @@ export async function POST(
         // Delete existing template
         sendEvent('progress', { step: 'delete', progress: 0, message: 'Deleting existing template...' });
         try {
-          await templateManager.deleteTemplate(templateVmid);
+          await templateManager.deleteProxmoxTemplate(templateVmid);
           sendEvent('progress', { step: 'delete', progress: 5, message: 'Existing template deleted' });
         } catch (deleteError) {
           // Template might not exist in Proxmox, continue anyway
@@ -107,10 +122,13 @@ export async function POST(
         }
 
         // Recreate template with progress updates (same VMID)
+        // If this template has a parent, clone from the parent template
         await templateManager.createTemplate(templateVmid, {
+          name: template.name,
           storage: targetStorage,
           node: targetNode,
           techStacks: template.techStacks || [],
+          parentVmid, // Clone from parent if this template is based on another
           onProgress: (progress) => {
             sendEvent('progress', progress);
           },
@@ -133,11 +151,21 @@ export async function POST(
       } catch (error) {
         console.error('Template recreation error:', error);
 
-        // Update template status to error
+        // Clean up the Proxmox container if it was partially created
+        try {
+          sendEvent('progress', { step: 'cleanup', progress: 0, message: 'Cleaning up failed container...' });
+          await templateManager.deleteProxmoxTemplate(templateVmid);
+          console.log(`Cleaned up failed template container VMID ${templateVmid}`);
+        } catch (cleanupError) {
+          // Log but don't fail - container might not have been created yet
+          console.warn(`Failed to cleanup container VMID ${templateVmid}:`, cleanupError);
+        }
+
+        // Update template status to error (clear VMID since we cleaned up)
         await templateService.updateTemplateStatus(
           id,
           'error',
-          templateVmid, // Keep the VMID even on error
+          undefined, // Clear VMID since container was cleaned up
           targetNode,
           targetStorage,
           error instanceof Error ? error.message : 'Failed to recreate template'

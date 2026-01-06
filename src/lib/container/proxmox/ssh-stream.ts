@@ -102,9 +102,11 @@ export async function createSSHConnection(options: SSHConnectionOptions): Promis
     };
 
     // Try private key authentication - prioritize ed25519 over rsa
+    // Include /home/sessionhub/.ssh for Docker container environments
     const keyLocations = [
       options.privateKeyPath,
       cfg.sshPrivateKeyPath,
+      '/home/sessionhub/.ssh/id_ed25519',
       path.join(os.homedir(), '.ssh', 'id_ed25519'),
       path.join(os.homedir(), '.ssh', 'id_ecdsa'),
       path.join(os.homedir(), '.ssh', 'id_rsa'),
@@ -343,6 +345,7 @@ export async function syncWorkspaceToContainer(
   let privateKeyPath = options.privateKeyPath || cfg.sshPrivateKeyPath;
   if (!privateKeyPath) {
     const keyLocations = [
+      '/home/sessionhub/.ssh/id_ed25519',
       path.join(os.homedir(), '.ssh', 'id_ed25519'),
       path.join(os.homedir(), '.ssh', 'id_rsa'),
       path.join(os.homedir(), '.ssh', 'id_ecdsa'),
@@ -476,6 +479,7 @@ export async function syncSSHKeyToContainer(
   let hostPrivateKeyPath = options.privateKeyPath || cfg.sshPrivateKeyPath;
   if (!hostPrivateKeyPath) {
     const keyLocations = [
+      '/home/sessionhub/.ssh/id_ed25519',
       path.join(os.homedir(), '.ssh', 'id_ed25519'),
       path.join(os.homedir(), '.ssh', 'id_rsa'),
       path.join(os.homedir(), '.ssh', 'id_ecdsa'),
@@ -875,6 +879,7 @@ export async function syncWorkspaceFromContainer(
   let privateKeyPath = options.privateKeyPath || cfg.sshPrivateKeyPath;
   if (!privateKeyPath) {
     const keyLocations = [
+      '/home/sessionhub/.ssh/id_ed25519',
       path.join(os.homedir(), '.ssh', 'id_ed25519'),
       path.join(os.homedir(), '.ssh', 'id_rsa'),
       path.join(os.homedir(), '.ssh', 'id_ecdsa'),
@@ -947,6 +952,7 @@ export async function setupContainerSSHAccess(
 
   // Find local SSH public key
   const pubKeyLocations = [
+    '/home/sessionhub/.ssh/id_ed25519.pub',
     path.join(os.homedir(), '.ssh', 'id_ed25519.pub'),
     path.join(os.homedir(), '.ssh', 'id_rsa.pub'),
     path.join(os.homedir(), '.ssh', 'id_ecdsa.pub'),
@@ -968,6 +974,7 @@ export async function setupContainerSSHAccess(
   let privateKeyPath = options.privateKeyPath || cfg.sshPrivateKeyPath;
   if (!privateKeyPath) {
     const keyLocations = [
+      '/home/sessionhub/.ssh/id_ed25519',
       path.join(os.homedir(), '.ssh', 'id_ed25519'),
       path.join(os.homedir(), '.ssh', 'id_rsa'),
       path.join(os.homedir(), '.ssh', 'id_ecdsa'),

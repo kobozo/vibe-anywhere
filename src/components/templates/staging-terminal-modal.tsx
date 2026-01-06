@@ -1,12 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Terminal as XTerm } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useStagingTerminal } from '@/hooks/useStagingTerminal';
 import type { ProxmoxTemplate } from '@/lib/db/schema';
-import '@xterm/xterm/css/xterm.css';
+
+// Dynamically import xterm modules to avoid SSR issues
+const loadXterm = async () => {
+  const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
+    import('@xterm/xterm'),
+    import('@xterm/addon-fit'),
+    import('@xterm/addon-web-links'),
+  ]);
+  // CSS import doesn't need await - it's just a side effect
+  import('@xterm/xterm/css/xterm.css');
+  return { Terminal, FitAddon, WebLinksAddon };
+};
 
 interface StagingTerminalModalProps {
   isOpen: boolean;
@@ -24,8 +32,8 @@ export function StagingTerminalModal({
   isFinalizing = false,
 }: StagingTerminalModalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  const xtermRef = useRef<InstanceType<typeof import('@xterm/xterm').Terminal> | null>(null);
+  const fitAddonRef = useRef<InstanceType<typeof import('@xterm/addon-fit').FitAddon> | null>(null);
   const [localFinalizing, setLocalFinalizing] = useState(false);
 
   // Debug: log template state
@@ -56,7 +64,7 @@ export function StagingTerminalModal({
   });
 
   // Safe fit function
-  const safeFit = useCallback((fitAddon: FitAddon, container: HTMLElement) => {
+  const safeFit = useCallback((fitAddon: { fit: () => void }, container: HTMLElement) => {
     if (container.offsetWidth > 0 && container.offsetHeight > 0) {
       try {
         fitAddon.fit();
@@ -71,64 +79,73 @@ export function StagingTerminalModal({
     if (!isOpen || !terminalRef.current) return;
 
     const container = terminalRef.current;
+    let xterm: InstanceType<typeof import('@xterm/xterm').Terminal> | null = null;
+    let fitAddon: InstanceType<typeof import('@xterm/addon-fit').FitAddon> | null = null;
+    let fitTimeout: NodeJS.Timeout | null = null;
+    let resizeObserver: ResizeObserver | null = null;
 
-    const xterm = new XTerm({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'JetBrains Mono, Fira Code, monospace',
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#aeafad',
-        cursorAccent: '#000000',
-        selectionBackground: '#264f78',
-        black: '#1e1e1e',
-        red: '#f44747',
-        green: '#6a9955',
-        yellow: '#dcdcaa',
-        blue: '#569cd6',
-        magenta: '#c586c0',
-        cyan: '#4ec9b0',
-        white: '#d4d4d4',
-        brightBlack: '#808080',
-        brightRed: '#f44747',
-        brightGreen: '#6a9955',
-        brightYellow: '#dcdcaa',
-        brightBlue: '#569cd6',
-        brightMagenta: '#c586c0',
-        brightCyan: '#4ec9b0',
-        brightWhite: '#ffffff',
-      },
-      allowTransparency: false,
-      scrollback: 10000,
+    // Dynamically load xterm modules
+    loadXterm().then(({ Terminal, FitAddon, WebLinksAddon }) => {
+      if (!terminalRef.current) return;
+
+      xterm = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'JetBrains Mono, Fira Code, monospace',
+        theme: {
+          background: '#1e1e1e',
+          foreground: '#d4d4d4',
+          cursor: '#aeafad',
+          cursorAccent: '#000000',
+          selectionBackground: '#264f78',
+          black: '#1e1e1e',
+          red: '#f44747',
+          green: '#6a9955',
+          yellow: '#dcdcaa',
+          blue: '#569cd6',
+          magenta: '#c586c0',
+          cyan: '#4ec9b0',
+          white: '#d4d4d4',
+          brightBlack: '#808080',
+          brightRed: '#f44747',
+          brightGreen: '#6a9955',
+          brightYellow: '#dcdcaa',
+          brightBlue: '#569cd6',
+          brightMagenta: '#c586c0',
+          brightCyan: '#4ec9b0',
+          brightWhite: '#ffffff',
+        },
+        allowTransparency: false,
+        scrollback: 10000,
+      });
+
+      fitAddon = new FitAddon();
+      const webLinksAddon = new WebLinksAddon();
+
+      xterm.loadAddon(fitAddon);
+      xterm.loadAddon(webLinksAddon);
+
+      xtermRef.current = xterm;
+      fitAddonRef.current = fitAddon;
+
+      xterm.open(container);
+
+      // Fit after short delay
+      fitTimeout = setTimeout(() => {
+        if (fitAddon) safeFit(fitAddon, container);
+      }, 50);
+
+      // Handle resize
+      resizeObserver = new ResizeObserver(() => {
+        if (fitAddon) safeFit(fitAddon, container);
+      });
+      resizeObserver.observe(container);
     });
-
-    const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
-
-    xterm.loadAddon(fitAddon);
-    xterm.loadAddon(webLinksAddon);
-
-    xtermRef.current = xterm;
-    fitAddonRef.current = fitAddon;
-
-    xterm.open(container);
-
-    // Fit after short delay
-    const fitTimeout = setTimeout(() => {
-      safeFit(fitAddon, container);
-    }, 50);
-
-    // Handle resize
-    const resizeObserver = new ResizeObserver(() => {
-      safeFit(fitAddon, container);
-    });
-    resizeObserver.observe(container);
 
     return () => {
-      clearTimeout(fitTimeout);
-      resizeObserver.disconnect();
-      xterm.dispose();
+      if (fitTimeout) clearTimeout(fitTimeout);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (xterm) xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
     };

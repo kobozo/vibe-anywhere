@@ -81,9 +81,10 @@ export function useSocket(options: UseSocketOptions): UseSocketReturn {
       globalSocket.on('connect', handleConnect);
       globalSocket.on('disconnect', handleDisconnect);
 
+      const socketRef = globalSocket;
       return () => {
-        globalSocket.off('connect', handleConnect);
-        globalSocket.off('disconnect', handleDisconnect);
+        socketRef.off('connect', handleConnect);
+        socketRef.off('disconnect', handleDisconnect);
       };
     }
 

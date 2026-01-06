@@ -16,7 +16,8 @@ const DEFAULT_OS_TEMPLATE = 'debian-12-standard';
 
 /**
  * Core provisioning script - Essential packages only
- * Tech stacks (Node.js, Python, etc.) are installed separately based on configuration
+ * Node.js is always installed because the Session Hub agent requires it
+ * Other tech stacks (Python, etc.) are installed separately based on configuration
  */
 const CORE_PROVISIONING_SCRIPT = `
 set -e
@@ -26,11 +27,11 @@ export DEBIAN_FRONTEND=noninteractive
 echo "=== Starting core template provisioning ==="
 
 # Update package lists
-echo "[1/8] Updating package lists..."
+echo "[1/9] Updating package lists..."
 apt-get update
 
 # Install base packages (essential for all workspaces)
-echo "[2/8] Installing base packages..."
+echo "[2/9] Installing base packages..."
 apt-get install -y \\
     curl \\
     git \\
@@ -46,7 +47,7 @@ apt-get install -y \\
     jq
 
 # Install GitHub CLI
-echo "[3/8] Installing GitHub CLI..."
+echo "[3/9] Installing GitHub CLI..."
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
@@ -55,7 +56,7 @@ apt-get install -y gh
 echo "GitHub CLI version: \$(gh --version | head -1)"
 
 # Install tmux
-echo "[4/8] Installing tmux..."
+echo "[4/9] Installing tmux..."
 apt-get install -y tmux
 
 # Configure tmux
@@ -80,8 +81,15 @@ setw -g pane-base-index 1
 TMUXEOF
 chmod 644 /etc/tmux.conf
 
+# Install Node.js 22 (required for Session Hub agent)
+echo "[5/9] Installing Node.js 22..."
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
+echo "Node.js version: \$(node --version)"
+echo "npm version: \$(npm --version)"
+
 # Create kobozo user for running Claude sessions
-echo "[5/8] Creating kobozo user..."
+echo "[6/9] Creating kobozo user..."
 if ! id kobozo &>/dev/null; then
     useradd -m -s /bin/bash kobozo
     echo "kobozo:SessionHub2024!" | chpasswd
@@ -91,13 +99,13 @@ if ! id kobozo &>/dev/null; then
 fi
 
 # Create workspace directory
-echo "[6/8] Creating workspace directory..."
+echo "[7/9] Creating workspace directory..."
 mkdir -p /workspace
 chown kobozo:kobozo /workspace
 chmod 755 /workspace
 
 # Setup Session Hub agent directory
-echo "[7/8] Setting up Session Hub agent..."
+echo "[8/9] Setting up Session Hub agent..."
 mkdir -p /opt/session-hub-agent
 chown -R kobozo:kobozo /opt/session-hub-agent
 
@@ -126,7 +134,7 @@ systemctl daemon-reload
 systemctl enable session-hub-agent
 
 # Configure SSH and git
-echo "[8/8] Configuring SSH and git..."
+echo "[9/9] Configuring SSH and git..."
 systemctl enable ssh
 
 # Configure git globally

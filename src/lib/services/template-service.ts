@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import {
   proxmoxTemplates,
   repositories,
+  workspaces,
   type ProxmoxTemplate,
   type NewProxmoxTemplate,
   type TemplateStatus,
@@ -306,6 +307,16 @@ export class TemplateService {
         updatedAt: new Date(),
       })
       .where(eq(repositories.templateId, templateId));
+
+    // Clear templateId on all workspaces using this template
+    // (workspaces store templateId as a snapshot of which template was used to create them)
+    await db
+      .update(workspaces)
+      .set({
+        templateId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(workspaces.templateId, templateId));
 
     // Delete the template
     await db.delete(proxmoxTemplates).where(eq(proxmoxTemplates.id, templateId));

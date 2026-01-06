@@ -60,6 +60,14 @@ export const portForwardProtocolEnum = pgEnum('port_forward_protocol', [
   'tcp',
 ]);
 
+export const tabGroupLayoutEnum = pgEnum('tab_group_layout', [
+  'horizontal',     // Left/Right (2 panes)
+  'vertical',       // Top/Bottom (2 panes)
+  'left-stack',     // Left + Right-Top/Right-Bottom (3 panes)
+  'right-stack',    // Left-Top/Left-Bottom + Right (3 panes)
+  'grid-2x2',       // 2x2 grid (4 panes)
+]);
+
 export const templateStatusEnum = pgEnum('template_status', [
   'pending',
   'provisioning',
@@ -231,6 +239,33 @@ export const portForwards = pgTable('port_forwards', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Tab groups - for split view layouts
+export const tabGroups = pgTable('tab_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id')
+    .references(() => workspaces.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  layout: tabGroupLayoutEnum('layout').default('horizontal').notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Tab group members - panes within a group
+export const tabGroupMembers = pgTable('tab_group_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  groupId: uuid('group_id')
+    .references(() => tabGroups.id, { onDelete: 'cascade' })
+    .notNull(),
+  tabId: uuid('tab_id')
+    .references(() => tabs.id, { onDelete: 'cascade' })
+    .notNull(),
+  paneIndex: integer('pane_index').default(0).notNull(),
+  sizePercent: integer('size_percent').default(50).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Application settings - key-value store for app configuration
 export const appSettings = pgTable('app_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -336,6 +371,7 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   }),
   tabs: many(tabs),
   portForwards: many(portForwards),
+  tabGroups: many(tabGroups),
 }));
 
 export const portForwardsRelations = relations(portForwards, ({ one }) => ({
@@ -351,6 +387,26 @@ export const tabsRelations = relations(tabs, ({ one, many }) => ({
     references: [workspaces.id],
   }),
   logs: many(tabLogs),
+  groupMemberships: many(tabGroupMembers),
+}));
+
+export const tabGroupsRelations = relations(tabGroups, ({ one, many }) => ({
+  workspace: one(workspaces, {
+    fields: [tabGroups.workspaceId],
+    references: [workspaces.id],
+  }),
+  members: many(tabGroupMembers),
+}));
+
+export const tabGroupMembersRelations = relations(tabGroupMembers, ({ one }) => ({
+  group: one(tabGroups, {
+    fields: [tabGroupMembers.groupId],
+    references: [tabGroups.id],
+  }),
+  tab: one(tabs, {
+    fields: [tabGroupMembers.tabId],
+    references: [tabs.id],
+  }),
 }));
 
 export const sshKeysRelations = relations(sshKeys, ({ one }) => ({
@@ -437,6 +493,13 @@ export type NewSessionLog = typeof sessionLogs.$inferInsert;
 export type PortForward = typeof portForwards.$inferSelect;
 export type NewPortForward = typeof portForwards.$inferInsert;
 export type PortForwardProtocol = (typeof portForwardProtocolEnum.enumValues)[number];
+
+// Tab Groups
+export type TabGroup = typeof tabGroups.$inferSelect;
+export type NewTabGroup = typeof tabGroups.$inferInsert;
+export type TabGroupMember = typeof tabGroupMembers.$inferSelect;
+export type NewTabGroupMember = typeof tabGroupMembers.$inferInsert;
+export type TabGroupLayout = (typeof tabGroupLayoutEnum.enumValues)[number];
 
 // App Settings
 export type AppSetting = typeof appSettings.$inferSelect;

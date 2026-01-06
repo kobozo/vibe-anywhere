@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
 import { getProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
 import { getTemplateService } from '@/lib/services/template-service';
+import { getSettingsService } from '@/lib/services/settings-service';
 import { requireAuth } from '@/lib/api-utils';
 
 /**
@@ -81,6 +82,11 @@ export async function POST(
   };
 
   const templateManager = getProxmoxTemplateManager();
+  const settingsService = getSettingsService();
+
+  // Get default storage from settings
+  const proxmoxSettings = await settingsService.getProxmoxSettings();
+  const defaultStorage = proxmoxSettings.defaultStorage || config.proxmox.storage || 'local-lvm';
 
   // Check SSH key availability
   const sshPublicKey = templateManager.getSSHPublicKey();
@@ -100,12 +106,16 @@ export async function POST(
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
 
+      // Track VMID for cleanup on failure
+      let allocatedVmid: number | null = null;
+
       try {
         // Update template status to provisioning
         await templateService.updateTemplateStatus(id, 'provisioning');
 
         // Allocate a VMID for this template
         const templateVmid = await templateService.allocateTemplateVmid();
+        allocatedVmid = templateVmid;
         sendEvent('progress', { step: 'init', progress: 0, message: `Allocated VMID ${templateVmid}` });
 
         // Get parent VMID if this template is based on another
@@ -147,7 +157,7 @@ export async function POST(
             'staging',
             templateVmid,
             targetNode || status.selectedNode || undefined,
-            storage || 'local',
+            storage || defaultStorage,
             undefined,
             result.containerIp
           );
@@ -165,7 +175,7 @@ export async function POST(
             'ready',
             templateVmid,
             targetNode || status.selectedNode || undefined,
-            storage || 'local'
+            storage || defaultStorage
           );
 
           sendEvent('complete', {
@@ -176,6 +186,18 @@ export async function POST(
         }
       } catch (error) {
         console.error('Template provisioning error:', error);
+
+        // Clean up the Proxmox container if it was created
+        if (allocatedVmid) {
+          try {
+            sendEvent('progress', { step: 'cleanup', progress: 0, message: 'Cleaning up failed container...' });
+            await templateManager.deleteProxmoxTemplate(allocatedVmid);
+            console.log(`Cleaned up failed template container VMID ${allocatedVmid}`);
+          } catch (cleanupError) {
+            // Log but don't fail - container might not have been created yet
+            console.warn(`Failed to cleanup container VMID ${allocatedVmid}:`, cleanupError);
+          }
+        }
 
         // Update template status to error
         await templateService.updateTemplateStatus(
