@@ -167,6 +167,7 @@ export const tabs = pgTable('tabs', {
   name: text('name').notNull(),
   status: sessionStatusEnum('status').default('pending').notNull(),
   tabType: tabTypeEnum('tab_type').default('terminal').notNull(),
+  icon: text('icon'), // Icon key from template (e.g., 'claude', 'terminal', 'code')
   isPinned: boolean('is_pinned').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
   command: jsonb('command').$type<string[]>().default(['/bin/bash']), // Command to exec

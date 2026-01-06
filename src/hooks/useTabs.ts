@@ -10,6 +10,7 @@ export interface TabInfo {
   name: string;
   status: string;
   tabType: TabType;
+  icon: string | null;
   isPinned: boolean;
   sortOrder: number;
   command: string[];
@@ -117,7 +118,7 @@ export function useTabs(workspaceId: string | null) {
     async (tab: TabInfo) => {
       if (!token || !workspaceId) throw new Error('Not authenticated or no workspace selected');
 
-      // Create a new tab with the same command
+      // Create a new tab with the same command and icon
       const response = await fetch(`/api/workspaces/${workspaceId}/tabs`, {
         method: 'POST',
         headers: {
@@ -128,6 +129,7 @@ export function useTabs(workspaceId: string | null) {
           name: `${tab.name} (copy)`,
           command: tab.command,
           exitOnClose: tab.exitOnClose,
+          icon: tab.icon,
         }),
       });
 

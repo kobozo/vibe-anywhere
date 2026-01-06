@@ -10,6 +10,7 @@ export interface CreateTabInput {
   exitOnClose?: boolean;
   autoShutdownMinutes?: number;
   tabType?: TabType;
+  icon?: string;
   isPinned?: boolean;
   sortOrder?: number;
 }
@@ -20,6 +21,7 @@ export interface TabInfo {
   name: string;
   status: SessionStatus;
   tabType: TabType;
+  icon: string | null;
   isPinned: boolean;
   sortOrder: number;
   command: string[];
@@ -68,6 +70,7 @@ export class TabService {
         exitOnClose: input.exitOnClose ?? false,
         status,
         tabType: input.tabType || 'terminal',
+        icon: input.icon || null,
         isPinned: input.isPinned || false,
         sortOrder: input.sortOrder ?? 0,
         outputBuffer: [],
@@ -324,6 +327,7 @@ export class TabService {
       name: tab.name,
       status: tab.status,
       tabType: tab.tabType,
+      icon: tab.icon,
       isPinned: tab.isPinned,
       sortOrder: tab.sortOrder,
       command: tab.command || ['/bin/bash'],

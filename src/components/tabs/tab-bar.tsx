@@ -9,6 +9,7 @@ import { TabGroupIcon } from './tab-group-icon';
 import { TabContextMenu } from './tab-context-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { VoiceButton, VoiceButtonRef } from '@/components/voice/voice-button';
+import { getTemplateIcon } from '@/components/icons/ai-icons';
 import type { TabGroupInfo } from '@/hooks/useTabGroups';
 
 interface TabBarProps {
@@ -345,8 +346,12 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
               />
             )}
 
-            {/* Git icon for git tabs */}
-            {tab.tabType === 'git' ? (
+            {/* Tab icon - use template icon if available, otherwise status dot */}
+            {tab.icon ? (
+              <span className="w-4 h-4 flex items-center justify-center">
+                {getTemplateIcon(tab.icon, true, 'w-4 h-4')}
+              </span>
+            ) : tab.tabType === 'git' ? (
               <Image
                 src="/icons/ai/github.png"
                 alt="Git"

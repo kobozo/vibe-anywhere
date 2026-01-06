@@ -21,6 +21,7 @@ const createTabSchema = z.object({
   args: z.array(z.string()).optional(),
   command: z.array(z.string()).optional(),
   exitOnClose: z.boolean().optional(),
+  icon: z.string().optional(),
   autoShutdownMinutes: z.number().int().positive().optional(),
 });
 
@@ -108,6 +109,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
   // Build the command from template if templateId provided
   let command: string[] | undefined = result.data.command;
   let exitOnClose: boolean | undefined = result.data.exitOnClose;
+  let icon: string | undefined = result.data.icon;
 
   if (result.data.templateId) {
     const templateService = getTabTemplateService();
@@ -124,6 +126,9 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     if (exitOnClose === undefined) {
       exitOnClose = template.exitOnClose;
     }
+
+    // Get icon from template
+    icon = template.icon || undefined;
   }
 
   const tabService = getTabService();
@@ -131,6 +136,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     name: result.data.name,
     command,
     exitOnClose,
+    icon,
     autoShutdownMinutes: result.data.autoShutdownMinutes,
   });
 
