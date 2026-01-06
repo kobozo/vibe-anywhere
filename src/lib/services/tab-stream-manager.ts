@@ -84,14 +84,15 @@ class TabStreamManager {
       socket.emit('terminal:buffer', { lines: buffer });
     }
 
-    // Build the command, wrapping with && exit if exitOnClose is enabled
+    // Build the command, appending && exit if exitOnClose is enabled
+    // Note: tmux already provides a shell, so we just send the command directly
     let command = tab.command || ['/bin/bash'];
     if (tab.exitOnClose && command.length > 0) {
-      // Wrap command to exit when it finishes: /bin/bash -c "command args && exit"
+      // Append && exit so the tmux shell exits when the command finishes
       const cmdString = command.map(arg =>
         arg.includes(' ') || arg.includes('"') ? `'${arg.replace(/'/g, "'\\''")}'` : arg
       ).join(' ');
-      command = ['/bin/bash', '-c', `${cmdString} && exit`];
+      command = [`${cmdString} && exit`];
     }
 
     if (useAgent) {
@@ -184,9 +185,9 @@ class TabStreamManager {
       // Buffer the output
       await tabService.appendOutput(tabId, data);
 
-      // Broadcast to all connected sockets
+      // Broadcast to all connected sockets (include tabId for filtering)
       for (const connectedSocket of tabStream.connectedSockets) {
-        connectedSocket.emit('terminal:output', { data });
+        connectedSocket.emit('terminal:output', { tabId, data });
       }
     });
 
@@ -370,9 +371,9 @@ class TabStreamManager {
     const tabService = getTabService();
     tabService.appendOutput(tabId, data).catch(console.error);
 
-    // Broadcast to all connected sockets
+    // Broadcast to all connected sockets (include tabId for filtering)
     for (const socket of tabStream.connectedSockets) {
-      socket.emit('terminal:output', { data });
+      socket.emit('terminal:output', { tabId, data });
     }
   }
 

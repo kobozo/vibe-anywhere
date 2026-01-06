@@ -177,8 +177,18 @@ export class TmuxManager {
     // Start output capture
     this.startOutputCapture(tabId, windowIndex);
 
-    // Send the command to execute
-    if (command.length > 0) {
+    // Helper to detect if command is just a shell (tmux already provides one)
+    const isShellOnly = (cmd: string[]): boolean => {
+      if (cmd.length === 0) return true;
+      if (cmd.length === 1) {
+        const c = cmd[0];
+        return c === '/bin/bash' || c === '/bin/sh' || c === 'bash' || c === 'sh' || c === '/bin/zsh' || c === 'zsh';
+      }
+      return false;
+    };
+
+    // Send the command to execute (skip if it's just a shell - tmux already starts one)
+    if (command.length > 0 && !isShellOnly(command)) {
       const cmdString = command.join(' ');
       // Use tmux send-keys to execute the command
       await exec(`tmux send-keys -t ${this.sessionName}:${windowIndex} '${cmdString.replace(/'/g, "'\\''")}' Enter`);
