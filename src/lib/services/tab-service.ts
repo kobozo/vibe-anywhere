@@ -212,7 +212,7 @@ export class TabService {
         command: [], // Git tabs don't run commands
         status: 'running', // Git tabs are always "running" since they just display UI
         tabType: 'git',
-        isPinned: true,
+        isPinned: false, // Can be closed and re-added via + button
         sortOrder: -100, // Always first
         outputBuffer: [],
         outputBufferSize: 0,
@@ -251,7 +251,7 @@ export class TabService {
         command: [], // Docker tabs don't run commands
         status: 'running', // Docker tabs are always "running" since they just display UI
         tabType: 'docker',
-        isPinned: true,
+        isPinned: false, // Can be closed and re-added via + button
         sortOrder: -99, // After git tab (-100), before terminals
         outputBuffer: [],
         outputBufferSize: 0,
