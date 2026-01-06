@@ -1,4 +1,7 @@
 import { NextRequest } from 'next/server';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { workspaces } from '@/lib/db/schema';
 import { getRepositoryService, getWorkspaceService, getTemplateService } from '@/lib/services';
 import {
   requireAuth,
@@ -33,9 +36,23 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     throw new NotFoundError('Workspace', id);
   }
 
-  // Get template for this repository
   const templateService = getTemplateService();
-  const template = await templateService.getTemplateForRepository(repository.id);
+  let template;
+
+  // Check if workspace has a templateId (new workspaces)
+  if (workspace.templateId) {
+    template = await templateService.getTemplate(workspace.templateId);
+  } else {
+    // Migration: get template from repository and save to workspace
+    template = await templateService.getTemplateForRepository(repository.id);
+    if (template) {
+      // Save template to workspace for future lookups
+      await db
+        .update(workspaces)
+        .set({ templateId: template.id })
+        .where(eq(workspaces.id, id));
+    }
+  }
 
   if (!template) {
     return successResponse({

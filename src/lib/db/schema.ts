@@ -127,6 +127,7 @@ export const workspaces = pgTable('workspaces', {
   repositoryId: uuid('repository_id')
     .references(() => repositories.id, { onDelete: 'cascade' })
     .notNull(),
+  templateId: uuid('template_id').references(() => proxmoxTemplates.id), // Template used for this workspace
   name: text('name').notNull(),
   branchName: text('branch_name').notNull(),
   status: workspaceStatusEnum('status').default('pending').notNull(),

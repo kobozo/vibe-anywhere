@@ -42,11 +42,16 @@ export class WorkspaceService {
       throw new Error('Repository has no clone URL configured');
     }
 
+    // Get template from repository (snapshot at creation time)
+    const templateService = getTemplateService();
+    const template = await templateService.getTemplateForRepository(repositoryId);
+
     // Create database record
     const [workspace] = await db
       .insert(workspaces)
       .values({
         repositoryId,
+        templateId: template?.id || null,
         name: input.name,
         branchName: input.branchName,
         status: 'active',
@@ -317,8 +322,15 @@ export class WorkspaceService {
     let proxmoxTemplateVmid: number | undefined;
     if (backendType === 'proxmox') {
       const templateService = getTemplateService();
-      const templateVmid = await templateService.getTemplateVmidForRepository(workspace.repositoryId);
-      proxmoxTemplateVmid = templateVmid ?? config.proxmox.templateVmid;
+      // Prefer workspace's saved template, fall back to repository template
+      if (workspace.templateId) {
+        const template = await templateService.getTemplate(workspace.templateId);
+        proxmoxTemplateVmid = template?.vmid ?? undefined;
+      }
+      if (!proxmoxTemplateVmid) {
+        const templateVmid = await templateService.getTemplateVmidForRepository(workspace.repositoryId);
+        proxmoxTemplateVmid = templateVmid ?? config.proxmox.templateVmid;
+      }
     }
 
     const containerId = await this.containerBackend.createContainer(workspaceId, {
