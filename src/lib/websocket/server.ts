@@ -25,6 +25,20 @@ interface AuthenticatedSocket extends Socket {
   stagingStream?: ContainerStream; // SSH stream for staging terminal
 }
 
+// Extend globalThis type to include our socket server
+declare global {
+  // eslint-disable-next-line no-var
+  var __socketServerInstance: SocketServer | undefined;
+}
+
+/**
+ * Get the Socket.io server instance
+ * Uses globalThis to ensure it's shared across all Next.js execution contexts
+ */
+export function getSocketServer(): SocketServer | null {
+  return globalThis.__socketServerInstance || null;
+}
+
 // Track pending file uploads for relay between browser and agent
 interface PendingUpload {
   socket: AuthenticatedSocket;
@@ -54,6 +68,9 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     },
     transports: ['websocket', 'polling'],
   });
+
+  // Store globally for access from any context (API routes, services, etc.)
+  globalThis.__socketServerInstance = io;
 
   // Initialize workspace state broadcaster
   const workspaceStateBroadcaster = getWorkspaceStateBroadcaster();

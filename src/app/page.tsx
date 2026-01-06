@@ -22,6 +22,7 @@ import { RepositoryDashboard } from '@/components/repositories/repository-dashbo
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
 import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
 import { SplitViewContainer, CreateGroupDialog } from '@/components/split-view';
+import { WorkspaceContent } from '@/components/workspace';
 import type { Repository, Workspace, ProxmoxTemplate } from '@/lib/db/schema';
 import type { TabInfo } from '@/hooks/useTabs';
 
@@ -603,7 +604,7 @@ function Dashboard() {
         {/* Main area - Tabs + Terminal */}
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {selectedWorkspace ? (
-            <>
+            <WorkspaceContent workspace={selectedWorkspace}>
               {/* Tab bar */}
               <TabBar
                 ref={tabBarRef}
@@ -737,7 +738,7 @@ function Dashboard() {
                   </div>
                 )}
               </div>
-            </>
+            </WorkspaceContent>
           ) : selectedRepository ? (
             // Show repository dashboard when repo is selected but no workspace
             <RepositoryDashboard repository={selectedRepository} />

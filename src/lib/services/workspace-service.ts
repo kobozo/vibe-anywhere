@@ -8,6 +8,8 @@ import { getContainerBackendAsync, type IContainerBackend } from '@/lib/containe
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { gitCloneInContainer, getGitStatusInContainer, isRepoClonedInContainer, type GitStatusResult } from '@/lib/container/proxmox/ssh-stream';
 import { config } from '@/lib/config';
+import { startupProgressStore } from './startup-progress-store';
+import type { StartupStep } from '@/lib/types/startup-progress';
 
 export interface CreateWorkspaceInput {
   name: string;
@@ -24,6 +26,35 @@ export class WorkspaceService {
   constructor(containerBackend: IContainerBackend) {
     this.repositoryService = getRepositoryService();
     this.containerBackend = containerBackend;
+  }
+
+  /**
+   * Emit startup progress for a workspace
+   */
+  private emitProgress(workspaceId: string, step: StartupStep, message?: string): void {
+    console.log(`[WorkspaceService] Emitting progress: workspace=${workspaceId}, step=${step}`);
+    const progress = startupProgressStore.setProgress(workspaceId, step, message);
+    try {
+      const broadcaster = getWorkspaceStateBroadcaster();
+      broadcaster.broadcastStartupProgress(progress);
+    } catch (e) {
+      console.error('[WorkspaceService] Failed to broadcast progress:', e);
+    }
+  }
+
+  /**
+   * Emit startup error for a workspace
+   */
+  private emitProgressError(workspaceId: string, error: string): void {
+    const progress = startupProgressStore.setError(workspaceId, error);
+    if (progress) {
+      try {
+        const broadcaster = getWorkspaceStateBroadcaster();
+        broadcaster.broadcastStartupProgress(progress);
+      } catch (e) {
+        // Broadcaster might not be initialized
+      }
+    }
   }
 
   /**
@@ -241,6 +272,8 @@ export class WorkspaceService {
 
           if (missingStacks.length > 0) {
             console.log(`Installing missing tech stacks: ${missingStacks.join(', ')}`);
+            // Emit installing tech stack progress
+            this.emitProgress(workspaceId, 'installing_tech_stack');
             const techStackBackend = this.containerBackend as {
               installTechStacks?: (containerId: string, techStackIds: string[]) => Promise<void>;
             };
@@ -262,6 +295,25 @@ export class WorkspaceService {
    * Internal method to actually start the container
    */
   private async doStartContainer(workspaceId: string): Promise<Workspace> {
+    // Emit initializing progress
+    this.emitProgress(workspaceId, 'initializing');
+
+    try {
+      return await this.doStartContainerInternal(workspaceId);
+    } catch (error) {
+      // Emit error progress
+      this.emitProgressError(
+        workspaceId,
+        error instanceof Error ? error.message : 'Unknown error during container startup'
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Internal implementation of container start (wrapped for error handling)
+   */
+  private async doStartContainerInternal(workspaceId: string): Promise<Workspace> {
     // Re-fetch workspace to get latest state
     const workspace = await this.getWorkspace(workspaceId);
     if (!workspace) {
@@ -280,6 +332,8 @@ export class WorkspaceService {
     if (workspace.containerId) {
       const info = await this.containerBackend.getContainerInfo(workspace.containerId);
       if (info?.status === 'running') {
+        // Container already running - emit connecting progress and wait for agent
+        this.emitProgress(workspaceId, 'connecting');
         // Update container IP if available
         const containerIp = info.ipAddress || workspace.containerIp;
         if (info.ipAddress && info.ipAddress !== workspace.containerIp) {
@@ -293,14 +347,18 @@ export class WorkspaceService {
       }
       // Container exists but not running - try to start it
       if (info && info.status !== 'exited' && info.status !== 'dead') {
+        this.emitProgress(workspaceId, 'starting_container');
         await this.containerBackend.startContainer(workspace.containerId);
+        this.emitProgress(workspaceId, 'configuring_network');
         const updatedInfo = await this.containerBackend.getContainerInfo(workspace.containerId);
         const containerIp = updatedInfo?.ipAddress || null;
         await this.updateContainerIp(workspaceId, containerIp);
         // Ensure repo is cloned after starting
         if (containerIp) {
+          this.emitProgress(workspaceId, 'cloning_repository');
           await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, workspace.containerId);
         }
+        this.emitProgress(workspaceId, 'connecting');
         return this.updateContainerStatus(workspaceId, workspace.containerId, 'running');
       }
       // Container is dead/exited - remove and recreate
@@ -313,6 +371,9 @@ export class WorkspaceService {
 
     // Ensure image/template exists
     await this.containerBackend.ensureImage();
+
+    // Emit creating container progress
+    this.emitProgress(workspaceId, 'creating_container');
 
     // Create container with backend-appropriate config
     const backendType = this.containerBackend.backendType;
@@ -352,8 +413,14 @@ export class WorkspaceService {
 
     console.log(`Container ${containerId} created for workspace ${workspaceId}, starting...`);
 
+    // Emit starting container progress
+    this.emitProgress(workspaceId, 'starting_container');
+
     // Start container
     await this.containerBackend.startContainer(containerId);
+
+    // Emit configuring network progress
+    this.emitProgress(workspaceId, 'configuring_network');
 
     // Get container info (for IP address)
     const containerInfo = await this.containerBackend.getContainerInfo(containerId);
@@ -363,8 +430,14 @@ export class WorkspaceService {
     if (backendType === 'proxmox' && containerIp) {
       console.log(`Setting up Proxmox container ${containerId}`);
 
+      // Emit cloning repository progress
+      this.emitProgress(workspaceId, 'cloning_repository');
+
       // Ensure repo is cloned (uses helper which handles SSH keys and tech stacks)
       await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, containerId);
+
+      // Emit starting agent progress
+      this.emitProgress(workspaceId, 'starting_agent');
 
       // Provision sidecar agent
       try {
@@ -382,6 +455,9 @@ export class WorkspaceService {
 
           await proxmoxBackend.provisionAgent(containerId, workspaceId, agentToken);
           console.log(`Agent provisioned in container ${containerId}`);
+
+          // Emit connecting progress - waiting for agent to connect
+          this.emitProgress(workspaceId, 'connecting');
         }
       } catch (error) {
         console.error('Failed to provision agent:', error);

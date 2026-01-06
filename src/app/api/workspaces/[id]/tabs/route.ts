@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getRepositoryService, getWorkspaceService, getTabService } from '@/lib/services';
 import { getTabTemplateService } from '@/lib/services/tab-template-service';
+import { getTemplateService } from '@/lib/services/template-service';
 import {
   requireAuth,
   successResponse,
@@ -50,9 +51,23 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   // Ensure git tab exists for this workspace
   await tabService.ensureGitTab(id);
 
-  // Ensure docker tab exists if Docker is in the repository's tech stack
-  const techStack = repository.techStack as string[] | null;
-  if (techStack?.includes('docker')) {
+  // Ensure docker tab exists if Docker is in the tech stack (repository or template)
+  let hasDocker = false;
+  const repoTechStack = repository.techStack as string[] | null;
+
+  if (repoTechStack?.includes('docker')) {
+    hasDocker = true;
+  } else {
+    // Check template's effective tech stacks
+    const templateService = getTemplateService();
+    const template = await templateService.getTemplateForRepository(workspace.repositoryId);
+    if (template) {
+      const effectiveTechStacks = templateService.getEffectiveTechStacks(template);
+      hasDocker = effectiveTechStacks.includes('docker');
+    }
+  }
+
+  if (hasDocker) {
     await tabService.ensureDockerTab(id);
   }
 

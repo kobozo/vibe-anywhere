@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { workspaces } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
+import { startupProgressStore } from './startup-progress-store';
 
 interface TabState {
   tabId: string;
@@ -95,6 +96,16 @@ class AgentRegistry {
     try {
       const broadcaster = getWorkspaceStateBroadcaster();
       broadcaster.broadcastAgentStatus(workspaceId, true, version);
+
+      // If there's active startup progress, mark it as ready
+      if (startupProgressStore.isStarting(workspaceId)) {
+        const readyProgress = startupProgressStore.setProgress(workspaceId, 'ready');
+        broadcaster.broadcastStartupProgress(readyProgress);
+        // Clear the progress after a short delay to allow clients to see the 'ready' state
+        setTimeout(() => {
+          startupProgressStore.clearProgress(workspaceId);
+        }, 1000);
+      }
 
       // Check if this agent just came back from an update
       if (this.updatingAgents.has(workspaceId)) {

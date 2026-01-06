@@ -5,6 +5,8 @@
 
 import type { Server as SocketServer } from 'socket.io';
 import type { ContainerStatus } from '@/lib/db/schema';
+import type { StartupProgress } from '@/lib/types/startup-progress';
+import { getSocketServer } from '@/lib/websocket/server';
 
 interface WorkspaceStateUpdate {
   workspaceId: string;
@@ -21,6 +23,7 @@ class WorkspaceStateBroadcaster {
 
   /**
    * Initialize the broadcaster with a Socket.io server instance
+   * @deprecated Use getSocketServer() instead - kept for backwards compatibility
    */
   initialize(io: SocketServer): void {
     this.io = io;
@@ -28,16 +31,29 @@ class WorkspaceStateBroadcaster {
   }
 
   /**
+   * Get the Socket.io instance (checks both local and global)
+   */
+  private getIo(): SocketServer | null {
+    // First check instance property (set by initialize())
+    if (this.io) {
+      return this.io;
+    }
+    // Fall back to global socket server (works across all contexts)
+    return getSocketServer();
+  }
+
+  /**
    * Broadcast a workspace state update to all connected clients
    */
   broadcastWorkspaceUpdate(update: WorkspaceStateUpdate): void {
-    if (!this.io) {
+    const io = this.getIo();
+    if (!io) {
       console.warn('Workspace state broadcaster not initialized');
       return;
     }
 
     console.log(`Broadcasting workspace update: ${update.workspaceId}`, update);
-    this.io.emit('workspace:updated', update);
+    io.emit('workspace:updated', update);
   }
 
   /**
@@ -80,6 +96,23 @@ class WorkspaceStateBroadcaster {
       workspaceId,
       agentUpdating: updating,
     });
+  }
+
+  /**
+   * Broadcast startup progress update
+   */
+  broadcastStartupProgress(progress: StartupProgress): void {
+    const io = this.getIo();
+    if (!io) {
+      console.warn('[Broadcaster] Socket server not initialized - cannot emit startup progress');
+      return;
+    }
+
+    const connectedSockets = io.sockets.sockets.size;
+    console.log(
+      `[Broadcaster] Emitting startup progress: workspace=${progress.workspaceId}, step=${progress.currentStep}, connectedClients=${connectedSockets}`
+    );
+    io.emit('workspace:startup-progress', progress);
   }
 }
 
