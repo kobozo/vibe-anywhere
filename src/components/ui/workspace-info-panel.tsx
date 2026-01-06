@@ -13,6 +13,14 @@ interface AgentInfo {
   tabCount: number;
 }
 
+interface TemplateInfo {
+  name: string;
+  vmid: number | null;
+  status: string;
+  techStacks: string[];
+  inheritedTechStacks: string[];
+}
+
 interface WorkspaceInfoPanelProps {
   workspace: Workspace;
   onClose: () => void;
@@ -29,7 +37,9 @@ export function WorkspaceInfoPanel({
   onDelete,
 }: WorkspaceInfoPanelProps) {
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
+  const [templateInfo, setTemplateInfo] = useState<TemplateInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [templateLoading, setTemplateLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
 
@@ -55,6 +65,26 @@ export function WorkspaceInfoPanel({
     const interval = setInterval(fetchAgentInfo, 5000);
     return () => clearInterval(interval);
   }, [fetchAgentInfo]);
+
+  // Fetch template info once on mount
+  useEffect(() => {
+    const fetchTemplateInfo = async () => {
+      try {
+        const response = await fetch(`/api/workspaces/${workspace.id}/template`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        });
+        if (response.ok) {
+          const { data } = await response.json();
+          setTemplateInfo(data.template);
+        }
+      } catch (error) {
+        console.error('Failed to fetch template info:', error);
+      } finally {
+        setTemplateLoading(false);
+      }
+    };
+    fetchTemplateInfo();
+  }, [workspace.id]);
 
   const handleUpdate = async () => {
     setUpdating(true);
@@ -139,6 +169,43 @@ export function WorkspaceInfoPanel({
                 </>
               )}
             </div>
+          </div>
+
+          {/* Template Info */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-400">Template</h4>
+            {templateLoading ? (
+              <div className="text-sm text-gray-400">Loading...</div>
+            ) : templateInfo ? (
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <span className="text-gray-400">Name:</span>
+                <span className="text-gray-200">{templateInfo.name}</span>
+                {templateInfo.vmid && (
+                  <>
+                    <span className="text-gray-400">VMID:</span>
+                    <span className="text-gray-200 font-mono">{templateInfo.vmid}</span>
+                  </>
+                )}
+                <span className="text-gray-400">Status:</span>
+                <span className={`${
+                  templateInfo.status === 'ready' ? 'text-green-400' :
+                  templateInfo.status === 'error' ? 'text-red-400' :
+                  'text-yellow-400'
+                }`}>
+                  {templateInfo.status}
+                </span>
+                {(templateInfo.techStacks.length > 0 || templateInfo.inheritedTechStacks.length > 0) && (
+                  <>
+                    <span className="text-gray-400">Tech stacks:</span>
+                    <span className="text-gray-200">
+                      {[...templateInfo.inheritedTechStacks, ...templateInfo.techStacks].join(', ')}
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-400">No template assigned</div>
+            )}
           </div>
 
           {/* Agent Info */}
