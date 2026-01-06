@@ -15,6 +15,7 @@ export interface ContainerConfig {
   env?: Record<string, string>;
   memoryLimit?: string;        // e.g., "2g", "512m"
   cpuLimit?: number;           // CPU cores
+  diskSize?: number;           // Disk size in GB (Proxmox only)
   reuseVmid?: number;          // Reuse this VMID when recreating (Proxmox only)
 }
 

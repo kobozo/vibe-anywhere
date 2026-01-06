@@ -399,6 +399,10 @@ export class WorkspaceService {
       image: backendType === 'docker' ? config.docker.claudeImage : undefined,
       templateId: proxmoxTemplateVmid,
       reuseVmid,
+      // Pass repository resource overrides (undefined means use global defaults)
+      memoryLimit: repo.resourceMemory ? `${repo.resourceMemory}m` : undefined,
+      cpuLimit: repo.resourceCpuCores ?? undefined,
+      diskSize: repo.resourceDiskSize ?? undefined,
     });
 
     // Save containerId immediately to prevent race conditions

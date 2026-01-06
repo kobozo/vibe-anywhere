@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
 import { useAuth } from '@/hooks/useAuth';
+import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
 import type { ProxmoxTemplate } from '@/lib/db/schema';
 
 interface TechStackInfo {
@@ -15,7 +16,18 @@ interface TechStackInfo {
 interface AddRepositoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onClone: (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => Promise<void>;
+  onClone: (
+    name: string,
+    url: string,
+    description?: string,
+    sshKeyId?: string,
+    techStack?: string[],
+    templateId?: string,
+    cloneDepth?: number,
+    resourceMemory?: number | null,
+    resourceCpuCores?: number | null,
+    resourceDiskSize?: number | null
+  ) => Promise<void>;
   isLoading: boolean;
   templates?: ProxmoxTemplate[];
 }
@@ -31,6 +43,7 @@ export function AddRepositoryDialog({
 }: AddRepositoryDialogProps) {
   const { token } = useAuth();
   const { keys, fetchKeys, generateKey } = useSSHKeys();
+  const { settings: proxmoxSettings, fetchSettings: fetchProxmoxSettings } = useProxmoxSettings();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [cloneUrl, setCloneUrl] = useState('');
@@ -38,6 +51,11 @@ export function AddRepositoryDialog({
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+
+  // Resource override state (empty string = use default)
+  const [resourceMemory, setResourceMemory] = useState<string>('');
+  const [resourceCpuCores, setResourceCpuCores] = useState<string>('');
+  const [resourceDiskSize, setResourceDiskSize] = useState<string>('');
 
   // SSH key generation state
   const [showGenerateKey, setShowGenerateKey] = useState(false);
@@ -69,13 +87,14 @@ export function AddRepositoryDialog({
     }
   }, [token]);
 
-  // Fetch SSH keys and tech stacks when dialog opens
+  // Fetch SSH keys, tech stacks, and settings when dialog opens
   useEffect(() => {
     if (isOpen) {
       fetchKeys();
       fetchTechStacks();
+      fetchProxmoxSettings();
     }
-  }, [isOpen, fetchKeys, fetchTechStacks]);
+  }, [isOpen, fetchKeys, fetchTechStacks, fetchProxmoxSettings]);
 
   // Auto-select default key
   useEffect(() => {
@@ -129,6 +148,11 @@ export function AddRepositoryDialog({
       const templateIdToUse = selectedTemplateId || undefined;
       const keyId = isSSHUrl ? selectedKeyId || undefined : undefined;
 
+      // Parse resource values (empty string = null = use default)
+      const memoryValue = resourceMemory ? parseInt(resourceMemory, 10) : null;
+      const cpuValue = resourceCpuCores ? parseInt(resourceCpuCores, 10) : null;
+      const diskValue = resourceDiskSize ? parseInt(resourceDiskSize, 10) : null;
+
       await onClone(
         name,
         cloneUrl,
@@ -136,7 +160,10 @@ export function AddRepositoryDialog({
         keyId,
         techStacksToInstall.length > 0 ? techStacksToInstall : undefined,
         templateIdToUse,
-        getCloneDepthValue()
+        getCloneDepthValue(),
+        memoryValue,
+        cpuValue,
+        diskValue
       );
 
       // Reset form
@@ -147,6 +174,9 @@ export function AddRepositoryDialog({
       setSelectedKeyId('');
       setSelectedTemplateId('');
       setSelectedTechStacks([]);
+      setResourceMemory('');
+      setResourceCpuCores('');
+      setResourceDiskSize('');
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add repository');
@@ -547,6 +577,54 @@ export function AddRepositoryDialog({
               )}
             </div>
           )}
+
+          {/* Resource Overrides */}
+          <div>
+            <label className="block text-sm text-foreground mb-2">
+              Resource Overrides
+            </label>
+            <p className="text-xs text-foreground-tertiary mb-3">
+              Leave empty to use global defaults. These settings apply to all workspaces created from this repository.
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-foreground-secondary mb-1">Memory (MB)</label>
+                <input
+                  type="number"
+                  value={resourceMemory}
+                  onChange={(e) => setResourceMemory(e.target.value)}
+                  placeholder={`${proxmoxSettings?.resources?.defaultMemory ?? 2048}`}
+                  min={512}
+                  max={65536}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-foreground-secondary mb-1">CPU Cores</label>
+                <input
+                  type="number"
+                  value={resourceCpuCores}
+                  onChange={(e) => setResourceCpuCores(e.target.value)}
+                  placeholder={`${proxmoxSettings?.resources?.defaultCpuCores ?? 2}`}
+                  min={1}
+                  max={32}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-foreground-secondary mb-1">Disk Size (GB)</label>
+                <input
+                  type="number"
+                  value={resourceDiskSize}
+                  onChange={(e) => setResourceDiskSize(e.target.value)}
+                  placeholder={`${proxmoxSettings?.resources?.defaultDiskSize ?? 50}`}
+                  min={4}
+                  max={500}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary text-sm"
+                />
+              </div>
+            </div>
+          </div>
         </form>
 
         {/* Footer */}

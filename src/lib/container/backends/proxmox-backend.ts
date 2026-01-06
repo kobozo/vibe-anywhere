@@ -50,7 +50,7 @@ export class ProxmoxBackend implements IContainerBackend {
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
     const client = await this.getClient();
     const cfg = await this.getRuntimeConfig();
-    const { workspacePath, env = {}, memoryLimit, cpuLimit, reuseVmid, templateId } = containerConfig;
+    const { workspacePath, env = {}, memoryLimit, cpuLimit, diskSize: configDiskSize, reuseVmid, templateId } = containerConfig;
     const settingsService = getSettingsService();
 
     // Use provided templateId from containerConfig, or fall back to settings (backwards compatibility)
@@ -81,9 +81,9 @@ export class ProxmoxBackend implements IContainerBackend {
 
     console.log(`LXC container ${newVmid} cloned successfully`);
 
-    // Resize disk to configured size
+    // Resize disk to configured size (use repository override if provided, otherwise global default)
     const proxmoxSettings = await settingsService.getProxmoxSettings();
-    const diskSize = proxmoxSettings.defaultDiskSize || 50;
+    const diskSize = configDiskSize ?? proxmoxSettings.defaultDiskSize ?? 50;
     try {
       const resizeUpid = await client.resizeLxcDisk(newVmid, diskSize);
       await pollTaskUntilComplete(client, resizeUpid, {
@@ -305,10 +305,6 @@ export class ProxmoxBackend implements IContainerBackend {
       COLORTERM: 'truecolor',
     };
 
-    if (config.anthropic.apiKey) {
-      env.ANTHROPIC_API_KEY = config.anthropic.apiKey;
-    }
-
     // Create SSH stream - use configured SSH user (defaults to kobozo)
     const streamResult = await createSSHStream(
       { host: ip, username: cfg.sshUser },
@@ -341,17 +337,11 @@ export class ProxmoxBackend implements IContainerBackend {
       this.containerIps.set(containerId, ip);
     }
 
-    // Build environment
-    const env: Record<string, string> = {};
-    if (config.anthropic.apiKey) {
-      env.ANTHROPIC_API_KEY = config.anthropic.apiKey;
-    }
-
     // Use configured SSH user (defaults to kobozo)
     return execSSHCommand(
       { host: ip, username: cfg.sshUser },
       command,
-      { workingDir: '/workspace', env }
+      { workingDir: '/workspace' }
     );
   }
 

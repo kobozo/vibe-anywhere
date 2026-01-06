@@ -14,6 +14,10 @@ export interface CreateRepoInput {
   defaultBranch?: string;
   techStack?: string[];
   templateId?: string;     // Proxmox template to use for workspaces
+  // Resource overrides (null = use global defaults)
+  resourceMemory?: number | null;     // Memory in MB
+  resourceCpuCores?: number | null;   // CPU cores
+  resourceDiskSize?: number | null;   // Disk size in GB
 }
 
 /**
@@ -44,6 +48,9 @@ export class RepositoryService {
       throw new Error(`Repository with name "${input.name}" already exists`);
     }
 
+    // Validate resource values if provided
+    this.validateResourceValues(input);
+
     // Create database record (metadata only)
     const [repo] = await db
       .insert(repositories)
@@ -57,6 +64,9 @@ export class RepositoryService {
         sshKeyId: input.sshKeyId || null,
         techStack: input.techStack || [],
         templateId: input.templateId || null,
+        resourceMemory: input.resourceMemory ?? null,
+        resourceCpuCores: input.resourceCpuCores ?? null,
+        resourceDiskSize: input.resourceDiskSize ?? null,
       })
       .returning();
 
@@ -110,8 +120,14 @@ export class RepositoryService {
       sshKeyId?: string | null;
       templateId?: string | null;
       techStack?: string[];
+      resourceMemory?: number | null;
+      resourceCpuCores?: number | null;
+      resourceDiskSize?: number | null;
     }
   ): Promise<Repository> {
+    // Validate resource values if provided
+    this.validateResourceValues(updates);
+
     const [updated] = await db
       .update(repositories)
       .set({
@@ -138,6 +154,42 @@ export class RepositoryService {
     const sshPattern = /^(git@[^\s:]+:[^\s]+|ssh:\/\/[^\s]+)$/;
 
     return httpsPattern.test(url) || sshPattern.test(url);
+  }
+
+  /**
+   * Validate resource override values
+   */
+  private validateResourceValues(input: {
+    resourceMemory?: number | null;
+    resourceCpuCores?: number | null;
+    resourceDiskSize?: number | null;
+  }): void {
+    if (input.resourceMemory !== undefined && input.resourceMemory !== null) {
+      if (input.resourceMemory < 512) {
+        throw new Error('Memory must be at least 512 MB');
+      }
+      if (input.resourceMemory > 65536) {
+        throw new Error('Memory cannot exceed 64 GB (65536 MB)');
+      }
+    }
+
+    if (input.resourceCpuCores !== undefined && input.resourceCpuCores !== null) {
+      if (input.resourceCpuCores < 1) {
+        throw new Error('CPU cores must be at least 1');
+      }
+      if (input.resourceCpuCores > 32) {
+        throw new Error('CPU cores cannot exceed 32');
+      }
+    }
+
+    if (input.resourceDiskSize !== undefined && input.resourceDiskSize !== null) {
+      if (input.resourceDiskSize < 4) {
+        throw new Error('Disk size must be at least 4 GB');
+      }
+      if (input.resourceDiskSize > 500) {
+        throw new Error('Disk size cannot exceed 500 GB');
+      }
+    }
   }
 }
 

@@ -22,6 +22,10 @@ const createRepoSchema = z.object({
   defaultBranch: z.string().min(1).max(100).optional(),
   techStack: z.array(z.enum(['nodejs', 'python', 'go', 'rust', 'docker'])).optional().default([]),
   templateId: z.string().uuid().optional(),
+  // Resource overrides (null = use global defaults)
+  resourceMemory: z.number().int().min(512).max(65536).nullable().optional(), // MB
+  resourceCpuCores: z.number().int().min(1).max(32).nullable().optional(),
+  resourceDiskSize: z.number().int().min(4).max(500).nullable().optional(), // GB
 });
 
 /**
@@ -59,6 +63,9 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     defaultBranch: result.data.defaultBranch,
     techStack: result.data.techStack,
     templateId: result.data.templateId,
+    resourceMemory: result.data.resourceMemory,
+    resourceCpuCores: result.data.resourceCpuCores,
+    resourceDiskSize: result.data.resourceDiskSize,
   });
 
   return successResponse({ repository }, 201);

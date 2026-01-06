@@ -36,7 +36,18 @@ export function useRepositories() {
   }, [token]);
 
   const cloneRepository = useCallback(
-    async (name: string, cloneUrl: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => {
+    async (
+      name: string,
+      cloneUrl: string,
+      description?: string,
+      sshKeyId?: string,
+      techStack?: string[],
+      templateId?: string,
+      cloneDepth?: number,
+      resourceMemory?: number | null,
+      resourceCpuCores?: number | null,
+      resourceDiskSize?: number | null
+    ) => {
       if (!token) throw new Error('Not authenticated');
 
       const body: Record<string, unknown> = {
@@ -48,6 +59,10 @@ export function useRepositories() {
       if (techStack && techStack.length > 0) body.techStack = techStack;
       if (templateId) body.templateId = templateId;
       if (cloneDepth !== undefined) body.cloneDepth = cloneDepth;
+      // Resource overrides (null means use defaults)
+      if (resourceMemory !== undefined) body.resourceMemory = resourceMemory;
+      if (resourceCpuCores !== undefined) body.resourceCpuCores = resourceCpuCores;
+      if (resourceDiskSize !== undefined) body.resourceDiskSize = resourceDiskSize;
 
       const response = await fetch('/api/repositories', {
         method: 'POST',

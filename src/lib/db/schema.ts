@@ -133,6 +133,10 @@ export const repositories = pgTable('repositories', {
   defaultBranch: text('default_branch').default('main'),
   techStack: jsonb('tech_stack').$type<string[]>().default([]), // Tech stack IDs to install on workspaces (override template)
   envVars: jsonb('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers (overrides template)
+  // Resource overrides (null = use global defaults from settings)
+  resourceMemory: integer('resource_memory'), // Memory in MB
+  resourceCpuCores: integer('resource_cpu_cores'), // CPU cores
+  resourceDiskSize: integer('resource_disk_size'), // Disk size in GB
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

@@ -339,10 +339,21 @@ function Dashboard() {
     }
   }, [workspaceRepoId]);
 
-  const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => {
+  const handleCloneRepo = useCallback(async (
+    name: string,
+    url: string,
+    description?: string,
+    sshKeyId?: string,
+    techStack?: string[],
+    templateId?: string,
+    cloneDepth?: number,
+    resourceMemory?: number | null,
+    resourceCpuCores?: number | null,
+    resourceDiskSize?: number | null
+  ) => {
     setActionLoading(true);
     try {
-      await cloneRepository(name, url, description, sshKeyId, techStack, templateId, cloneDepth);
+      await cloneRepository(name, url, description, sshKeyId, techStack, templateId, cloneDepth, resourceMemory, resourceCpuCores, resourceDiskSize);
       await fetchRepositories(); // Refresh to ensure sidebar updates
       setIsAddRepoOpen(false);
     } finally {
@@ -360,12 +371,15 @@ function Dashboard() {
     description?: string;
     templateId?: string | null;
     envVars?: Array<{ key: string; value: string; encrypted: boolean }>;
+    resourceMemory?: number | null;
+    resourceCpuCores?: number | null;
+    resourceDiskSize?: number | null;
   }) => {
     if (!editingRepository) return;
 
     setIsEditRepoLoading(true);
     try {
-      // Save repository metadata
+      // Save repository metadata (includes resources)
       const { envVars, ...repoUpdates } = updates;
       const response = await fetch(`/api/repositories/${editingRepository.id}`, {
         method: 'PATCH',

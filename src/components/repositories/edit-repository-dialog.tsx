@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Repository, ProxmoxTemplate } from '@/lib/db/schema';
 import { EnvVarEditor, type EnvVar } from '@/components/env-vars/env-var-editor';
+import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
 
-type RepoDialogTab = 'general' | 'environment';
+type RepoDialogTab = 'general' | 'environment' | 'resources';
 
 interface EditRepositoryDialogProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ interface EditRepositoryDialogProps {
     description?: string;
     templateId?: string | null;
     envVars?: EnvVar[];
+    resourceMemory?: number | null;
+    resourceCpuCores?: number | null;
+    resourceDiskSize?: number | null;
   }) => Promise<void>;
   isLoading: boolean;
 }
@@ -28,11 +32,18 @@ export function EditRepositoryDialog({
   onSave,
   isLoading,
 }: EditRepositoryDialogProps) {
+  const { settings: proxmoxSettings, fetchSettings: fetchProxmoxSettings } = useProxmoxSettings();
   const [activeTab, setActiveTab] = useState<RepoDialogTab>('general');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Resource override state (empty string = use default)
+  const [resourceMemory, setResourceMemory] = useState<string>('');
+  const [resourceCpuCores, setResourceCpuCores] = useState<string>('');
+  const [resourceDiskSize, setResourceDiskSize] = useState<string>('');
+  const [resourcesModified, setResourcesModified] = useState(false);
 
   // Environment variables state
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
@@ -65,12 +76,18 @@ export function EditRepositoryDialog({
       setDescription(repository.description || '');
       setTemplateId(repository.templateId || null);
       setError(null);
+      // Initialize resource fields from repository (empty if null = use defaults)
+      setResourceMemory(repository.resourceMemory?.toString() || '');
+      setResourceCpuCores(repository.resourceCpuCores?.toString() || '');
+      setResourceDiskSize(repository.resourceDiskSize?.toString() || '');
+      setResourcesModified(false);
       setEnvVars([]);
       setInheritedEnvVars({});
       setEnvVarsModified(false);
       loadEnvVars(repository.id);
+      fetchProxmoxSettings();
     }
-  }, [isOpen, repository, loadEnvVars]);
+  }, [isOpen, repository, loadEnvVars, fetchProxmoxSettings]);
 
   // Track env vars modifications
   const handleEnvVarsChange = useCallback((newEnvVars: EnvVar[]) => {
@@ -88,12 +105,23 @@ export function EditRepositoryDialog({
     }
 
     try {
+      // Parse resource values (empty string = null = use default)
+      const memoryValue = resourceMemory ? parseInt(resourceMemory, 10) : null;
+      const cpuValue = resourceCpuCores ? parseInt(resourceCpuCores, 10) : null;
+      const diskValue = resourceDiskSize ? parseInt(resourceDiskSize, 10) : null;
+
       await onSave({
         name: name.trim(),
         description: description.trim() || undefined,
         templateId,
         // Only include envVars if they were modified
         ...(envVarsModified ? { envVars } : {}),
+        // Only include resources if they were modified
+        ...(resourcesModified ? {
+          resourceMemory: memoryValue,
+          resourceCpuCores: cpuValue,
+          resourceDiskSize: diskValue,
+        } : {}),
       });
       onClose();
     } catch (err) {
@@ -126,6 +154,21 @@ export function EditRepositoryDialog({
                 : 'text-foreground-secondary hover:text-foreground'}`}
           >
             General
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('resources')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'resources'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
+          >
+            Resources
+            {(repository?.resourceMemory || repository?.resourceCpuCores || repository?.resourceDiskSize) && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded">
+                Custom
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -239,6 +282,98 @@ export function EditRepositoryDialog({
                     No ready templates available. Create and provision a template first.
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Resources Tab */}
+            {activeTab === 'resources' && (
+              <div className="space-y-4">
+                <p className="text-sm text-foreground-secondary">
+                  Override default resource allocations for workspaces created from this repository.
+                  Leave fields empty to use global defaults.
+                </p>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm text-foreground mb-1">Memory (MB)</label>
+                    <input
+                      type="number"
+                      value={resourceMemory}
+                      onChange={(e) => {
+                        setResourceMemory(e.target.value);
+                        setResourcesModified(true);
+                      }}
+                      placeholder={`${proxmoxSettings?.resources?.defaultMemory ?? 2048}`}
+                      min={512}
+                      max={65536}
+                      className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-foreground-tertiary mt-1">
+                      Min: 512 MB
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-foreground mb-1">CPU Cores</label>
+                    <input
+                      type="number"
+                      value={resourceCpuCores}
+                      onChange={(e) => {
+                        setResourceCpuCores(e.target.value);
+                        setResourcesModified(true);
+                      }}
+                      placeholder={`${proxmoxSettings?.resources?.defaultCpuCores ?? 2}`}
+                      min={1}
+                      max={32}
+                      className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-foreground-tertiary mt-1">
+                      Min: 1, Max: 32
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-foreground mb-1">Disk Size (GB)</label>
+                    <input
+                      type="number"
+                      value={resourceDiskSize}
+                      onChange={(e) => {
+                        setResourceDiskSize(e.target.value);
+                        setResourcesModified(true);
+                      }}
+                      placeholder={`${proxmoxSettings?.resources?.defaultDiskSize ?? 50}`}
+                      min={4}
+                      max={500}
+                      className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-foreground-tertiary mt-1">
+                      Min: 4 GB, Max: 500 GB
+                    </p>
+                  </div>
+                </div>
+
+                {/* Current values summary */}
+                <div className="bg-background-tertiary/50 rounded p-3 text-sm">
+                  <div className="text-foreground-secondary mb-1">Current configuration:</div>
+                  <div className="grid grid-cols-3 gap-2 text-foreground">
+                    <div>
+                      Memory: {resourceMemory ? `${resourceMemory} MB` : <span className="text-foreground-tertiary">Default ({proxmoxSettings?.resources?.defaultMemory ?? 2048} MB)</span>}
+                    </div>
+                    <div>
+                      CPU: {resourceCpuCores ? `${resourceCpuCores} cores` : <span className="text-foreground-tertiary">Default ({proxmoxSettings?.resources?.defaultCpuCores ?? 2} cores)</span>}
+                    </div>
+                    <div>
+                      Disk: {resourceDiskSize ? `${resourceDiskSize} GB` : <span className="text-foreground-tertiary">Default ({proxmoxSettings?.resources?.defaultDiskSize ?? 50} GB)</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-foreground-tertiary">
+                  Resource changes only apply to newly created workspaces. Existing workspaces will keep their current resources.
+                </p>
               </div>
             )}
 

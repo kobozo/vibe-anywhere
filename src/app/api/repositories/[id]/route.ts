@@ -23,6 +23,10 @@ const updateRepositorySchema = z.object({
   templateId: z.string().uuid().optional().nullable(),
   techStack: z.array(z.enum(validTechStacks)).optional(),
   sshKeyId: z.string().uuid().optional().nullable(),
+  // Resource overrides (null = use global defaults)
+  resourceMemory: z.number().int().min(512).max(65536).nullable().optional(), // MB
+  resourceCpuCores: z.number().int().min(1).max(32).nullable().optional(),
+  resourceDiskSize: z.number().int().min(4).max(500).nullable().optional(), // GB
 });
 
 interface RouteContext {
