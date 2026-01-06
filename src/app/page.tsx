@@ -162,6 +162,14 @@ function Dashboard() {
     }
   }, [selectedWorkspace]);
 
+  // Handle workspace removal (container destroyed or workspace deleted)
+  const handleWorkspaceRemoved = useCallback((workspaceId: string) => {
+    if (selectedWorkspace?.id === workspaceId) {
+      setSelectedTab(null);
+      setSelectedWorkspace(null);
+    }
+  }, [selectedWorkspace]);
+
   // Subscribe to workspace state updates for the selected workspace
   useWorkspaceState({
     workspaceIds: selectedWorkspace ? [selectedWorkspace.id] : undefined,
@@ -525,6 +533,7 @@ function Dashboard() {
               onDeleteRepository={deleteRepository}
               refreshWorkspacesForRepoId={refreshWorkspacesForRepoId}
               onWorkspacesRefreshed={() => setRefreshWorkspacesForRepoId(null)}
+              onWorkspaceRemoved={handleWorkspaceRemoved}
             />
           </div>
           <TemplateSection

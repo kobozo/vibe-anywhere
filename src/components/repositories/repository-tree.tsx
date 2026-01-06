@@ -20,6 +20,8 @@ interface RepositoryTreeProps {
   // When set, refresh workspaces for this repo ID (used after creating a workspace)
   refreshWorkspacesForRepoId?: string | null;
   onWorkspacesRefreshed?: () => void;
+  // Called when a workspace is removed (container destroyed or workspace deleted)
+  onWorkspaceRemoved?: (workspaceId: string) => void;
 }
 
 export function RepositoryTree({
@@ -35,6 +37,7 @@ export function RepositoryTree({
   onDeleteRepository,
   refreshWorkspacesForRepoId,
   onWorkspacesRefreshed,
+  onWorkspaceRemoved,
 }: RepositoryTreeProps) {
 
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set());
@@ -185,6 +188,8 @@ export function RepositoryTree({
         ...prev,
         [workspaceToDelete.repositoryId]: prev[workspaceToDelete.repositoryId]?.filter(w => w.id !== workspaceToDelete.id) || [],
       }));
+      // Notify parent to reset selection if this workspace was selected
+      onWorkspaceRemoved?.(workspaceToDelete.id);
     }
     setWorkspaceToDelete(null);
   };
@@ -248,11 +253,12 @@ export function RepositoryTree({
   const confirmDestroyContainer = async () => {
     if (!workspaceToDestroy) return;
 
-    setDestroyingWorkspaces(prev => new Set([...prev, workspaceToDestroy.id]));
+    const destroyedWorkspaceId = workspaceToDestroy.id;
+    setDestroyingWorkspaces(prev => new Set([...prev, destroyedWorkspaceId]));
     setWorkspaceToDestroy(null);
 
     try {
-      const response = await fetch(`/api/workspaces/${workspaceToDestroy.id}/destroy`, {
+      const response = await fetch(`/api/workspaces/${destroyedWorkspaceId}/destroy`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
       });
@@ -266,6 +272,8 @@ export function RepositoryTree({
           const { data } = await workspacesResponse.json();
           setWorkspacesByRepo(prev => ({ ...prev, [workspaceToDestroy.repositoryId]: data.workspaces }));
         }
+        // Notify parent to reset selection if this workspace was selected
+        onWorkspaceRemoved?.(destroyedWorkspaceId);
       } else {
         const { error } = await response.json();
         alert(`Failed to destroy container: ${error?.message || 'Unknown error'}`);
@@ -276,7 +284,7 @@ export function RepositoryTree({
     } finally {
       setDestroyingWorkspaces(prev => {
         const next = new Set(prev);
-        next.delete(workspaceToDestroy.id);
+        next.delete(destroyedWorkspaceId);
         return next;
       });
     }
