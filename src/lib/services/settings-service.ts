@@ -4,8 +4,9 @@
  */
 
 import { db } from '@/lib/db';
-import { appSettings } from '@/lib/db/schema';
+import { appSettings, workspaces } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 import { config } from '@/lib/config';
 import * as crypto from 'crypto';
 
@@ -178,18 +179,47 @@ class SettingsService {
 
   /**
    * Allocate the next available VMID for a workspace
+   * Finds the first free VMID by checking both Proxmox and database
    */
   async allocateWorkspaceVmid(): Promise<number> {
-    const config = await this.getVmidConfig();
-    const vmid = config.nextWorkspaceVmid;
+    const vmidConfig = await this.getVmidConfig();
+    const maxVmid = vmidConfig.maxVmid || vmidConfig.startingVmid + 1000;
 
-    // Increment for next allocation
-    await this.saveVmidConfig({
-      ...config,
-      nextWorkspaceVmid: vmid + 1,
-    });
+    // Get all VMIDs currently in use in Proxmox
+    let proxmoxVmids = new Set<number>();
+    try {
+      const client = await getProxmoxClientAsync();
+      const containers = await client.getLxcContainers();
+      proxmoxVmids = new Set(containers.map(c => c.vmid));
+    } catch (error) {
+      console.warn('Could not fetch Proxmox containers, using database-only check:', error);
+    }
 
-    return vmid;
+    // Get VMIDs from workspaces table (Proxmox backend only)
+    const dbWorkspaces = await db
+      .select({ containerId: workspaces.containerId })
+      .from(workspaces)
+      .where(eq(workspaces.containerBackend, 'proxmox'));
+
+    const dbVmids = new Set(
+      dbWorkspaces
+        .filter(w => w.containerId !== null)
+        .map(w => parseInt(w.containerId!, 10))
+    );
+
+    // Combine both sets
+    const usedVmids = new Set([...proxmoxVmids, ...dbVmids]);
+
+    // Find first free VMID starting after template VMID
+    for (let vmid = vmidConfig.startingVmid + 1; vmid <= maxVmid; vmid++) {
+      if (!usedVmids.has(vmid)) {
+        return vmid;
+      }
+    }
+
+    throw new Error(
+      `No available VMIDs in range ${vmidConfig.startingVmid + 1}-${maxVmid}. All VMIDs are in use.`
+    );
   }
 
   /**
