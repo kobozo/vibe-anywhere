@@ -113,6 +113,36 @@ export function useTabs(workspaceId: string | null) {
     [token]
   );
 
+  const duplicateTab = useCallback(
+    async (tab: TabInfo) => {
+      if (!token || !workspaceId) throw new Error('Not authenticated or no workspace selected');
+
+      // Create a new tab with the same command
+      const response = await fetch(`/api/workspaces/${workspaceId}/tabs`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${tab.name} (copy)`,
+          command: tab.command,
+          exitOnClose: tab.exitOnClose,
+        }),
+      });
+
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error?.message || 'Failed to duplicate tab');
+      }
+
+      const { data } = await response.json();
+      setTabs((prev) => [...prev, data.tab]);
+      return data.tab as TabInfo;
+    },
+    [token, workspaceId]
+  );
+
   const prepareAttach = useCallback(
     async (tabId: string) => {
       if (!token) throw new Error('Not authenticated');
@@ -141,6 +171,7 @@ export function useTabs(workspaceId: string | null) {
     createTab,
     startTab,
     deleteTab,
+    duplicateTab,
     prepareAttach,
     setTabs,
   };

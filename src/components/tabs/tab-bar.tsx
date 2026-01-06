@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import Image from 'next/image';
 import { useTabs, TabInfo } from '@/hooks/useTabs';
 import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
 import { CreateTabDialog } from './create-tab-dialog';
 import { TabGroupIcon } from './tab-group-icon';
+import { TabContextMenu } from './tab-context-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { VoiceButton, VoiceButtonRef } from '@/components/voice/voice-button';
 import type { TabGroupInfo } from '@/hooks/useTabGroups';
@@ -17,6 +19,7 @@ interface TabBarProps {
   onExposeDeleteTab?: (deleteTab: (tabId: string) => Promise<void>) => void;
   whisperEnabled?: boolean;
   onVoiceTranscription?: (text: string) => void;
+  workspaceTechStacks?: string[];
   // Tab group props
   groups?: TabGroupInfo[];
   groupedTabIds?: Set<string>;
@@ -45,6 +48,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
   onExposeDeleteTab,
   whisperEnabled,
   onVoiceTranscription,
+  workspaceTechStacks = [],
   // Tab group props
   groups = [],
   groupedTabIds = new Set(),
@@ -67,12 +71,14 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
     createTab,
     startTab,
     deleteTab,
+    duplicateTab,
   } = useTabs(workspaceId);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tabToDelete, setTabToDelete] = useState<TabInfo | null>(null);
   const [agentUpdating, setAgentUpdating] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ tab: TabInfo; position: { x: number; y: number } } | null>(null);
   const prevAgentUpdating = useRef(false);
   const voiceButtonRef = useRef<VoiceButtonRef>(null);
 
@@ -219,6 +225,44 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent, tab: TabInfo) => {
+    e.preventDefault();
+    setContextMenu({ tab, position: { x: e.clientX, y: e.clientY } });
+  };
+
+  const handleDuplicateTab = async (tab: TabInfo) => {
+    try {
+      setActionLoading('duplicate');
+      const newTab = await duplicateTab(tab);
+      onSelectTab(newTab);
+    } catch (error) {
+      console.error('Failed to duplicate tab:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleGroupWith = (currentTabId: string, otherTabId: string) => {
+    // Enter multi-select mode and select both tabs, then create group
+    onEnterMultiSelectMode?.();
+    // Need to toggle both tabs after entering multi-select mode
+    setTimeout(() => {
+      onToggleTabSelection?.(currentTabId);
+      onToggleTabSelection?.(otherTabId);
+      // Trigger group creation after a small delay for state to update
+      setTimeout(() => {
+        onCreateGroupClick?.();
+      }, 50);
+    }, 0);
+  };
+
+  const handleStartMultiSelect = (tabId: string) => {
+    onEnterMultiSelectMode?.();
+    setTimeout(() => {
+      onToggleTabSelection?.(tabId);
+    }, 0);
+  };
+
   if (!workspaceId) {
     return null;
   }
@@ -281,6 +325,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
           <div
             key={tab.id}
             onClick={() => handleTabClick(tab)}
+            onContextMenu={(e) => handleContextMenu(e, tab)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-t cursor-pointer group relative
               ${isSelected
                 ? 'bg-background text-foreground'
@@ -302,13 +347,23 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
 
             {/* Git icon for git tabs */}
             {tab.tabType === 'git' ? (
-              <svg className="w-4 h-4 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3-3 3 3m0 6l-3 3-3-3" />
-              </svg>
+              <Image
+                src="/icons/ai/github.png"
+                alt="Git"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+                unoptimized
+              />
             ) : tab.tabType === 'docker' ? (
-              <svg className="w-4 h-4 text-info" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.186.186 0 00-.185.186v1.887c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 00.186-.186V3.574a.186.186 0 00-.186-.185h-2.118a.186.186 0 00-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 00.186-.186V6.29a.186.186 0 00-.186-.185h-2.118a.186.186 0 00-.185.185v1.887c0 .102.082.186.185.186m-2.93 0h2.12a.186.186 0 00.184-.186V6.29a.185.185 0 00-.185-.185H8.1a.185.185 0 00-.185.185v1.887c0 .102.083.186.185.186m-2.964 0h2.119a.186.186 0 00.185-.186V6.29a.186.186 0 00-.185-.185H5.136a.186.186 0 00-.186.185v1.887c0 .102.084.186.186.186m5.893 2.715h2.118a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.118a.186.186 0 00-.185.186v1.887c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 00.184-.185V9.006a.185.185 0 00-.184-.186h-2.12a.185.185 0 00-.184.186v1.887c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186h-2.12a.186.186 0 00-.185.186v1.887c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 00.184-.185V9.006a.185.185 0 00-.184-.186h-2.12a.186.186 0 00-.186.186v1.887c0 .102.084.185.186.185" />
-              </svg>
+              <Image
+                src="/icons/ai/docker.png"
+                alt="Docker"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+                unoptimized
+              />
             ) : (
               <span className={`w-2 h-2 rounded-full ${getStatusColor(tab.status)}`} />
             )}
@@ -327,7 +382,46 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
         );
       })}
 
-      {/* Voice button */}
+      {/* New tab "+" button - styled like a tab */}
+      {!multiSelectMode && (
+        <button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="flex items-center justify-center px-3 py-1.5 rounded-t
+            bg-background-tertiary/50 text-foreground-tertiary text-lg
+            hover:bg-background-tertiary hover:text-foreground"
+          title="New tab"
+        >
+          +
+        </button>
+      )}
+
+      {/* Spacer to push right-side controls to the edge */}
+      <div className="flex-grow" />
+
+      {/* Multi-select mode controls */}
+      {multiSelectMode && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-foreground-secondary">
+            {selectedTabIdsForGroup.size} selected
+          </span>
+          {selectedTabIdsForGroup.size >= 2 && (
+            <button
+              onClick={onCreateGroupClick}
+              className="px-2 py-1 text-sm bg-primary text-white rounded hover:bg-primary-hover"
+            >
+              Create Group
+            </button>
+          )}
+          <button
+            onClick={onExitMultiSelectMode}
+            className="px-2 py-1 text-foreground-tertiary hover:text-foreground text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Voice button - far right */}
       {whisperEnabled && onVoiceTranscription && !multiSelectMode && (() => {
         const selectedTab = tabs.find(t => t.id === selectedTabId);
         const isTerminalTab = selectedTab && selectedTab.tabType !== 'git';
@@ -355,57 +449,13 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
         );
       })()}
 
-      {/* Multi-select mode controls */}
-      {multiSelectMode ? (
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-foreground-secondary">
-            {selectedTabIdsForGroup.size} selected
-          </span>
-          {selectedTabIdsForGroup.size >= 2 && (
-            <button
-              onClick={onCreateGroupClick}
-              className="px-2 py-1 text-sm bg-primary text-white rounded hover:bg-primary-hover"
-            >
-              Create Group
-            </button>
-          )}
-          <button
-            onClick={onExitMultiSelectMode}
-            className="px-2 py-1 text-foreground-tertiary hover:text-foreground text-sm"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Select button to enter multi-select mode */}
-          {visibleTabs.length >= 2 && onEnterMultiSelectMode && (
-            <button
-              onClick={onEnterMultiSelectMode}
-              className="px-2 py-1 text-foreground-tertiary hover:text-foreground text-sm"
-              title="Select tabs to group"
-            >
-              Select
-            </button>
-          )}
-
-          {/* New tab button */}
-          <button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="px-2 py-1 text-foreground-tertiary hover:text-foreground text-sm"
-            title="New tab"
-          >
-            + New Tab
-          </button>
-        </>
-      )}
-
       {/* Create tab dialog */}
       <CreateTabDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         onCreate={handleCreateTab}
         isLoading={actionLoading === 'create'}
+        workspaceTechStacks={workspaceTechStacks}
       />
 
       {/* Delete tab confirmation */}
@@ -418,6 +468,21 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
         onConfirm={confirmDeleteTab}
         onCancel={() => setTabToDelete(null)}
       />
+
+      {/* Tab context menu */}
+      {contextMenu && (
+        <TabContextMenu
+          tab={contextMenu.tab}
+          position={contextMenu.position}
+          otherTabs={visibleTabs.filter(t => t.id !== contextMenu.tab.id)}
+          groups={groups}
+          onClose={() => setContextMenu(null)}
+          onDelete={() => setTabToDelete(contextMenu.tab)}
+          onDuplicate={() => handleDuplicateTab(contextMenu.tab)}
+          onGroupWith={(otherTabId) => handleGroupWith(contextMenu.tab.id, otherTabId)}
+          onStartMultiSelect={() => handleStartMultiSelect(contextMenu.tab.id)}
+        />
+      )}
     </div>
   );
 });
