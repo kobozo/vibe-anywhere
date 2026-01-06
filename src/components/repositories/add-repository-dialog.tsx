@@ -226,14 +226,14 @@ export function AddRepositoryDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-gray-700">
+        <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Add Repository</h2>
+            <h2 className="text-lg font-semibold text-foreground">Add Repository</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white"
+              className="text-foreground-secondary hover:text-foreground"
             >
               ×
             </button>
@@ -243,39 +243,39 @@ export function AddRepositoryDialog({
         {/* Content */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
           {error && (
-            <div className="p-3 bg-red-600/20 border border-red-600/50 rounded text-red-400 text-sm">
+            <div className="p-3 bg-error/20 border border-error/50 rounded text-error text-sm">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">
-              Repository URL <span className="text-red-400">*</span>
+            <label className="block text-sm text-foreground mb-1">
+              Repository URL <span className="text-error">*</span>
             </label>
             <input
               type="text"
               value={cloneUrl}
               onChange={(e) => handleCloneUrlChange(e.target.value)}
               placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary"
             />
           </div>
 
           {/* Clone Depth Selection */}
           <div>
-            <label className="block text-sm text-gray-300 mb-1">
+            <label className="block text-sm text-foreground mb-1">
               Clone Depth
             </label>
             <select
               value={cloneDepth}
               onChange={(e) => setCloneDepth(e.target.value as CloneDepthOption)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
             >
               <option value="shallow">Shallow clone (depth=1) - Fastest startup</option>
               <option value="recent">Recent history (depth=10) - For recent blame/log</option>
               <option value="full">Full clone - Complete git history</option>
             </select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-foreground-tertiary mt-1">
               Shallow clones are faster but have limited git history. Use full clone for bisect/blame.
             </p>
           </div>
@@ -283,32 +283,32 @@ export function AddRepositoryDialog({
           {/* SSH Key selection - only show for SSH URLs */}
           {isSSHUrl && (
             <div>
-              <label className="block text-sm text-gray-300 mb-1">
+              <label className="block text-sm text-foreground mb-1">
                 SSH Key
               </label>
               {generatedKey ? (
                 <div className="space-y-3">
-                  <div className="p-3 bg-green-600/20 border border-green-600/50 rounded text-green-400 text-sm">
+                  <div className="p-3 bg-success/20 border border-success/50 rounded text-success text-sm">
                     Key "{generatedKey.name}" generated successfully!
                   </div>
-                  <div className="p-3 bg-gray-700/50 rounded space-y-2">
+                  <div className="p-3 bg-background-tertiary/50 rounded space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Public Key (copy this to GitHub)</span>
+                      <span className="text-xs text-foreground-secondary">Public Key (copy this to GitHub)</span>
                       <button
                         type="button"
                         onClick={() => handleCopyPublicKey()}
-                        className="text-xs text-blue-400 hover:text-blue-300"
+                        className="text-xs text-primary hover:text-primary-hover"
                       >
                         {copied ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
-                    <div className="font-mono text-xs text-gray-300 break-all bg-gray-900/50 p-2 rounded max-h-20 overflow-y-auto">
+                    <div className="font-mono text-xs text-foreground break-all bg-gray-900/50 p-2 rounded max-h-20 overflow-y-auto">
                       {generatedKey.publicKey}
                     </div>
                     <button
                       type="button"
                       onClick={handleDismissGeneratedKey}
-                      className="w-full mt-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded text-sm text-white"
+                      className="w-full mt-2 px-3 py-1.5 bg-background-input hover:bg-background-tertiary rounded text-sm text-foreground"
                     >
                       Done
                     </button>
@@ -319,7 +319,7 @@ export function AddRepositoryDialog({
                   <select
                     value={selectedKeyId}
                     onChange={(e) => { setSelectedKeyId(e.target.value); setCopied(false); }}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                    className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
                   >
                     <option value="">Select SSH key...</option>
                     {keys.map((key) => (
@@ -333,7 +333,7 @@ export function AddRepositoryDialog({
                       <button
                         type="button"
                         onClick={() => handleCopyPublicKey(selectedKey.publicKey)}
-                        className="text-sm text-blue-400 hover:text-blue-300"
+                        className="text-sm text-primary hover:text-primary-hover"
                       >
                         {copied ? 'Copied!' : 'Copy public key'}
                       </button>
@@ -342,29 +342,29 @@ export function AddRepositoryDialog({
                       <button
                         type="button"
                         onClick={() => setShowGenerateKey(true)}
-                        className="text-sm text-blue-400 hover:text-blue-300"
+                        className="text-sm text-primary hover:text-primary-hover"
                       >
                         + Generate new key
                       </button>
                     )}
                   </div>
                   {showGenerateKey && (
-                    <div className="mt-3 p-3 bg-gray-700/50 rounded space-y-3">
+                    <div className="mt-3 p-3 bg-background-tertiary/50 rounded space-y-3">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Key Name</label>
+                        <label className="block text-xs text-foreground-secondary mb-1">Key Name</label>
                         <input
                           type="text"
                           value={newKeyName}
                           onChange={(e) => setNewKeyName(e.target.value)}
                           placeholder="github-key"
-                          className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                          className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                         />
                       </div>
                       <div className="flex items-center gap-3">
                         <select
                           value={newKeyType}
                           onChange={(e) => setNewKeyType(e.target.value as 'ed25519' | 'rsa' | 'ecdsa')}
-                          className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                          className="px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                         >
                           <option value="ed25519">Ed25519 (recommended)</option>
                           <option value="rsa">RSA 4096</option>
@@ -374,7 +374,7 @@ export function AddRepositoryDialog({
                           type="button"
                           onClick={handleGenerateKey}
                           disabled={isGenerating || !newKeyName.trim()}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-sm text-white"
+                          className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-sm text-foreground"
                         >
                           {isGenerating ? 'Generating...' : 'Generate'}
                         </button>
@@ -384,7 +384,7 @@ export function AddRepositoryDialog({
                             setShowGenerateKey(false);
                             setNewKeyName('');
                           }}
-                          className="text-sm text-gray-400 hover:text-white"
+                          className="text-sm text-foreground-secondary hover:text-foreground"
                         >
                           Cancel
                         </button>
@@ -394,25 +394,25 @@ export function AddRepositoryDialog({
                 </>
               ) : (
                 <div className="space-y-3">
-                  <div className="p-3 bg-yellow-600/20 border border-yellow-600/50 rounded text-yellow-400 text-sm">
+                  <div className="p-3 bg-warning/20 border border-warning/50 rounded text-warning text-sm">
                     No SSH keys found. Generate one to use SSH cloning:
                   </div>
-                  <div className="p-3 bg-gray-700/50 rounded space-y-3">
+                  <div className="p-3 bg-background-tertiary/50 rounded space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Key Name</label>
+                      <label className="block text-xs text-foreground-secondary mb-1">Key Name</label>
                       <input
                         type="text"
                         value={newKeyName}
                         onChange={(e) => setNewKeyName(e.target.value)}
                         placeholder="github-key"
-                        className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                        className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                       />
                     </div>
                     <div className="flex items-center gap-3">
                       <select
                         value={newKeyType}
                         onChange={(e) => setNewKeyType(e.target.value as 'ed25519' | 'rsa' | 'ecdsa')}
-                        className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                        className="px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                       >
                         <option value="ed25519">Ed25519 (recommended)</option>
                         <option value="rsa">RSA 4096</option>
@@ -422,7 +422,7 @@ export function AddRepositoryDialog({
                         type="button"
                         onClick={handleGenerateKey}
                         disabled={isGenerating || !newKeyName.trim()}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-sm text-white"
+                        className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-sm text-foreground"
                       >
                         {isGenerating ? 'Generating...' : 'Generate'}
                       </button>
@@ -434,8 +434,8 @@ export function AddRepositoryDialog({
           )}
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">
-              Name <span className="text-red-400">*</span>
+            <label className="block text-sm text-foreground mb-1">
+              Name <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -443,12 +443,12 @@ export function AddRepositoryDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="my-project"
               required
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">
+            <label className="block text-sm text-foreground mb-1">
               Description
             </label>
             <input
@@ -456,20 +456,20 @@ export function AddRepositoryDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary"
             />
           </div>
 
           {/* Template Selection */}
           {templates.length > 0 && (
             <div>
-              <label className="block text-sm text-gray-300 mb-1">
+              <label className="block text-sm text-foreground mb-1">
                 Template
               </label>
               <select
                 value={selectedTemplateId}
                 onChange={(e) => setSelectedTemplateId(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
               >
                 <option value="">Use default template</option>
                 {templates.map((template) => (
@@ -487,7 +487,7 @@ export function AddRepositoryDialog({
               {selectedTemplateId && (() => {
                 const selected = templates.find(t => t.id === selectedTemplateId);
                 return selected?.techStacks && selected.techStacks.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-foreground-tertiary mt-1">
                     Includes: {selected.techStacks.join(', ')}
                   </p>
                 );
@@ -498,10 +498,10 @@ export function AddRepositoryDialog({
           {/* Tech Stack Selection */}
           {availableTechStacks.length > 0 && (
             <div>
-              <label className="block text-sm text-gray-300 mb-2">
+              <label className="block text-sm text-foreground mb-2">
                 Tech Stack
               </label>
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-foreground-tertiary mb-2">
                 Select development tools to install on workspaces created from this repository.
               </p>
               <div className="grid grid-cols-2 gap-2">
@@ -514,10 +514,10 @@ export function AddRepositoryDialog({
                       key={stack.id}
                       className={`flex items-start gap-2 p-2 rounded cursor-pointer transition-colors ${
                         isInTemplate
-                          ? 'bg-green-600/10 border border-green-500/30 cursor-default'
+                          ? 'bg-success/10 border border-success/30 cursor-default'
                           : isSelected
-                          ? 'bg-blue-600/20 border border-blue-500/50'
-                          : 'bg-gray-700/50 border border-gray-600/50 hover:bg-gray-700'
+                          ? 'bg-primary/20 border border-primary/50'
+                          : 'bg-background-tertiary/50 border border-border-secondary/50 hover:bg-background-tertiary'
                       }`}
                     >
                       <input
@@ -525,23 +525,23 @@ export function AddRepositoryDialog({
                         checked={isSelected || isInTemplate}
                         onChange={() => !isInTemplate && toggleTechStack(stack.id)}
                         disabled={isInTemplate}
-                        className="mt-0.5 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 disabled:opacity-50"
+                        className="mt-0.5 rounded border-border bg-background-tertiary text-primary focus:ring-primary disabled:opacity-50"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm text-white flex items-center gap-1">
+                        <div className="text-sm text-foreground flex items-center gap-1">
                           {stack.name}
                           {isInTemplate && (
-                            <span className="text-xs text-green-400">(in template)</span>
+                            <span className="text-xs text-success">(in template)</span>
                           )}
                         </div>
-                        <div className="text-xs text-gray-400 truncate">{stack.description}</div>
+                        <div className="text-xs text-foreground-secondary truncate">{stack.description}</div>
                       </div>
                     </label>
                   );
                 })}
               </div>
               {templateTechStacks.length > 0 && (
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-foreground-tertiary mt-2">
                   Stacks marked "in template" are already pre-installed and will be available immediately.
                 </p>
               )}
@@ -550,11 +550,11 @@ export function AddRepositoryDialog({
         </form>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700 flex justify-end gap-3">
+        <div className="p-4 border-t border-border flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors"
             disabled={isLoading}
           >
             Cancel
@@ -562,7 +562,7 @@ export function AddRepositoryDialog({
           <button
             onClick={handleSubmit}
             disabled={isLoading || !name || !cloneUrl}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-white transition-colors"
+            className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 disabled:cursor-not-allowed rounded text-foreground transition-colors"
           >
             {isLoading ? 'Adding...' : 'Add Repository'}
           </button>

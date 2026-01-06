@@ -2,9 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Default theme values (Tokyo Night) - applied before JS loads */
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  /* Backgrounds */
+  --background: #1a1b26;
+  --background-secondary: #16161e;
+  --background-tertiary: #1f2335;
+  --background-input: #24283b;
+
+  /* Borders */
+  --border: #3b4261;
+  --border-secondary: #292e42;
+
+  /* Text */
+  --foreground: #c0caf5;
+  --foreground-secondary: #9aa5ce;
+  --foreground-tertiary: #565f89;
+
+  /* Primary (accent) */
+  --primary: #7aa2f7;
+  --primary-hover: #89b4fa;
+  --primary-foreground: #1a1b26;
+
+  /* Semantic colors */
+  --success: #9ece6a;
+  --success-foreground: #1a1b26;
+  --warning: #e0af68;
+  --warning-foreground: #1a1b26;
+  --error: #f7768e;
+  --error-foreground: #1a1b26;
+
+  /* Selection/focus */
+  --selection: #283457;
+  --focus: #7aa2f7;
+
+  /* Scrollbar */
+  --scrollbar-track: #1a1b26;
+  --scrollbar-thumb: #3b4261;
+  --scrollbar-thumb-hover: #565f89;
+
+  /* Terminal colors */
+  --terminal-background: #1a1b26;
+  --terminal-foreground: #c0caf5;
+  --terminal-cursor: #c0caf5;
+  --terminal-cursor-accent: #1a1b26;
+  --terminal-selection-background: #283457;
 }
 
 body {
@@ -13,23 +55,23 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - uses theme variables */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4a4a4a;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5a5a5a;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* xterm.js overrides */

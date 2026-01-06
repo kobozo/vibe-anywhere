@@ -21,21 +21,21 @@ function Section({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-gray-700 rounded-lg overflow-hidden">
+    <div className="border border-border rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 bg-gray-800 hover:bg-gray-750 transition-colors"
+        className="w-full flex items-center justify-between p-3 bg-background-secondary hover:bg-background-tertiary transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className="text-gray-400 transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+          <span className="text-foreground-secondary transition-transform" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
             ▶
           </span>
-          <span className="text-sm font-medium text-white">{title}</span>
+          <span className="text-sm font-medium text-foreground">{title}</span>
           {badge}
         </div>
       </button>
-      {isOpen && <div className="p-4 bg-gray-800/50">{children}</div>}
+      {isOpen && <div className="p-4 bg-background-secondary/50">{children}</div>}
     </div>
   );
 }
@@ -99,65 +99,65 @@ function ConnectionForm({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Host</label>
+          <label className="block text-xs text-foreground-secondary mb-1">Host</label>
           <input
             type="text"
             placeholder="192.168.1.100"
             value={host}
             onChange={(e) => setHost(e.target.value)}
-            className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+            className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Port</label>
+          <label className="block text-xs text-foreground-secondary mb-1">Port</label>
           <input
             type="number"
             min="1"
             max="65535"
             value={port}
             onChange={(e) => setPort(parseInt(e.target.value) || 8006)}
-            className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+            className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Token ID</label>
+        <label className="block text-xs text-foreground-secondary mb-1">Token ID</label>
         <input
           type="text"
           placeholder="root@pam!session-hub"
           value={tokenId}
           onChange={(e) => setTokenId(e.target.value)}
-          className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+          className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1">
-          Token Secret {settings?.tokenId && <span className="text-gray-500">(leave empty to keep existing)</span>}
+        <label className="block text-xs text-foreground-secondary mb-1">
+          Token Secret {settings?.tokenId && <span className="text-foreground-tertiary">(leave empty to keep existing)</span>}
         </label>
         <input
           type="password"
           placeholder={settings?.tokenId ? '••••••••' : 'Enter token secret'}
           value={tokenSecret}
           onChange={(e) => setTokenSecret(e.target.value)}
-          className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+          className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Node</label>
+        <label className="block text-xs text-foreground-secondary mb-1">Node</label>
         <input
           type="text"
           placeholder="pve"
           value={node}
           onChange={(e) => setNode(e.target.value)}
-          className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+          className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
         />
       </div>
 
       {testResult && (
-        <div className={`p-2 rounded text-sm ${testResult.success ? 'bg-green-900/30 text-green-400 border border-green-700' : 'bg-red-900/30 text-red-400 border border-red-700'}`}>
+        <div className={`p-2 rounded text-sm ${testResult.success ? 'bg-success/30 text-success border border-success/50' : 'bg-error/30 text-error border border-error/50'}`}>
           {testResult.success ? testResult.message : testResult.error}
         </div>
       )}
@@ -166,14 +166,14 @@ function ConnectionForm({
         <button
           onClick={handleTest}
           disabled={!host || !tokenId || !tokenSecret || !node || isTesting}
-          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm text-white"
+          className="px-3 py-1.5 bg-background-input hover:bg-background-tertiary disabled:bg-background-tertiary disabled:text-foreground-tertiary rounded text-sm text-foreground"
         >
           {isTesting ? 'Testing...' : 'Test Connection'}
         </button>
         <button
           onClick={handleSave}
           disabled={!hasChanges || !host || !tokenId || !tokenSecret || !node || isLoading}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm text-white"
+          className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-tertiary disabled:text-foreground-tertiary rounded text-sm text-foreground"
         >
           {isLoading ? 'Saving...' : 'Save Connection'}
         </button>
@@ -237,7 +237,7 @@ function SimpleSettingsForm({
       <div className="grid grid-cols-2 gap-4">
         {fields.map((field) => (
           <div key={field.key}>
-            <label className="block text-xs text-gray-400 mb-1">{field.label}</label>
+            <label className="block text-xs text-foreground-secondary mb-1">{field.label}</label>
             <input
               type={field.type}
               placeholder={field.placeholder}
@@ -250,7 +250,7 @@ function SimpleSettingsForm({
                   [field.key]: field.type === 'number' ? (e.target.value ? parseInt(e.target.value) : '') : e.target.value,
                 }))
               }
-              className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+              className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
             />
           </div>
         ))}
@@ -258,7 +258,7 @@ function SimpleSettingsForm({
       <button
         onClick={handleSave}
         disabled={!hasChanges || isLoading}
-        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm text-white"
+        className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-tertiary disabled:text-foreground-tertiary rounded text-sm text-foreground"
       >
         {isLoading ? 'Saving...' : 'Save'}
       </button>
@@ -348,14 +348,14 @@ export function ProxmoxSettings() {
 
   if (error) {
     return (
-      <div className="p-3 bg-red-900/30 border border-red-700 rounded text-red-400 text-sm">
+      <div className="p-3 bg-error/30 border border-error/50 rounded text-error text-sm">
         {error}
       </div>
     );
   }
 
   if (!settings && isLoading) {
-    return <div className="text-gray-500 text-sm py-4">Loading settings...</div>;
+    return <div className="text-foreground-tertiary text-sm py-4">Loading settings...</div>;
   }
 
   return (
@@ -366,9 +366,9 @@ export function ProxmoxSettings() {
         defaultOpen={true}
         badge={
           settings?.connection.isConfigured ? (
-            <span className="px-2 py-0.5 bg-green-900/50 text-green-400 text-xs rounded">Connected</span>
+            <span className="px-2 py-0.5 bg-success/50 text-success text-xs rounded">Connected</span>
           ) : (
-            <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-400 text-xs rounded">Not configured</span>
+            <span className="px-2 py-0.5 bg-warning/50 text-warning text-xs rounded">Not configured</span>
           )
         }
       >
@@ -422,19 +422,19 @@ export function ProxmoxSettings() {
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Template VMID</label>
-                  <div className="text-sm text-white">{vmidConfig.startingVmid}</div>
+                  <label className="block text-xs text-foreground-secondary mb-1">Template VMID</label>
+                  <div className="text-sm text-foreground">{vmidConfig.startingVmid}</div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Next Workspace VMID</label>
-                  <div className="text-sm text-white">{vmidConfig.nextWorkspaceVmid}</div>
+                  <label className="block text-xs text-foreground-secondary mb-1">Next Workspace VMID</label>
+                  <div className="text-sm text-foreground">{vmidConfig.nextWorkspaceVmid}</div>
                 </div>
               </div>
 
               {vmidEditMode ? (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">New Starting VMID</label>
+                    <label className="block text-xs text-foreground-secondary mb-1">New Starting VMID</label>
                     <input
                       type="number"
                       min="100"
@@ -443,15 +443,15 @@ export function ProxmoxSettings() {
                         setVmidInput(e.target.value);
                         setVmidError(null);
                       }}
-                      className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-foreground-tertiary mt-1">
                       Next workspace will use VMID {parseInt(vmidInput) >= 100 ? parseInt(vmidInput) + 1 : '...'}
                     </p>
                   </div>
 
                   {vmidError && (
-                    <div className="p-2 rounded text-sm bg-red-900/30 text-red-400 border border-red-700">
+                    <div className="p-2 rounded text-sm bg-error/30 text-error border border-error/50">
                       {vmidError}
                     </div>
                   )}
@@ -460,7 +460,7 @@ export function ProxmoxSettings() {
                     <button
                       onClick={handleVmidSave}
                       disabled={vmidSaving}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm text-white"
+                      className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-tertiary disabled:text-foreground-tertiary rounded text-sm text-foreground"
                     >
                       {vmidSaving ? 'Saving...' : 'Save'}
                     </button>
@@ -471,7 +471,7 @@ export function ProxmoxSettings() {
                         setVmidError(null);
                       }}
                       disabled={vmidSaving}
-                      className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm text-white"
+                      className="px-3 py-1.5 bg-background-input hover:bg-background-tertiary disabled:bg-background-tertiary disabled:text-foreground-tertiary rounded text-sm text-foreground"
                     >
                       Cancel
                     </button>
@@ -482,12 +482,12 @@ export function ProxmoxSettings() {
                   <button
                     onClick={() => setVmidEditMode(true)}
                     disabled={vmidConfig.templateExists}
-                    className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-sm text-white"
+                    className="px-3 py-1.5 bg-background-input hover:bg-background-tertiary disabled:bg-background-tertiary disabled:text-foreground-tertiary rounded text-sm text-foreground"
                   >
                     Edit Starting VMID
                   </button>
                   {vmidConfig.templateExists && (
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-foreground-tertiary mt-2">
                       VMID can only be changed before creating a template
                     </p>
                   )}
@@ -495,7 +495,7 @@ export function ProxmoxSettings() {
               )}
             </>
           ) : (
-            <div className="text-gray-500 text-sm">Loading VMID configuration...</div>
+            <div className="text-foreground-tertiary text-sm">Loading VMID configuration...</div>
           )}
         </div>
       </Section>

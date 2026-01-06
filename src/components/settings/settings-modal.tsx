@@ -5,6 +5,7 @@ import { useTabTemplates, TabTemplate } from '@/hooks/useTabTemplates';
 import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
 import { ProxmoxSettings } from './proxmox-settings';
 import { VoiceSettings } from './voice-settings';
+import { ThemeSettings } from './theme-settings';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,7 +13,7 @@ interface SettingsModalProps {
   onVoiceSettingsChange?: () => void;
 }
 
-type SettingsTab = 'templates' | 'ssh-keys' | 'proxmox' | 'voice';
+type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'proxmox' | 'voice';
 
 const ICON_OPTIONS = [
   { value: 'bot', label: 'Bot', emoji: '\u{1F916}' },
@@ -24,7 +25,7 @@ const ICON_OPTIONS = [
 ];
 
 export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('templates');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('theme');
 
   // Tab Templates
   const { templates, fetchTemplates, createTemplate, deleteTemplate, isLoading: templatesLoading } = useTabTemplates();
@@ -124,23 +125,32 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Settings</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Settings</h2>
+          <button onClick={onClose} className="text-foreground-secondary hover:text-foreground text-xl">
             &times;
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-700">
+        <div className="flex border-b border-border">
+          <button
+            onClick={() => setActiveTab('theme')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'theme'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
+          >
+            Theme
+          </button>
           <button
             onClick={() => setActiveTab('templates')}
             className={`px-4 py-2 text-sm font-medium transition-colors
               ${activeTab === 'templates'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-white'}`}
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
           >
             Tab Templates
           </button>
@@ -148,8 +158,8 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
             onClick={() => setActiveTab('ssh-keys')}
             className={`px-4 py-2 text-sm font-medium transition-colors
               ${activeTab === 'ssh-keys'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-white'}`}
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
           >
             SSH Keys
           </button>
@@ -157,8 +167,8 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
             onClick={() => setActiveTab('proxmox')}
             className={`px-4 py-2 text-sm font-medium transition-colors
               ${activeTab === 'proxmox'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-white'}`}
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
           >
             Proxmox
           </button>
@@ -166,8 +176,8 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
             onClick={() => setActiveTab('voice')}
             className={`px-4 py-2 text-sm font-medium transition-colors
               ${activeTab === 'voice'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-white'}`}
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
           >
             Voice
           </button>
@@ -175,16 +185,19 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Theme */}
+          {activeTab === 'theme' && <ThemeSettings />}
+
           {/* Tab Templates */}
           {activeTab === 'templates' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-foreground-secondary">
                   Configure which tab types are available when creating new tabs.
                 </p>
                 <button
                   onClick={() => setShowAddTemplate(!showAddTemplate)}
-                  className="text-sm text-blue-400 hover:text-blue-300"
+                  className="text-sm text-primary hover:text-primary-hover"
                 >
                   {showAddTemplate ? 'Cancel' : '+ Add Template'}
                 </button>
@@ -192,24 +205,24 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
               {/* Add Template Form */}
               {showAddTemplate && (
-                <div className="p-4 bg-gray-700/50 rounded space-y-3">
+                <div className="p-4 bg-background-tertiary/50 rounded space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Name</label>
+                      <label className="block text-xs text-foreground-secondary mb-1">Name</label>
                       <input
                         type="text"
                         value={newTemplate.name}
                         onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
                         placeholder="My Tool"
-                        className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                        className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Icon</label>
+                      <label className="block text-xs text-foreground-secondary mb-1">Icon</label>
                       <select
                         value={newTemplate.icon}
                         onChange={(e) => setNewTemplate({ ...newTemplate, icon: e.target.value })}
-                        className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                        className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                       >
                         {ICON_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -220,23 +233,23 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Command</label>
+                    <label className="block text-xs text-foreground-secondary mb-1">Command</label>
                     <input
                       type="text"
                       value={newTemplate.command}
                       onChange={(e) => setNewTemplate({ ...newTemplate, command: e.target.value })}
                       placeholder="/usr/bin/my-tool"
-                      className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Description (optional)</label>
+                    <label className="block text-xs text-foreground-secondary mb-1">Description (optional)</label>
                     <input
                       type="text"
                       value={newTemplate.description}
                       onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
                       placeholder="What does this tool do?"
-                      className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -245,19 +258,19 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                       id="exitOnClose"
                       checked={newTemplate.exitOnClose}
                       onChange={(e) => setNewTemplate({ ...newTemplate, exitOnClose: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600"
+                      className="w-4 h-4 rounded border-border-secondary bg-background-tertiary text-primary"
                     />
-                    <label htmlFor="exitOnClose" className="text-sm text-gray-300">
+                    <label htmlFor="exitOnClose" className="text-sm text-foreground">
                       Exit on close
                     </label>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-foreground-tertiary">
                       (close tab when command exits)
                     </span>
                   </div>
                   <button
                     onClick={handleAddTemplate}
                     disabled={!newTemplate.name || !newTemplate.command}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-sm text-white"
+                    className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-sm text-primary-foreground"
                   >
                     Add Template
                   </button>
@@ -266,38 +279,38 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
               {/* Templates List */}
               {templatesLoading && templates.length === 0 ? (
-                <div className="text-gray-500 text-sm py-4">Loading templates...</div>
+                <div className="text-foreground-tertiary text-sm py-4">Loading templates...</div>
               ) : (
                 <div className="space-y-2">
                   {templates.map((template) => (
                     <div
                       key={template.id}
-                      className="flex items-center gap-3 p-3 bg-gray-700/30 rounded group"
+                      className="flex items-center gap-3 p-3 bg-background-tertiary/30 rounded group"
                     >
                       <span className="text-xl">{getIconEmoji(template.icon)}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-white font-medium">{template.name}</span>
+                          <span className="text-sm text-foreground font-medium">{template.name}</span>
                           {template.isBuiltIn && (
-                            <span className="text-xs px-1.5 py-0.5 bg-gray-600 text-gray-400 rounded">
+                            <span className="text-xs px-1.5 py-0.5 bg-background-input text-foreground-secondary rounded">
                               built-in
                             </span>
                           )}
                           {template.exitOnClose && (
-                            <span className="text-xs px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded">
+                            <span className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary rounded">
                               exit on close
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-gray-500 truncate">{template.command}</div>
+                        <div className="text-xs text-foreground-tertiary truncate">{template.command}</div>
                         {template.description && (
-                          <div className="text-xs text-gray-400 mt-0.5">{template.description}</div>
+                          <div className="text-xs text-foreground-secondary mt-0.5">{template.description}</div>
                         )}
                       </div>
                       {!template.isBuiltIn && (
                         <button
                           onClick={() => handleDeleteTemplate(template)}
-                          className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-2"
+                          className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-2"
                         >
                           &times;
                         </button>
@@ -313,12 +326,12 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
           {activeTab === 'ssh-keys' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-foreground-secondary">
                   Manage SSH keys for Git repository authentication.
                 </p>
                 <button
                   onClick={() => setShowAddKey(!showAddKey)}
-                  className="text-sm text-blue-400 hover:text-blue-300"
+                  className="text-sm text-primary hover:text-primary-hover"
                 >
                   {showAddKey ? 'Cancel' : '+ Generate Key'}
                 </button>
@@ -326,22 +339,22 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
               {/* Generate Key Form */}
               {showAddKey && (
-                <div className="p-4 bg-gray-700/50 rounded space-y-3">
+                <div className="p-4 bg-background-tertiary/50 rounded space-y-3">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Key Name</label>
+                    <label className="block text-xs text-foreground-secondary mb-1">Key Name</label>
                     <input
                       type="text"
                       value={newKeyName}
                       onChange={(e) => setNewKeyName(e.target.value)}
                       placeholder="github-key"
-                      className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                     />
                   </div>
                   <div className="flex items-center gap-3">
                     <select
                       value={keyType}
                       onChange={(e) => setKeyType(e.target.value as 'ed25519' | 'rsa' | 'ecdsa')}
-                      className="px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                      className="px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
                     >
                       <option value="ed25519">Ed25519 (recommended)</option>
                       <option value="rsa">RSA 4096</option>
@@ -350,7 +363,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                     <button
                       onClick={handleGenerateKey}
                       disabled={isGenerating || !newKeyName.trim()}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-sm text-white"
+                      className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-sm text-primary-foreground"
                     >
                       {isGenerating ? 'Generating...' : 'Generate'}
                     </button>
@@ -360,61 +373,61 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
               {/* Keys List */}
               {keysLoading && keys.length === 0 ? (
-                <div className="text-gray-500 text-sm py-4">Loading keys...</div>
+                <div className="text-foreground-tertiary text-sm py-4">Loading keys...</div>
               ) : keys.length === 0 ? (
-                <div className="text-gray-500 text-sm py-4">
+                <div className="text-foreground-tertiary text-sm py-4">
                   No SSH keys yet. Generate one to enable SSH cloning.
                 </div>
               ) : (
                 <div className="space-y-2">
                   {keys.map((key) => (
-                    <div key={key.id} className="bg-gray-700/30 rounded">
+                    <div key={key.id} className="bg-background-tertiary/30 rounded">
                       <div
                         onClick={() => setExpandedKey(expandedKey === key.id ? null : key.id)}
                         className="flex items-center gap-3 p-3 cursor-pointer group"
                       >
-                        <span className="text-yellow-400">{'\u{1F511}'}</span>
+                        <span className="text-warning">{'\u{1F511}'}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-white font-medium">{key.name}</span>
+                            <span className="text-sm text-foreground font-medium">{key.name}</span>
                             {key.isDefault && (
-                              <span className="text-xs px-1.5 py-0.5 bg-green-600/20 text-green-400 rounded">
+                              <span className="text-xs px-1.5 py-0.5 bg-success/20 text-success rounded">
                                 default
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-gray-500">{key.keyType} &bull; {key.fingerprint}</div>
+                          <div className="text-xs text-foreground-tertiary">{key.keyType} &bull; {key.fingerprint}</div>
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteKey(key); }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-2"
+                          className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-2"
                         >
                           &times;
                         </button>
                       </div>
 
                       {expandedKey === key.id && (
-                        <div className="px-3 pb-3 pt-1 border-t border-gray-700/50">
+                        <div className="px-3 pb-3 pt-1 border-t border-border/50">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-gray-400">Public Key</span>
+                            <span className="text-xs text-foreground-secondary">Public Key</span>
                             <div className="flex gap-2">
                               {!key.isDefault && (
                                 <button
                                   onClick={() => setDefaultKey(key.id)}
-                                  className="text-xs text-blue-400 hover:text-blue-300"
+                                  className="text-xs text-primary hover:text-primary-hover"
                                 >
                                   Set Default
                                 </button>
                               )}
                               <button
                                 onClick={() => handleCopyPublicKey(key)}
-                                className="text-xs text-blue-400 hover:text-blue-300"
+                                className="text-xs text-primary hover:text-primary-hover"
                               >
                                 {copiedId === key.id ? 'Copied!' : 'Copy'}
                               </button>
                             </div>
                           </div>
-                          <div className="font-mono text-xs text-gray-300 break-all bg-gray-900/50 p-2 rounded max-h-20 overflow-y-auto">
+                          <div className="font-mono text-xs text-foreground break-all bg-background/50 p-2 rounded max-h-20 overflow-y-auto">
                             {key.publicKey}
                           </div>
                         </div>
@@ -436,10 +449,10 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700 flex justify-end">
+        <div className="p-4 border-t border-border flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white"
+            className="px-4 py-2 bg-background-tertiary hover:bg-background-input rounded text-foreground"
           >
             Close
           </button>

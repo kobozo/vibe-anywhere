@@ -28,13 +28,13 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Session Hub</h1>
-          <p className="text-gray-400 mt-2">Claude Code Manager</p>
+          <h1 className="text-2xl font-bold text-foreground">Session Hub</h1>
+          <p className="text-foreground-secondary mt-2">Claude Code Manager</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-lg p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-background-secondary rounded-lg p-6 space-y-4">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
               Username
             </label>
             <input
@@ -42,14 +42,14 @@ export function LoginForm() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-secondary focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Enter username"
               autoFocus
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
               Password
             </label>
             <input
@@ -57,25 +57,25 @@ export function LoginForm() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-secondary focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Enter password"
             />
           </div>
 
           {error && (
-            <div className="text-sm text-red-400 bg-red-400/10 px-3 py-2 rounded">{error}</div>
+            <div className="text-sm text-error bg-error/10 px-3 py-2 rounded">{error}</div>
           )}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-medium transition-colors disabled:opacity-50"
+            className="w-full py-2 bg-primary hover:bg-primary-hover rounded text-foreground font-medium transition-colors disabled:opacity-50"
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-foreground-tertiary mt-4">
           First time? Create a user with the CLI or database.
         </p>
       </div>

@@ -120,13 +120,13 @@ export function WorkspaceInfoPanel({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4"
+        className="bg-background-secondary rounded-lg shadow-xl w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">{workspace.name}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-foreground">{workspace.name}</h3>
+          <button onClick={onClose} className="text-foreground-secondary hover:text-foreground">
             &times;
           </button>
         </div>
@@ -135,37 +135,37 @@ export function WorkspaceInfoPanel({
         <div className="p-4 space-y-4">
           {/* Workspace Info */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-400">Workspace</h4>
+            <h4 className="text-sm font-medium text-foreground-secondary">Workspace</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <span className="text-gray-400">Branch:</span>
-              <span className="text-gray-200">{workspace.branchName}</span>
-              <span className="text-gray-400">Status:</span>
-              <span className="text-gray-200">{workspace.status}</span>
+              <span className="text-foreground-secondary">Branch:</span>
+              <span className="text-foreground">{workspace.branchName}</span>
+              <span className="text-foreground-secondary">Status:</span>
+              <span className="text-foreground">{workspace.status}</span>
             </div>
           </div>
 
           {/* Container Info */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-400">Container</h4>
+            <h4 className="text-sm font-medium text-foreground-secondary">Container</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <span className="text-gray-400">Status:</span>
+              <span className="text-foreground-secondary">Status:</span>
               <span className={`${
-                workspace.containerStatus === 'running' ? 'text-green-400' :
-                workspace.containerStatus === 'exited' || workspace.containerStatus === 'dead' ? 'text-red-400' :
-                'text-gray-200'
+                workspace.containerStatus === 'running' ? 'text-success' :
+                workspace.containerStatus === 'exited' || workspace.containerStatus === 'dead' ? 'text-error' :
+                'text-foreground'
               }`}>
                 {workspace.containerStatus || 'none'}
               </span>
               {workspace.containerId && (
                 <>
-                  <span className="text-gray-400">ID:</span>
-                  <span className="text-gray-200 font-mono text-xs">{workspace.containerId}</span>
+                  <span className="text-foreground-secondary">ID:</span>
+                  <span className="text-foreground font-mono text-xs">{workspace.containerId}</span>
                 </>
               )}
               {workspace.containerIp && (
                 <>
-                  <span className="text-gray-400">IP:</span>
-                  <span className="text-gray-200 font-mono">{workspace.containerIp}</span>
+                  <span className="text-foreground-secondary">IP:</span>
+                  <span className="text-foreground font-mono">{workspace.containerIp}</span>
                 </>
               )}
             </div>
@@ -173,66 +173,66 @@ export function WorkspaceInfoPanel({
 
           {/* Template Info */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-400">Template</h4>
+            <h4 className="text-sm font-medium text-foreground-secondary">Template</h4>
             {templateLoading ? (
-              <div className="text-sm text-gray-400">Loading...</div>
+              <div className="text-sm text-foreground-secondary">Loading...</div>
             ) : templateInfo ? (
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <span className="text-gray-400">Name:</span>
-                <span className="text-gray-200">{templateInfo.name}</span>
+                <span className="text-foreground-secondary">Name:</span>
+                <span className="text-foreground">{templateInfo.name}</span>
                 {templateInfo.vmid && (
                   <>
-                    <span className="text-gray-400">VMID:</span>
-                    <span className="text-gray-200 font-mono">{templateInfo.vmid}</span>
+                    <span className="text-foreground-secondary">VMID:</span>
+                    <span className="text-foreground font-mono">{templateInfo.vmid}</span>
                   </>
                 )}
-                <span className="text-gray-400">Status:</span>
+                <span className="text-foreground-secondary">Status:</span>
                 <span className={`${
-                  templateInfo.status === 'ready' ? 'text-green-400' :
-                  templateInfo.status === 'error' ? 'text-red-400' :
-                  'text-yellow-400'
+                  templateInfo.status === 'ready' ? 'text-success' :
+                  templateInfo.status === 'error' ? 'text-error' :
+                  'text-warning'
                 }`}>
                   {templateInfo.status}
                 </span>
                 {(templateInfo.techStacks.length > 0 || templateInfo.inheritedTechStacks.length > 0) && (
                   <>
-                    <span className="text-gray-400">Tech stacks:</span>
-                    <span className="text-gray-200">
+                    <span className="text-foreground-secondary">Tech stacks:</span>
+                    <span className="text-foreground">
                       {[...templateInfo.inheritedTechStacks, ...templateInfo.techStacks].join(', ')}
                     </span>
                   </>
                 )}
               </div>
             ) : (
-              <div className="text-sm text-gray-400">No template assigned</div>
+              <div className="text-sm text-foreground-secondary">No template assigned</div>
             )}
           </div>
 
           {/* Agent Info */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-400">Agent</h4>
+            <h4 className="text-sm font-medium text-foreground-secondary">Agent</h4>
             {loading ? (
-              <div className="text-sm text-gray-400">Loading...</div>
+              <div className="text-sm text-foreground-secondary">Loading...</div>
             ) : agentInfo ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-gray-400">Connected:</span>
-                  <span className={agentInfo.connected ? 'text-green-400' : 'text-red-400'}>
+                  <span className="text-foreground-secondary">Connected:</span>
+                  <span className={agentInfo.connected ? 'text-success' : 'text-error'}>
                     {agentInfo.connected ? 'Yes' : 'No'}
                   </span>
-                  <span className="text-gray-400">Version:</span>
-                  <span className="text-gray-200">
+                  <span className="text-foreground-secondary">Version:</span>
+                  <span className="text-foreground">
                     {agentInfo.currentVersion || 'Unknown'}
                     {agentInfo.updateAvailable && (
-                      <span className="ml-2 text-yellow-400 text-xs">
+                      <span className="ml-2 text-warning text-xs">
                         (v{agentInfo.expectedVersion} available)
                       </span>
                     )}
                   </span>
                   {agentInfo.connected && (
                     <>
-                      <span className="text-gray-400">Tabs:</span>
-                      <span className="text-gray-200">{agentInfo.tabCount}</span>
+                      <span className="text-foreground-secondary">Tabs:</span>
+                      <span className="text-foreground">{agentInfo.tabCount}</span>
                     </>
                   )}
                 </div>
@@ -248,12 +248,12 @@ export function WorkspaceInfoPanel({
                       {updating ? 'Updating...' : `Update Agent to v${agentInfo.expectedVersion}`}
                     </button>
                     {!agentInfo.connected && (
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="mt-1 text-xs text-foreground-secondary">
                         Will push update via SSH and restart service
                       </p>
                     )}
                     {updateMessage && (
-                      <p className={`mt-2 text-xs ${updateMessage.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+                      <p className={`mt-2 text-xs ${updateMessage.startsWith('Error') ? 'text-error' : 'text-success'}`}>
                         {updateMessage}
                       </p>
                     )}
@@ -261,24 +261,24 @@ export function WorkspaceInfoPanel({
                 )}
               </div>
             ) : (
-              <div className="text-sm text-gray-400">No agent info available</div>
+              <div className="text-sm text-foreground-secondary">No agent info available</div>
             )}
           </div>
         </div>
 
         {/* Actions */}
-        <div className="px-4 py-3 border-t border-gray-700 space-y-2">
+        <div className="px-4 py-3 border-t border-border space-y-2">
           {hasContainer && (
             <>
               <button
                 onClick={() => { onRestart(); onClose(); }}
-                className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors flex items-center justify-center gap-2"
+                className="w-full px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors flex items-center justify-center gap-2"
               >
                 <span>Restart Container</span>
               </button>
               <button
                 onClick={() => { onDestroy(); onClose(); }}
-                className="w-full px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-white transition-colors flex items-center justify-center gap-2"
+                className="w-full px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-foreground transition-colors flex items-center justify-center gap-2"
               >
                 <span>Destroy Container</span>
               </button>
@@ -286,7 +286,7 @@ export function WorkspaceInfoPanel({
           )}
           <button
             onClick={() => { onDelete(); onClose(); }}
-            className="w-full px-3 py-2 bg-red-600 hover:bg-red-500 rounded text-sm text-white transition-colors flex items-center justify-center gap-2"
+            className="w-full px-3 py-2 bg-error hover:bg-error/80 rounded text-sm text-foreground transition-colors flex items-center justify-center gap-2"
           >
             <span>Delete Workspace</span>
           </button>

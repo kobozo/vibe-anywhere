@@ -49,9 +49,9 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   const confirmButtonClass = {
-    danger: 'bg-red-600 hover:bg-red-500',
-    warning: 'bg-orange-600 hover:bg-orange-500',
-    default: 'bg-blue-600 hover:bg-blue-500',
+    danger: 'bg-error hover:bg-error/80',
+    warning: 'bg-warning hover:bg-warning/80',
+    default: 'bg-primary hover:bg-primary-hover',
   }[confirmVariant];
 
   return (
@@ -66,23 +66,23 @@ export function ConfirmDialog({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+        className="relative bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
       >
-        <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-        <p className="text-gray-300 mb-6">{message}</p>
+        <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
+        <p className="text-foreground mb-6">{message}</p>
 
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-background-tertiary hover:bg-background-input text-foreground rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmButtonClass}`}
+            className={`px-4 py-2 text-foreground rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmButtonClass}`}
           >
             {isLoading ? 'Loading...' : confirmLabel}
           </button>

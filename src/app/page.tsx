@@ -28,7 +28,7 @@ const Terminal = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full flex items-center justify-center text-gray-500">
+      <div className="h-full flex items-center justify-center text-foreground-tertiary">
         Loading terminal...
       </div>
     )
@@ -450,7 +450,7 @@ function Dashboard() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-400">Loading...</div>
+        <div className="text-foreground-secondary">Loading...</div>
       </div>
     );
   }
@@ -462,35 +462,35 @@ function Dashboard() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="h-14 flex-shrink-0 border-b border-gray-700 flex items-center justify-between px-4">
+      <header className="h-14 flex-shrink-0 border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-white">Session Hub</h1>
+          <h1 className="text-lg font-bold text-foreground">Session Hub</h1>
           {selectedRepository && (
             <>
-              <span className="text-gray-500">/</span>
-              <span className="text-gray-300">{selectedRepository.name}</span>
+              <span className="text-foreground-tertiary">/</span>
+              <span className="text-foreground">{selectedRepository.name}</span>
             </>
           )}
           {selectedWorkspace && (
             <>
-              <span className="text-gray-500">/</span>
-              <span className="text-blue-400">{selectedWorkspace.name}</span>
-              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded">
+              <span className="text-foreground-tertiary">/</span>
+              <span className="text-primary">{selectedWorkspace.name}</span>
+              <span className="text-xs text-foreground-tertiary bg-background-tertiary px-2 py-0.5 rounded">
                 {selectedWorkspace.branchName}
               </span>
             </>
           )}
           {selectedTab && isTerminalConnected && (
-            <span className="px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded">
+            <span className="px-2 py-0.5 text-xs bg-success/20 text-success rounded">
               Connected
             </span>
           )}
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-400">{user?.username}</span>
+          <span className="text-sm text-foreground-secondary">{user?.username}</span>
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-foreground-secondary hover:text-foreground transition-colors"
             title="Settings"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -500,7 +500,7 @@ function Dashboard() {
           </button>
           <button
             onClick={logout}
-            className="text-sm text-gray-400 hover:text-white transition-colors"
+            className="text-sm text-foreground-secondary hover:text-foreground transition-colors"
           >
             Logout
           </button>
@@ -510,7 +510,7 @@ function Dashboard() {
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Sidebar - Repository tree + Templates */}
-        <aside className="w-72 border-r border-gray-700 flex-shrink-0 overflow-hidden flex flex-col">
+        <aside className="w-72 border-r border-border flex-shrink-0 overflow-hidden flex flex-col">
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <RepositoryTree
               onSelectWorkspace={handleSelectWorkspace}
@@ -579,7 +579,7 @@ function Dashboard() {
                     }}
                   />
                 ) : selectedTab ? (
-                  <div className="h-full flex items-center justify-center text-gray-500">
+                  <div className="h-full flex items-center justify-center text-foreground-tertiary">
                     <div className="text-center">
                       <p className="text-lg">Tab is {selectedTab.status}</p>
                       <p className="text-sm mt-2">
@@ -592,7 +592,7 @@ function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-gray-500">
+                  <div className="h-full flex items-center justify-center text-foreground-tertiary">
                     <div className="text-center">
                       <p className="text-lg">No tab selected</p>
                       <p className="text-sm mt-2">
@@ -607,7 +607,7 @@ function Dashboard() {
             // Show repository dashboard when repo is selected but no workspace
             <RepositoryDashboard repository={selectedRepository} />
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-foreground-tertiary">
               <div className="text-center">
                 <p className="text-lg">No repository selected</p>
                 <p className="text-sm mt-2">

@@ -34,7 +34,7 @@ export function GitPanel({ workspaceId }: GitPanelProps) {
   } = useGitPanel({ workspaceId });
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 text-gray-100 overflow-hidden">
+    <div className="h-full flex flex-col bg-background text-foreground overflow-hidden">
       {/* Header */}
       <GitStatusHeader
         branch={status?.branch}
@@ -48,11 +48,11 @@ export function GitPanel({ workspaceId }: GitPanelProps) {
 
       {/* Error display */}
       {error && (
-        <div className="px-4 py-2 bg-red-900/30 border-b border-red-800/50 flex items-center justify-between">
-          <span className="text-red-400 text-sm">{error}</span>
+        <div className="px-4 py-2 bg-error/30 border-b border-error/50 flex items-center justify-between">
+          <span className="text-error text-sm">{error}</span>
           <button
             onClick={clearError}
-            className="text-red-400 hover:text-red-300 text-sm"
+            className="text-error hover:text-error/80 text-sm"
           >
             Dismiss
           </button>
@@ -62,7 +62,7 @@ export function GitPanel({ workspaceId }: GitPanelProps) {
       {/* Main content */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* File list panel */}
-        <div className="w-80 flex-shrink-0 border-r border-gray-700 overflow-y-auto">
+        <div className="w-80 flex-shrink-0 border-r border-border overflow-y-auto">
           <FileList
             staged={status?.staged ?? []}
             unstaged={status?.unstaged ?? []}
@@ -91,7 +91,7 @@ export function GitPanel({ workspaceId }: GitPanelProps) {
           </div>
 
           {/* Commit form */}
-          <div className="border-t border-gray-700">
+          <div className="border-t border-border">
             <CommitForm
               stagedCount={status?.staged.length ?? 0}
               onCommit={commit}

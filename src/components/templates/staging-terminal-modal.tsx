@@ -204,14 +204,14 @@ export function StagingTerminalModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-[90vw] h-[85vh] flex flex-col max-w-6xl">
+      <div className="bg-background-secondary rounded-lg w-[90vw] h-[85vh] flex flex-col max-w-6xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-foreground">
               Staging: {template.name}
             </h2>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-foreground-secondary">
               {template.stagingContainerIp ? (
                 <>Connected to {template.stagingContainerIp} (VMID: {template.vmid})</>
               ) : (
@@ -223,15 +223,15 @@ export function StagingTerminalModal({
             <div className="flex items-center gap-2">
               <span
                 className={`w-2 h-2 rounded-full ${
-                  isAttached ? 'bg-green-500' : isConnected ? 'bg-yellow-500' : 'bg-red-500'
+                  isAttached ? 'bg-success' : isConnected ? 'bg-warning' : 'bg-error'
                 }`}
               />
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-foreground-secondary">
                 {isAttached ? 'Connected' : isConnected ? 'Connecting...' : 'Disconnected'}
               </span>
             </div>
             {error && (
-              <span className="text-sm text-red-400" title={error.message}>
+              <span className="text-sm text-error" title={error.message}>
                 Error
               </span>
             )}
@@ -244,22 +244,22 @@ export function StagingTerminalModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center p-4 border-t border-gray-700">
-          <div className="text-sm text-gray-400 max-w-xl">
+        <div className="flex justify-between items-center p-4 border-t border-border">
+          <div className="text-sm text-foreground-secondary max-w-xl">
             Make your customizations in the terminal above. When finished, click
             &quot;Finalize Template&quot; to stop the container and convert it to a template.
           </div>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors"
               disabled={finalizing}
             >
               Cancel (Keep Running)
             </button>
             <button
               onClick={handleFinalize}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-success hover:bg-success/80 text-foreground rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={finalizing}
             >
               {finalizing ? 'Finalizing...' : 'Finalize Template'}

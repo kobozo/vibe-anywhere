@@ -32,7 +32,7 @@ export function CommitForm({ stagedCount, onCommit, isCommitting }: CommitFormPr
     <form onSubmit={handleSubmit} className="p-3">
       {/* Last commit info */}
       {lastCommit && (
-        <div className="mb-2 px-2 py-1.5 bg-green-900/20 rounded text-xs text-green-400 flex items-center gap-2">
+        <div className="mb-2 px-2 py-1.5 bg-success/20 rounded text-xs text-success flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
@@ -55,12 +55,12 @@ export function CommitForm({ stagedCount, onCommit, isCommitting }: CommitFormPr
               : `Commit message (${stagedCount} file${stagedCount > 1 ? 's' : ''} staged)`
           }
           disabled={stagedCount === 0 || isCommitting}
-          className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+          className="flex-1 bg-background-secondary border border-border-secondary rounded px-3 py-2 text-sm text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!canCommit}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded text-sm font-medium transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-success hover:bg-success/80 disabled:bg-background-tertiary disabled:text-foreground-tertiary text-success-foreground rounded text-sm font-medium transition-colors flex items-center gap-2"
         >
           {isCommitting ? (
             <>

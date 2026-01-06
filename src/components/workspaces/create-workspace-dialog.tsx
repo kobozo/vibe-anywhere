@@ -79,13 +79,13 @@ export function CreateWorkspaceDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-md">
+      <div className="bg-background-secondary rounded-lg w-full max-w-md">
         {/* Header */}
-        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Create Workspace</h2>
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Create Workspace</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white"
+            className="text-foreground-secondary hover:text-foreground"
           >
             ×
           </button>
@@ -94,14 +94,14 @@ export function CreateWorkspaceDialog({
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
-            <div className="p-3 bg-red-600/20 border border-red-600/50 rounded text-red-400 text-sm">
+            <div className="p-3 bg-error/20 border border-error/50 rounded text-error text-sm">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">
-              Workspace Name <span className="text-red-400">*</span>
+            <label className="block text-sm text-foreground mb-1">
+              Workspace Name <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -109,30 +109,30 @@ export function CreateWorkspaceDialog({
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="My Feature"
               required
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-300 mb-2">Branch</label>
+            <label className="block text-sm text-foreground mb-2">Branch</label>
             <div className="flex gap-4 mb-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   checked={branchType === 'new'}
                   onChange={() => setBranchType('new')}
-                  className="text-blue-600"
+                  className="text-primary"
                 />
-                <span className="text-sm text-gray-300">Create new branch</span>
+                <span className="text-sm text-foreground">Create new branch</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   checked={branchType === 'existing'}
                   onChange={() => setBranchType('existing')}
-                  className="text-blue-600"
+                  className="text-primary"
                 />
-                <span className="text-sm text-gray-300">Use existing branch</span>
+                <span className="text-sm text-foreground">Use existing branch</span>
               </label>
             </div>
 
@@ -144,13 +144,13 @@ export function CreateWorkspaceDialog({
                   onChange={(e) => setBranchName(e.target.value)}
                   placeholder="feature/my-feature"
                   required
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 mb-3"
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary mb-3"
                 />
-                <label className="block text-sm text-gray-400 mb-1">Base Branch</label>
+                <label className="block text-sm text-foreground-secondary mb-1">Base Branch</label>
                 <select
                   value={baseBranch}
                   onChange={(e) => setBaseBranch(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
                 >
                   {branches.map((branch) => (
                     <option key={branch} value={branch}>
@@ -163,7 +163,7 @@ export function CreateWorkspaceDialog({
               <select
                 value={baseBranch}
                 onChange={(e) => setBaseBranch(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
               >
                 {branches.map((branch) => (
                   <option key={branch} value={branch}>
@@ -176,11 +176,11 @@ export function CreateWorkspaceDialog({
         </form>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700 flex justify-end gap-3">
+        <div className="p-4 border-t border-border flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors"
             disabled={isLoading}
           >
             Cancel
@@ -188,7 +188,7 @@ export function CreateWorkspaceDialog({
           <button
             onClick={handleSubmit}
             disabled={isLoading || !name || (branchType === 'new' ? !branchName : !baseBranch)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-white transition-colors"
+            className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 disabled:cursor-not-allowed rounded text-foreground transition-colors"
           >
             {isLoading ? 'Creating...' : 'Create Workspace'}
           </button>

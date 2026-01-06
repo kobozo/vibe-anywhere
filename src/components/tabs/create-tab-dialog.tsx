@@ -79,11 +79,11 @@ export function CreateTabDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-md">
+      <div className="bg-background-secondary rounded-lg w-full max-w-md">
         {/* Header */}
-        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">New Tab</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">New Tab</h2>
+          <button onClick={onClose} className="text-foreground-secondary hover:text-foreground text-xl">
             &times;
           </button>
         </div>
@@ -91,16 +91,16 @@ export function CreateTabDialog({
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
-            <div className="p-3 bg-red-600/20 border border-red-600/50 rounded text-red-400 text-sm">
+            <div className="p-3 bg-error/20 border border-error/50 rounded text-error text-sm">
               {error}
             </div>
           )}
 
           {/* Template selection */}
           <div>
-            <label className="block text-sm text-gray-300 mb-2">Tab Type</label>
+            <label className="block text-sm text-foreground mb-2">Tab Type</label>
             {templatesLoading && templates.length === 0 ? (
-              <div className="text-gray-500 text-sm">Loading templates...</div>
+              <div className="text-foreground-tertiary text-sm">Loading templates...</div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {templates.map((template) => (
@@ -115,14 +115,14 @@ export function CreateTabDialog({
                     }}
                     className={`flex items-center gap-3 p-3 rounded border transition-colors text-left
                       ${selectedTemplate?.id === template.id
-                        ? 'border-blue-500 bg-blue-600/20'
-                        : 'border-gray-600 bg-gray-700/50 hover:bg-gray-700'}`}
+                        ? 'border-primary bg-primary/20'
+                        : 'border-border-secondary bg-background-tertiary/50 hover:bg-background-tertiary'}`}
                   >
                     <span className="text-2xl">{getIconEmoji(template.icon)}</span>
                     <div>
-                      <div className="text-sm font-medium text-white">{template.name}</div>
+                      <div className="text-sm font-medium text-foreground">{template.name}</div>
                       {template.description && (
-                        <div className="text-xs text-gray-400">{template.description}</div>
+                        <div className="text-xs text-foreground-secondary">{template.description}</div>
                       )}
                     </div>
                   </button>
@@ -133,30 +133,30 @@ export function CreateTabDialog({
 
           {/* Tab name */}
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Tab Name</label>
+            <label className="block text-sm text-foreground mb-1">Tab Name</label>
             <input
               type="text"
               value={tabName}
               onChange={(e) => setTabName(e.target.value)}
               placeholder={selectedTemplate?.name || 'My Tab'}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+              className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary"
             />
           </div>
 
           {/* Claude-specific options */}
           {isClaude && (
             <div>
-              <label className="block text-sm text-gray-300 mb-1">
-                Claude Arguments <span className="text-gray-500">(optional)</span>
+              <label className="block text-sm text-foreground mb-1">
+                Claude Arguments <span className="text-foreground-tertiary">(optional)</span>
               </label>
               <input
                 type="text"
                 value={claudeArgs}
                 onChange={(e) => setClaudeArgs(e.target.value)}
                 placeholder="--print 'Hello' --dangerously-skip-permissions"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 font-mono text-sm"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary font-mono text-sm"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-foreground-tertiary mt-1">
                 Additional arguments to pass to the Claude CLI
               </p>
             </div>
@@ -165,11 +165,11 @@ export function CreateTabDialog({
         </form>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700 flex justify-end gap-3">
+        <div className="p-4 border-t border-border flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors"
             disabled={isLoading}
           >
             Cancel
@@ -177,7 +177,7 @@ export function CreateTabDialog({
           <button
             onClick={handleSubmit}
             disabled={isLoading || !selectedTemplate}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-white transition-colors"
+            className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 disabled:cursor-not-allowed rounded text-foreground transition-colors"
           >
             {isLoading ? 'Creating...' : 'Create Tab'}
           </button>

@@ -192,21 +192,21 @@ export function TemplateDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-background-secondary rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">
+          <h2 className="text-xl font-semibold text-foreground mb-4">
             {isEditMode ? 'Edit Template' : isCloneMode ? 'Clone Template' : 'Create Template'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Name *</label>
+              <label className="block text-sm text-foreground mb-1">Name *</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
                 placeholder="e.g., Node.js Development"
                 disabled={isLoading}
               />
@@ -214,11 +214,11 @@ export function TemplateDialog({
 
             {/* Description */}
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Description</label>
+              <label className="block text-sm text-foreground mb-1">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500 h-20 resize-none"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary h-20 resize-none"
                 placeholder="Optional description"
                 disabled={isLoading}
               />
@@ -227,11 +227,11 @@ export function TemplateDialog({
             {/* Based on (Parent Template) - only for new templates, not in forced clone mode */}
             {!isEditMode && !isCloneMode && availableParentTemplates.length > 0 && (
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Based on (optional)</label>
+                <label className="block text-sm text-foreground mb-1">Based on (optional)</label>
                 <select
                   value={selectedParentId}
                   onChange={(e) => handleParentChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
                   disabled={isLoading}
                 >
                   <option value="">None - start from scratch</option>
@@ -241,7 +241,7 @@ export function TemplateDialog({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-foreground-tertiary mt-1">
                   Clone from an existing template to inherit its configuration and tech stacks.
                 </p>
               </div>
@@ -252,7 +252,7 @@ export function TemplateDialog({
               <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
                 <div className="text-sm text-purple-300">
                   {isCloneMode ? 'Based on:' : 'Inheriting from:'}{' '}
-                  <span className="text-white font-medium">{effectiveParent.name}</span>
+                  <span className="text-foreground font-medium">{effectiveParent.name}</span>
                 </div>
                 {inheritedStacks.length > 0 && (
                   <div className="text-xs text-purple-400 mt-1">
@@ -264,22 +264,22 @@ export function TemplateDialog({
 
             {/* Tech Stacks with Tabs */}
             <div>
-              <label className="block text-sm text-gray-300 mb-2">
+              <label className="block text-sm text-foreground mb-2">
                 Tech Stacks
                 {isProvisioned && (
-                  <span className="text-gray-500 ml-2">(locked after provisioning)</span>
+                  <span className="text-foreground-tertiary ml-2">(locked after provisioning)</span>
                 )}
               </label>
 
               {/* Tabs */}
-              <div className="flex border-b border-gray-600 mb-3">
+              <div className="flex border-b border-border-secondary mb-3">
                 <button
                   type="button"
                   onClick={() => setActiveTab('runtime')}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'runtime'
-                      ? 'text-blue-400 border-b-2 border-blue-400'
-                      : 'text-gray-400 hover:text-gray-300'
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-foreground-secondary hover:text-foreground'
                   }`}
                 >
                   Dev Tools
@@ -289,8 +289,8 @@ export function TemplateDialog({
                   onClick={() => setActiveTab('ai-assistant')}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
                     activeTab === 'ai-assistant'
-                      ? 'text-blue-400 border-b-2 border-blue-400'
-                      : 'text-gray-400 hover:text-gray-300'
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-foreground-secondary hover:text-foreground'
                   }`}
                 >
                   AI Assistants
@@ -311,13 +311,13 @@ export function TemplateDialog({
                       key={stack.id}
                       className={`relative flex items-start gap-2 p-2 rounded border ${
                         isProvisioned
-                          ? 'border-gray-700 opacity-50 cursor-not-allowed'
+                          ? 'border-border opacity-50 cursor-not-allowed'
                           : isInherited
                           ? 'bg-purple-600/20 border-purple-500 cursor-not-allowed'
                           : isDisabled
-                          ? 'border-gray-600 cursor-not-allowed'
-                          : 'border-gray-600 cursor-pointer hover:border-gray-500'
-                      } ${!isInherited && isSelected ? 'bg-blue-600/20 border-blue-500' : !isInherited && !isProvisioned ? 'bg-gray-700' : ''}`}
+                          ? 'border-border-secondary cursor-not-allowed'
+                          : 'border-border-secondary cursor-pointer hover:border-foreground-tertiary'
+                      } ${!isInherited && isSelected ? 'bg-primary/20 border-primary' : !isInherited && !isProvisioned ? 'bg-background-tertiary' : ''}`}
                     >
                       <input
                         type="checkbox"
@@ -328,7 +328,7 @@ export function TemplateDialog({
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1">
-                          <span className="text-sm text-white truncate">{stack.name}</span>
+                          <span className="text-sm text-foreground truncate">{stack.name}</span>
                           {/* Inherited badge */}
                           {isInherited && (
                             <span className="text-xs text-purple-400 ml-1">(inherited)</span>
@@ -353,14 +353,14 @@ export function TemplateDialog({
                               </svg>
                               {/* Tooltip */}
                               {hoveredLock === stack.id && (
-                                <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-gray-900 text-xs text-gray-200 rounded shadow-lg whitespace-nowrap z-10">
+                                <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-background text-xs text-foreground rounded shadow-lg whitespace-nowrap z-10">
                                   Required by: {lockedByNames.join(', ')}
                                 </div>
                               )}
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-gray-400 truncate">{stack.description}</div>
+                        <div className="text-xs text-foreground-secondary truncate">{stack.description}</div>
                       </div>
                     </label>
                   );
@@ -369,7 +369,7 @@ export function TemplateDialog({
 
               {/* Selection summary */}
               {(techStacks.length > 0 || inheritedStacks.length > 0) && (
-                <div className="mt-2 text-xs text-gray-400 space-y-1">
+                <div className="mt-2 text-xs text-foreground-secondary space-y-1">
                   {inheritedStacks.length > 0 && (
                     <div>
                       <span className="text-purple-400">Inherited:</span>{' '}
@@ -378,7 +378,7 @@ export function TemplateDialog({
                   )}
                   {techStacks.length > 0 && (
                     <div>
-                      <span className="text-blue-400">{isCloneMode ? 'Additional:' : 'Selected:'}</span>{' '}
+                      <span className="text-primary">{isCloneMode ? 'Additional:' : 'Selected:'}</span>{' '}
                       {techStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
                     </div>
                   )}
@@ -396,9 +396,9 @@ export function TemplateDialog({
                   disabled={isLoading}
                   className="w-4 h-4"
                 />
-                <span className="text-sm text-gray-300">Set as default template</span>
+                <span className="text-sm text-foreground">Set as default template</span>
               </label>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-foreground-tertiary mt-1">
                 New repositories will use the default template unless specified otherwise.
               </p>
             </div>
@@ -414,9 +414,9 @@ export function TemplateDialog({
                     disabled={isLoading}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm text-gray-300">Enable staging mode</span>
+                  <span className="text-sm text-foreground">Enable staging mode</span>
                 </label>
-                <p className="text-xs text-gray-500 mt-1 ml-6">
+                <p className="text-xs text-foreground-tertiary mt-1 ml-6">
                   Keep container running after provisioning for manual customization.
                   You can SSH into the container to install additional software before finalizing.
                 </p>
@@ -425,23 +425,23 @@ export function TemplateDialog({
 
             {/* Template Status Info */}
             {isEditMode && template && (
-              <div className="bg-gray-700/50 rounded p-3 text-sm">
-                <div className="text-gray-400">Status: <span className="text-white capitalize">{template.status}</span></div>
+              <div className="bg-background-tertiary/50 rounded p-3 text-sm">
+                <div className="text-foreground-secondary">Status: <span className="text-foreground capitalize">{template.status}</span></div>
                 {template.vmid && (
-                  <div className="text-gray-400">VMID: <span className="text-white">{template.vmid}</span></div>
+                  <div className="text-foreground-secondary">VMID: <span className="text-foreground">{template.vmid}</span></div>
                 )}
                 {template.node && (
-                  <div className="text-gray-400">Node: <span className="text-white">{template.node}</span></div>
+                  <div className="text-foreground-secondary">Node: <span className="text-foreground">{template.node}</span></div>
                 )}
                 {template.errorMessage && (
-                  <div className="text-red-400 mt-2">Error: {template.errorMessage}</div>
+                  <div className="text-error mt-2">Error: {template.errorMessage}</div>
                 )}
               </div>
             )}
 
             {/* Error */}
             {error && (
-              <div className="text-red-400 text-sm">{error}</div>
+              <div className="text-error text-sm">{error}</div>
             )}
 
             {/* Actions */}
@@ -449,14 +449,14 @@ export function TemplateDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                className="px-4 py-2 text-foreground hover:text-foreground transition-colors"
                 disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-foreground rounded transition-colors disabled:opacity-50"
                 disabled={isLoading}
               >
                 {isLoading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Template'}

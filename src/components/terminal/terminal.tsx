@@ -6,6 +6,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/lib/theme';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalProps {
@@ -21,6 +22,7 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
   const [isAttached, setIsAttached] = useState(false);
   const attachedTabIdRef = useRef<string | null>(null);
   const { token } = useAuth();
+  const { theme } = useTheme();
 
   const handleConnect = useCallback(() => {
     onConnectionChange?.(true);
@@ -58,29 +60,7 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
       cursorBlink: true,
       fontSize: 14,
       fontFamily: 'JetBrains Mono, Fira Code, monospace',
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#aeafad',
-        cursorAccent: '#000000',
-        selectionBackground: '#264f78',
-        black: '#1e1e1e',
-        red: '#f44747',
-        green: '#6a9955',
-        yellow: '#dcdcaa',
-        blue: '#569cd6',
-        magenta: '#c586c0',
-        cyan: '#4ec9b0',
-        white: '#d4d4d4',
-        brightBlack: '#808080',
-        brightRed: '#f44747',
-        brightGreen: '#6a9955',
-        brightYellow: '#dcdcaa',
-        brightBlue: '#569cd6',
-        brightMagenta: '#c586c0',
-        brightCyan: '#4ec9b0',
-        brightWhite: '#ffffff',
-      },
+      theme: theme.terminal,
       allowTransparency: false,
       scrollback: 10000,
     });
@@ -115,7 +95,17 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
       xtermRef.current = null;
       fitAddonRef.current = null;
     };
+  // Note: We don't include theme in deps to avoid recreating terminal on theme change
+  // Theme updates are handled separately below
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeFit]);
+
+  // Update terminal theme when app theme changes
+  useEffect(() => {
+    if (xtermRef.current) {
+      xtermRef.current.options.theme = theme.terminal;
+    }
+  }, [theme]);
 
   // Handle socket events
   useEffect(() => {
@@ -327,7 +317,10 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
   }, [error]);
 
   return (
-    <div className="h-full w-full min-h-0 bg-[#1e1e1e] rounded-lg overflow-hidden flex flex-col">
+    <div
+      className="h-full w-full min-h-0 rounded-lg overflow-hidden flex flex-col"
+      style={{ backgroundColor: theme.terminal.background }}
+    >
       <div ref={terminalRef} className="flex-1 min-h-0" />
     </div>
   );

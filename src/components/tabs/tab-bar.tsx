@@ -153,30 +153,30 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running':
-        return 'bg-green-500';
+        return 'bg-success';
       case 'starting':
-        return 'bg-yellow-500 animate-pulse';
+        return 'bg-warning animate-pulse';
       case 'pending':
       case 'stopped':
-        return 'bg-gray-500';
+        return 'bg-foreground-tertiary';
       case 'error':
-        return 'bg-red-500';
+        return 'bg-error';
       default:
-        return 'bg-gray-500';
+        return 'bg-foreground-tertiary';
     }
   };
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-gray-800 border-b border-gray-700 overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1 bg-background-secondary border-b border-border overflow-x-auto">
       {agentUpdating && (
-        <span className="text-yellow-400 text-sm px-2 flex items-center gap-1">
+        <span className="text-warning text-sm px-2 flex items-center gap-1">
           <span className="animate-spin">⟳</span>
           Agent updating...
         </span>
       )}
 
       {isLoading && tabs.length === 0 && !agentUpdating && (
-        <span className="text-gray-500 text-sm px-2">Loading tabs...</span>
+        <span className="text-foreground-tertiary text-sm px-2">Loading tabs...</span>
       )}
 
       {tabs.map((tab) => (
@@ -194,13 +194,13 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
           }}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-t cursor-pointer group
             ${selectedTabId === tab.id
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+              ? 'bg-background text-foreground'
+              : 'bg-background-tertiary/50 text-foreground-secondary hover:bg-background-tertiary hover:text-foreground'
             }`}
         >
           {/* Git icon for git tabs */}
           {tab.tabType === 'git' ? (
-            <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3-3 3 3m0 6l-3 3-3-3" />
             </svg>
           ) : (
@@ -212,7 +212,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
           ) : !tab.isPinned && (
             <button
               onClick={(e) => handleDeleteTabClick(e, tab)}
-              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 ml-1"
+              className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error ml-1"
             >
               ×
             </button>
@@ -249,7 +249,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
       {/* New tab button */}
       <button
         onClick={() => setIsCreateDialogOpen(true)}
-        className="px-2 py-1 text-gray-500 hover:text-gray-300 text-sm"
+        className="px-2 py-1 text-foreground-tertiary hover:text-foreground text-sm"
         title="New tab"
       >
         + New Tab

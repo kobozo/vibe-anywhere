@@ -21,16 +21,16 @@ export function TemplateSection({
   const getStatusIcon = (template: ProxmoxTemplate) => {
     switch (template.status) {
       case 'ready':
-        return <span className="text-green-400">&#x2713;</span>;
+        return <span className="text-success">&#x2713;</span>;
       case 'provisioning':
-        return <span className="animate-spin text-yellow-400">&#x21BB;</span>;
+        return <span className="animate-spin text-warning">&#x21BB;</span>;
       case 'staging':
-        return <span className="text-blue-400">&#x25A0;</span>;
+        return <span className="text-primary">&#x25A0;</span>;
       case 'error':
-        return <span className="text-red-400">&#x2717;</span>;
+        return <span className="text-error">&#x2717;</span>;
       case 'pending':
       default:
-        return <span className="text-gray-400">&#x25CB;</span>;
+        return <span className="text-foreground-secondary">&#x25CB;</span>;
     }
   };
 
@@ -45,30 +45,30 @@ export function TemplateSection({
       case 'error':
         return 'border-l-2 border-l-red-500/50 bg-red-500/5';
       default:
-        return 'border-l-2 border-l-gray-500/30';
+        return 'border-l-2 border-l-foreground-tertiary/30';
     }
   };
 
   return (
-    <div className="border-t border-gray-700">
+    <div className="border-t border-border">
       {/* Header */}
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 text-white hover:text-gray-300"
+            className="flex items-center gap-2 text-foreground hover:text-foreground"
           >
-            <span className="text-gray-400 text-xs w-4">
+            <span className="text-foreground-secondary text-xs w-4">
               {isExpanded ? '▾' : '▸'}
             </span>
             <h2 className="text-lg font-semibold">Templates</h2>
-            <span className="text-xs text-gray-500 ml-1">
+            <span className="text-xs text-foreground-tertiary ml-1">
               ({templates.length})
             </span>
           </button>
           <button
             onClick={onAddTemplate}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors"
+            className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors"
           >
             + Add
           </button>
@@ -79,11 +79,11 @@ export function TemplateSection({
       {isExpanded && (
         <div className="p-2 max-h-64 overflow-y-auto">
           {isLoading && templates.length === 0 && (
-            <div className="text-center text-gray-400 py-4">Loading templates...</div>
+            <div className="text-center text-foreground-secondary py-4">Loading templates...</div>
           )}
 
           {!isLoading && templates.length === 0 && (
-            <div className="text-center text-gray-400 py-4">
+            <div className="text-center text-foreground-secondary py-4">
               <p>No templates yet.</p>
               <p className="text-sm mt-1">Add a template to get started.</p>
             </div>
@@ -93,7 +93,7 @@ export function TemplateSection({
             <div
               key={template.id}
               onClick={() => onSelectTemplate(template)}
-              className={`flex items-center gap-2 px-2 py-2 rounded cursor-pointer hover:bg-gray-700/50 ${getStatusBorder(template)}`}
+              className={`flex items-center gap-2 px-2 py-2 rounded cursor-pointer hover:bg-background-tertiary/50 ${getStatusBorder(template)}`}
             >
               <span className="text-sm w-5 flex justify-center">
                 {getStatusIcon(template)}
@@ -102,7 +102,7 @@ export function TemplateSection({
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-200 truncate">{template.name}</span>
                   {template.isDefault && (
-                    <span className="text-xs bg-blue-600/30 text-blue-400 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-primary/30 text-primary px-1.5 py-0.5 rounded">
                       Default
                     </span>
                   )}
@@ -110,11 +110,11 @@ export function TemplateSection({
                 <div className="flex items-center gap-2 mt-0.5">
                   {/* Status text */}
                   <span className={`text-xs ${
-                    template.status === 'ready' ? 'text-green-400/70' :
-                    template.status === 'provisioning' ? 'text-yellow-400/70' :
-                    template.status === 'staging' ? 'text-blue-400/70' :
-                    template.status === 'error' ? 'text-red-400/70' :
-                    'text-gray-500'
+                    template.status === 'ready' ? 'text-success/70' :
+                    template.status === 'provisioning' ? 'text-warning/70' :
+                    template.status === 'staging' ? 'text-primary/70' :
+                    template.status === 'error' ? 'text-error/70' :
+                    'text-foreground-tertiary'
                   }`}>
                     {template.status === 'ready' && template.vmid ? `VMID: ${template.vmid}` :
                      template.status === 'provisioning' ? 'Provisioning...' :
@@ -129,13 +129,13 @@ export function TemplateSection({
                     {(template.techStacks as string[]).slice(0, 3).map((stack) => (
                       <span
                         key={stack}
-                        className="text-xs bg-gray-700 text-gray-400 px-1 py-0.5 rounded"
+                        className="text-xs bg-background-tertiary text-foreground-secondary px-1 py-0.5 rounded"
                       >
                         {stack}
                       </span>
                     ))}
                     {template.techStacks.length > 3 && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-foreground-tertiary">
                         +{template.techStacks.length - 3}
                       </span>
                     )}
@@ -143,7 +143,7 @@ export function TemplateSection({
                 )}
               </div>
               {/* Click indicator */}
-              <span className="text-gray-500 text-xs">
+              <span className="text-foreground-tertiary text-xs">
                 &#x276F;
               </span>
             </div>

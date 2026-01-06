@@ -284,12 +284,12 @@ export function RepositoryTree({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Repositories</h2>
+          <h2 className="text-lg font-semibold text-foreground">Repositories</h2>
           <button
             onClick={onAddRepository}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors"
+            className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-primary-foreground transition-colors"
           >
             + Add
           </button>
@@ -298,17 +298,17 @@ export function RepositoryTree({
 
       <div className="flex-1 overflow-y-auto p-2">
         {isLoading && repositories.length === 0 && (
-          <div className="text-center text-gray-400 py-8">Loading repositories...</div>
+          <div className="text-center text-foreground-secondary py-8">Loading repositories...</div>
         )}
 
         {error && (
-          <div className="text-center text-red-400 py-4">
+          <div className="text-center text-error py-4">
             Failed to load repositories: {error.message}
           </div>
         )}
 
         {!isLoading && repositories.length === 0 && (
-          <div className="text-center text-gray-400 py-8">
+          <div className="text-center text-foreground-secondary py-8">
             <p>No repositories yet.</p>
             <p className="text-sm mt-2">Add a repository to get started.</p>
           </div>
@@ -323,16 +323,16 @@ export function RepositoryTree({
                 onSelectWorkspace(null, repo);
               }}
               className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
-                hover:bg-gray-700/50 ${
+                hover:bg-background-tertiary/50 ${
                   selectedRepositoryId === repo.id && !selectedWorkspaceId
-                    ? 'bg-blue-600/20 ring-1 ring-blue-500/30'
+                    ? 'bg-primary/20 ring-1 ring-primary/30'
                     : expandedRepos.has(repo.id)
-                    ? 'bg-gray-700/30'
+                    ? 'bg-background-tertiary/30'
                     : ''
                 }`}
             >
               <span
-                className="text-gray-400 text-xs w-4 hover:text-white"
+                className="text-foreground-secondary text-xs w-4 hover:text-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleRepo(repo.id);
@@ -340,13 +340,13 @@ export function RepositoryTree({
               >
                 {expandedRepos.has(repo.id) ? '▾' : '▸'}
               </span>
-              <span className="text-yellow-400 text-sm">📁</span>
+              <span className="text-warning text-sm">📁</span>
               <span className={`flex-1 text-sm truncate ${
                 selectedRepositoryId === repo.id && !selectedWorkspaceId
-                  ? 'text-blue-400'
-                  : 'text-gray-200'
+                  ? 'text-primary'
+                  : 'text-foreground'
               }`}>{repo.name}</span>
-              <span className="text-xs text-gray-500" title={repo.cloneUrl}>
+              <span className="text-xs text-foreground-tertiary" title={repo.cloneUrl}>
                 🔗
               </span>
               <button
@@ -354,14 +354,14 @@ export function RepositoryTree({
                   e.stopPropagation();
                   onEditRepository(repo);
                 }}
-                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 px-1"
+                className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-primary px-1"
                 title="Edit repository"
               >
                 ✎
               </button>
               <button
                 onClick={(e) => handleDeleteRepoClick(e, repo)}
-                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1"
+                className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-1"
                 title="Delete repository"
               >
                 ×
@@ -370,9 +370,9 @@ export function RepositoryTree({
 
             {/* Workspaces */}
             {expandedRepos.has(repo.id) && (
-              <div className="ml-4 border-l border-gray-700">
+              <div className="ml-4 border-l border-border">
                 {loadingRepos.has(repo.id) ? (
-                  <div className="text-gray-500 text-xs py-2 pl-4">Loading...</div>
+                  <div className="text-foreground-tertiary text-xs py-2 pl-4">Loading...</div>
                 ) : (
                   <>
                     {(workspacesByRepo[repo.id] || []).map((workspace) => (
@@ -380,20 +380,20 @@ export function RepositoryTree({
                         key={workspace.id}
                         onClick={() => onSelectWorkspace(workspace, repo)}
                         className={`flex items-center gap-2 px-2 py-1.5 ml-2 rounded cursor-pointer group relative
-                          hover:bg-gray-700/50
-                          ${selectedWorkspaceId === workspace.id ? 'bg-blue-600/20 text-blue-400' : 'text-gray-300'}`}
+                          hover:bg-background-tertiary/50
+                          ${selectedWorkspaceId === workspace.id ? 'bg-primary/20 text-primary' : 'text-foreground'}`}
                       >
                         <span className="text-sm" title={`Container: ${workspace.containerStatus || 'unknown'}`}>
                           {getContainerStatusIcon(workspace)}
                         </span>
                         <span className="flex-1 text-sm truncate">{workspace.name}</span>
-                        <span className="text-xs text-gray-500">{workspace.branchName}</span>
+                        <span className="text-xs text-foreground-tertiary">{workspace.branchName}</span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setInfoPanelWorkspace(workspace);
                           }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white px-1"
+                          className="opacity-0 group-hover:opacity-100 text-foreground-secondary hover:text-foreground px-1"
                           title="Workspace info"
                         >
                           ⓘ
@@ -402,7 +402,7 @@ export function RepositoryTree({
                     ))}
                     <button
                       onClick={() => onAddWorkspace(repo.id)}
-                      className="flex items-center gap-2 px-2 py-1.5 ml-2 text-gray-500 hover:text-gray-300 text-sm"
+                      className="flex items-center gap-2 px-2 py-1.5 ml-2 text-foreground-tertiary hover:text-foreground text-sm"
                     >
                       <span>+</span>
                       <span>New workspace</span>

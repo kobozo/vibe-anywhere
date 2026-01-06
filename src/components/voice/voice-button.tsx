@@ -68,22 +68,22 @@ export const VoiceButton = forwardRef<VoiceButtonRef, VoiceButtonProps>(
 
       // Check transcribing first before the isDisabled check narrows the type
       if (state === 'transcribing') {
-        return `${baseStyles} text-blue-400 bg-blue-900/30 cursor-wait`;
+        return `${baseStyles} text-primary bg-primary/30 cursor-wait`;
       }
 
       if (isDisabled) {
-        return `${baseStyles} text-gray-600 cursor-not-allowed`;
+        return `${baseStyles} text-foreground-tertiary cursor-not-allowed`;
       }
 
       if (state === 'recording') {
-        return `${baseStyles} text-red-400 bg-red-900/30 hover:bg-red-900/50`;
+        return `${baseStyles} text-error bg-error/30 hover:bg-error/50`;
       }
 
       if (state === 'error') {
-        return `${baseStyles} text-red-400 hover:text-red-300`;
+        return `${baseStyles} text-error hover:text-error/80`;
       }
 
-      return `${baseStyles} text-gray-400 hover:text-gray-200 hover:bg-gray-700/50`;
+      return `${baseStyles} text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50`;
     };
 
     const getTooltip = (): string => {

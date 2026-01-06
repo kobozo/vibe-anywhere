@@ -9,13 +9,44 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Backgrounds
         background: 'var(--background)',
+        'background-secondary': 'var(--background-secondary)',
+        'background-tertiary': 'var(--background-tertiary)',
+        'background-input': 'var(--background-input)',
+
+        // Borders
+        border: 'var(--border)',
+        'border-secondary': 'var(--border-secondary)',
+
+        // Text
         foreground: 'var(--foreground)',
+        'foreground-secondary': 'var(--foreground-secondary)',
+        'foreground-tertiary': 'var(--foreground-tertiary)',
+
+        // Primary (accent)
+        primary: 'var(--primary)',
+        'primary-hover': 'var(--primary-hover)',
+        'primary-foreground': 'var(--primary-foreground)',
+
+        // Semantic
+        success: 'var(--success)',
+        'success-foreground': 'var(--success-foreground)',
+        warning: 'var(--warning)',
+        'warning-foreground': 'var(--warning-foreground)',
+        error: 'var(--error)',
+        'error-foreground': 'var(--error-foreground)',
+
+        // Selection/Focus
+        selection: 'var(--selection)',
+        focus: 'var(--focus)',
+
+        // Terminal
         terminal: {
-          bg: '#1e1e1e',
-          fg: '#d4d4d4',
-          cursor: '#aeafad',
-          selection: '#264f78',
+          bg: 'var(--terminal-background)',
+          fg: 'var(--terminal-foreground)',
+          cursor: 'var(--terminal-cursor)',
+          selection: 'var(--terminal-selection-background)',
         },
       },
       fontFamily: {
