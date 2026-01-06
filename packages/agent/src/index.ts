@@ -9,6 +9,7 @@ import { TmuxManager } from './tmux-manager.js';
 import { OutputBufferManager } from './output-buffer.js';
 import { selfUpdate } from './updater.js';
 import { GitHandler } from './git-handler.js';
+import { DockerHandler } from './docker-handler.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -35,6 +36,7 @@ console.log(`Session Hub URL: ${config.sessionHubUrl}`);
 // Initialize components
 const bufferManager = new OutputBufferManager(config.bufferSize);
 const gitHandler = new GitHandler('/workspace');
+const dockerHandler = new DockerHandler();
 
 const tmuxManager = new TmuxManager(
   config.workspaceId,
@@ -288,6 +290,87 @@ const wsClient = new AgentWebSocket(config, {
       console.error('Git discard failed:', error);
       wsClient.sendGitDiscard(
         data.requestId,
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  // Docker event handlers
+  onDockerStatus: async (data) => {
+    console.log(`Docker status request: ${data.requestId}`);
+    try {
+      const status = await dockerHandler.getContainers();
+      wsClient.sendDockerStatus(data.requestId, true, status);
+    } catch (error) {
+      console.error('Docker status failed:', error);
+      wsClient.sendDockerStatus(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onDockerLogs: async (data) => {
+    console.log(`Docker logs request: ${data.requestId}, container: ${data.containerId}`);
+    try {
+      const logs = await dockerHandler.getLogs(data.containerId, data.tail);
+      wsClient.sendDockerLogs(data.requestId, true, { containerId: data.containerId, logs });
+    } catch (error) {
+      console.error('Docker logs failed:', error);
+      wsClient.sendDockerLogs(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onDockerStart: async (data) => {
+    console.log(`Docker start request: ${data.requestId}, container: ${data.containerId}`);
+    try {
+      await dockerHandler.startContainer(data.containerId);
+      wsClient.sendDockerAction(data.requestId, 'start', true);
+    } catch (error) {
+      console.error('Docker start failed:', error);
+      wsClient.sendDockerAction(
+        data.requestId,
+        'start',
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onDockerStop: async (data) => {
+    console.log(`Docker stop request: ${data.requestId}, container: ${data.containerId}`);
+    try {
+      await dockerHandler.stopContainer(data.containerId);
+      wsClient.sendDockerAction(data.requestId, 'stop', true);
+    } catch (error) {
+      console.error('Docker stop failed:', error);
+      wsClient.sendDockerAction(
+        data.requestId,
+        'stop',
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onDockerRestart: async (data) => {
+    console.log(`Docker restart request: ${data.requestId}, container: ${data.containerId}`);
+    try {
+      await dockerHandler.restartContainer(data.containerId);
+      wsClient.sendDockerAction(data.requestId, 'restart', true);
+    } catch (error) {
+      console.error('Docker restart failed:', error);
+      wsClient.sendDockerAction(
+        data.requestId,
+        'restart',
         false,
         error instanceof Error ? error.message : String(error)
       );

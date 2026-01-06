@@ -220,6 +220,45 @@ export class TabService {
   }
 
   /**
+   * Ensure a Docker tab exists for the workspace (only if Docker is in tech stack)
+   * Creates one if it doesn't exist, returns existing if it does
+   */
+  async ensureDockerTab(workspaceId: string): Promise<Tab> {
+    // Check if docker tab already exists
+    const existingTabs = await this.listTabs(workspaceId);
+    const dockerTab = existingTabs.find(t => t.tabType === 'docker');
+
+    if (dockerTab) {
+      return dockerTab;
+    }
+
+    // Get workspace to check container status
+    const workspaceService = await this.getWorkspace();
+    const workspace = await workspaceService.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error(`Workspace ${workspaceId} not found`);
+    }
+
+    // Create docker tab - it's always running since it doesn't need a terminal session
+    const [tab] = await db
+      .insert(tabs)
+      .values({
+        workspaceId,
+        name: 'Docker',
+        command: [], // Docker tabs don't run commands
+        status: 'running', // Docker tabs are always "running" since they just display UI
+        tabType: 'docker',
+        isPinned: true,
+        sortOrder: -99, // After git tab (-100), before terminals
+        outputBuffer: [],
+        outputBufferSize: 0,
+      })
+      .returning();
+
+    return tab;
+  }
+
+  /**
    * Update tab fields
    */
   async updateTab(

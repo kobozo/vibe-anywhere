@@ -39,6 +39,13 @@ interface PendingGitOperation {
 }
 const pendingGitOperations: Map<string, PendingGitOperation> = new Map();
 
+// Track pending docker operations for relay between browser and agent
+interface PendingDockerOperation {
+  socket: AuthenticatedSocket;
+  timeoutId: NodeJS.Timeout;
+}
+const pendingDockerOperations: Map<string, PendingDockerOperation> = new Map();
+
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
@@ -305,6 +312,136 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
+    // Docker: Get container status
+    socket.on('docker:status', async (data: { requestId: string; workspaceId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('docker:status:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingDockerOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingDockerOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.dockerStatus(data.workspaceId, data.requestId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingDockerOperations.delete(data.requestId);
+          socket.emit('docker:status:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('docker:status:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Docker status failed',
+        });
+      }
+    });
+
+    // Docker: Get container logs
+    socket.on('docker:logs', async (data: { requestId: string; workspaceId: string; containerId: string; tail?: number }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('docker:logs:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingDockerOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingDockerOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.dockerLogs(data.workspaceId, data.requestId, data.containerId, data.tail);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingDockerOperations.delete(data.requestId);
+          socket.emit('docker:logs:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('docker:logs:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Docker logs failed',
+        });
+      }
+    });
+
+    // Docker: Start container
+    socket.on('docker:start', async (data: { requestId: string; workspaceId: string; containerId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('docker:start:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingDockerOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingDockerOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.dockerStart(data.workspaceId, data.requestId, data.containerId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingDockerOperations.delete(data.requestId);
+          socket.emit('docker:start:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('docker:start:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Docker start failed',
+        });
+      }
+    });
+
+    // Docker: Stop container
+    socket.on('docker:stop', async (data: { requestId: string; workspaceId: string; containerId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('docker:stop:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingDockerOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingDockerOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.dockerStop(data.workspaceId, data.requestId, data.containerId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingDockerOperations.delete(data.requestId);
+          socket.emit('docker:stop:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('docker:stop:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Docker stop failed',
+        });
+      }
+    });
+
+    // Docker: Restart container
+    socket.on('docker:restart', async (data: { requestId: string; workspaceId: string; containerId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('docker:restart:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingDockerOperations.delete(data.requestId);
+        }, 30000);
+
+        pendingDockerOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.dockerRestart(data.workspaceId, data.requestId, data.containerId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingDockerOperations.delete(data.requestId);
+          socket.emit('docker:restart:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('docker:restart:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Docker restart failed',
+        });
+      }
+    });
+
     // Handle file upload (for clipboard image paste)
     socket.on('file:upload', async (data: { requestId: string; filename: string; data: string; mimeType: string }) => {
       try {
@@ -557,6 +694,52 @@ function setupAgentNamespace(io: SocketServer): void {
         clearTimeout(pending.timeoutId);
         pending.socket.emit('git:discard:response', data);
         pendingGitOperations.delete(data.requestId);
+      }
+    });
+
+    // Docker response handlers (relay from agent to browser)
+    socket.on('docker:status:response', (data: { requestId: string; success: boolean; data?: unknown; error?: string }) => {
+      const pending = pendingDockerOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('docker:status:response', data);
+        pendingDockerOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('docker:logs:response', (data: { requestId: string; success: boolean; data?: unknown; error?: string }) => {
+      const pending = pendingDockerOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('docker:logs:response', data);
+        pendingDockerOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('docker:start:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingDockerOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('docker:start:response', data);
+        pendingDockerOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('docker:stop:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingDockerOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('docker:stop:response', data);
+        pendingDockerOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('docker:restart:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingDockerOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('docker:restart:response', data);
+        pendingDockerOperations.delete(data.requestId);
       }
     });
 

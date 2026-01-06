@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { GitPanel } from '@/components/git/GitPanel';
+import { DockerPanel } from '@/components/docker/DockerPanel';
 import type { TabInfo } from '@/hooks/useTabs';
 
 // Dynamically import Terminal to avoid SSR issues with xterm
@@ -13,6 +14,7 @@ const Terminal = dynamic(
 interface SplitViewPaneProps {
   tab: TabInfo | null;
   workspaceId: string;
+  containerIp?: string | null;
   onConnectionChange?: (connected: boolean) => void;
   onEnd?: () => void;
 }
@@ -20,6 +22,7 @@ interface SplitViewPaneProps {
 export function SplitViewPane({
   tab,
   workspaceId,
+  containerIp,
   onConnectionChange,
   onEnd,
 }: SplitViewPaneProps) {
@@ -37,6 +40,15 @@ export function SplitViewPane({
     return (
       <div className="h-full w-full overflow-hidden">
         <GitPanel workspaceId={workspaceId} />
+      </div>
+    );
+  }
+
+  // Docker tab - render DockerPanel
+  if (tab.tabType === 'docker') {
+    return (
+      <div className="h-full w-full overflow-hidden">
+        <DockerPanel workspaceId={workspaceId} containerIp={containerIp ?? null} />
       </div>
     );
   }

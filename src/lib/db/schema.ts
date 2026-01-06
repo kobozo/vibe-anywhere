@@ -53,6 +53,7 @@ export const containerBackendEnum = pgEnum('container_backend', [
 export const tabTypeEnum = pgEnum('tab_type', [
   'terminal',
   'git',
+  'docker',
 ]);
 
 export const portForwardProtocolEnum = pgEnum('port_forward_protocol', [

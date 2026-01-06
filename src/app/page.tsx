@@ -17,6 +17,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { GitPanel } from '@/components/git';
+import { DockerPanel } from '@/components/docker';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
 import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
@@ -670,6 +671,7 @@ function Dashboard() {
                         group={activeGroup}
                         tabs={workspaceTabsRef.current}
                         workspaceId={selectedWorkspace.id}
+                        containerIp={selectedWorkspace.containerIp}
                         onPaneResize={handlePaneResize}
                         onConnectionChange={(tabId, connected) => {
                           // Track connection for the first running tab in group
@@ -689,6 +691,9 @@ function Dashboard() {
                 ) : selectedTab && selectedTab.tabType === 'git' ? (
                   // Git panel - no terminal needed
                   <GitPanel workspaceId={selectedWorkspace.id} />
+                ) : selectedTab && selectedTab.tabType === 'docker' ? (
+                  // Docker panel - no terminal needed
+                  <DockerPanel workspaceId={selectedWorkspace.id} containerIp={selectedWorkspace.containerIp ?? null} />
                 ) : selectedTab && selectedTab.status === 'running' ? (
                   <Terminal
                     tabId={selectedTab.id}

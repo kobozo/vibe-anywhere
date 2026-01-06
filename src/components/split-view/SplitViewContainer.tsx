@@ -12,6 +12,7 @@ interface SplitViewContainerProps {
   group: TabGroupInfo;
   tabs: TabInfo[];
   workspaceId: string;
+  containerIp?: string | null;
   onPaneResize?: (sizes: { tabId: string; sizePercent: number }[]) => void;
   onConnectionChange?: (tabId: string, connected: boolean) => void;
   onTabEnd?: (tabId: string) => void;
@@ -21,6 +22,7 @@ export function SplitViewContainer({
   group,
   tabs,
   workspaceId,
+  containerIp,
   onPaneResize,
   onConnectionChange,
   onTabEnd,
@@ -59,6 +61,7 @@ export function SplitViewContainer({
           <SplitViewPane
             tab={getTabForMember(0)}
             workspaceId={workspaceId}
+            containerIp={containerIp}
             onConnectionChange={connected => {
               const tab = getTabForMember(0);
               if (tab) onConnectionChange?.(tab.id, connected);
@@ -80,6 +83,7 @@ export function SplitViewContainer({
           <SplitViewPane
             tab={getTabForMember(1)}
             workspaceId={workspaceId}
+            containerIp={containerIp}
             onConnectionChange={connected => {
               const tab = getTabForMember(1);
               if (tab) onConnectionChange?.(tab.id, connected);
@@ -103,6 +107,7 @@ export function SplitViewContainer({
           <SplitViewPane
             tab={getTabForMember(0)}
             workspaceId={workspaceId}
+            containerIp={containerIp}
             onConnectionChange={connected => {
               const tab = getTabForMember(0);
               if (tab) onConnectionChange?.(tab.id, connected);
@@ -201,6 +206,7 @@ export function SplitViewContainer({
           <SplitViewPane
             tab={getTabForMember(2)}
             workspaceId={workspaceId}
+            containerIp={containerIp}
             onConnectionChange={connected => {
               const tab = getTabForMember(2);
               if (tab) onConnectionChange?.(tab.id, connected);
@@ -282,6 +288,7 @@ export function SplitViewContainer({
               <SplitViewPane
                 tab={getTabForMember(3)}
                 workspaceId={workspaceId}
+                containerIp={containerIp}
                 onConnectionChange={connected => {
                   const tab = getTabForMember(3);
                   if (tab) onConnectionChange?.(tab.id, connected);

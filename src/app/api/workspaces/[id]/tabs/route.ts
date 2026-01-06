@@ -50,6 +50,12 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   // Ensure git tab exists for this workspace
   await tabService.ensureGitTab(id);
 
+  // Ensure docker tab exists if Docker is in the repository's tech stack
+  const techStack = repository.techStack as string[] | null;
+  if (techStack?.includes('docker')) {
+    await tabService.ensureDockerTab(id);
+  }
+
   const tabs = await tabService.listTabs(id);
   const tabInfos = tabs.map((t) => tabService.toTabInfo(t));
 

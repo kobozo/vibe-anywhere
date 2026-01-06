@@ -187,8 +187,8 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
       onSelectGroup?.(null);
     }
 
-    // Git tabs don't need starting - they're UI-only
-    if (tab.tabType === 'git') {
+    // Git and Docker tabs don't need starting - they're UI-only
+    if (tab.tabType === 'git' || tab.tabType === 'docker') {
       onSelectTab(tab);
     } else if (tab.status === 'running') {
       onSelectTab(tab);
@@ -304,6 +304,10 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
             {tab.tabType === 'git' ? (
               <svg className="w-4 h-4 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3-3 3 3m0 6l-3 3-3-3" />
+              </svg>
+            ) : tab.tabType === 'docker' ? (
+              <svg className="w-4 h-4 text-info" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.186.186 0 00-.185.186v1.887c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 00.186-.186V3.574a.186.186 0 00-.186-.185h-2.118a.186.186 0 00-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 00.186-.186V6.29a.186.186 0 00-.186-.185h-2.118a.186.186 0 00-.185.185v1.887c0 .102.082.186.185.186m-2.93 0h2.12a.186.186 0 00.184-.186V6.29a.185.185 0 00-.185-.185H8.1a.185.185 0 00-.185.185v1.887c0 .102.083.186.185.186m-2.964 0h2.119a.186.186 0 00.185-.186V6.29a.186.186 0 00-.185-.185H5.136a.186.186 0 00-.186.185v1.887c0 .102.084.186.186.186m5.893 2.715h2.118a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.118a.186.186 0 00-.185.186v1.887c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 00.184-.185V9.006a.185.185 0 00-.184-.186h-2.12a.185.185 0 00-.184.186v1.887c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186h-2.12a.186.186 0 00-.185.186v1.887c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 00.184-.185V9.006a.185.185 0 00-.184-.186h-2.12a.186.186 0 00-.186.186v1.887c0 .102.084.185.186.185" />
               </svg>
             ) : (
               <span className={`w-2 h-2 rounded-full ${getStatusColor(tab.status)}`} />

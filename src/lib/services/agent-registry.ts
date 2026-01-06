@@ -26,7 +26,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.3.3';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.4.0';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -336,6 +336,41 @@ class AgentRegistry {
    */
   gitDiscard(workspaceId: string, requestId: string, files: string[]): boolean {
     return this.emit(workspaceId, 'git:discard', { requestId, files });
+  }
+
+  /**
+   * Request docker status from the agent
+   */
+  dockerStatus(workspaceId: string, requestId: string): boolean {
+    return this.emit(workspaceId, 'docker:status', { requestId });
+  }
+
+  /**
+   * Request docker logs from the agent
+   */
+  dockerLogs(workspaceId: string, requestId: string, containerId: string, tail?: number): boolean {
+    return this.emit(workspaceId, 'docker:logs', { requestId, containerId, tail });
+  }
+
+  /**
+   * Start a docker container via the agent
+   */
+  dockerStart(workspaceId: string, requestId: string, containerId: string): boolean {
+    return this.emit(workspaceId, 'docker:start', { requestId, containerId });
+  }
+
+  /**
+   * Stop a docker container via the agent
+   */
+  dockerStop(workspaceId: string, requestId: string, containerId: string): boolean {
+    return this.emit(workspaceId, 'docker:stop', { requestId, containerId });
+  }
+
+  /**
+   * Restart a docker container via the agent
+   */
+  dockerRestart(workspaceId: string, requestId: string, containerId: string): boolean {
+    return this.emit(workspaceId, 'docker:restart', { requestId, containerId });
   }
 
   /**
