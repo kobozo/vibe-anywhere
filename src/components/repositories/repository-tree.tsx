@@ -17,6 +17,9 @@ interface RepositoryTreeProps {
   isLoading: boolean;
   error: Error | null;
   onDeleteRepository: (repoId: string) => Promise<void>;
+  // When set, refresh workspaces for this repo ID (used after creating a workspace)
+  refreshWorkspacesForRepoId?: string | null;
+  onWorkspacesRefreshed?: () => void;
 }
 
 export function RepositoryTree({
@@ -30,6 +33,8 @@ export function RepositoryTree({
   isLoading,
   error,
   onDeleteRepository,
+  refreshWorkspacesForRepoId,
+  onWorkspacesRefreshed,
 }: RepositoryTreeProps) {
 
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set());
@@ -96,6 +101,29 @@ export function RepositoryTree({
       }
     }
   }, [selectedWorkspaceId, workspacesByRepo]);
+
+  // Refresh workspaces for a specific repo when triggered from parent
+  useEffect(() => {
+    if (!refreshWorkspacesForRepoId) return;
+
+    const fetchWorkspacesForRepo = async () => {
+      try {
+        const response = await fetch(`/api/repositories/${refreshWorkspacesForRepoId}/workspaces`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        });
+        if (response.ok) {
+          const { data } = await response.json();
+          setWorkspacesByRepo(prev => ({ ...prev, [refreshWorkspacesForRepoId]: data.workspaces }));
+          // Auto-expand the repo to show the new workspace
+          setExpandedRepos(prev => new Set([...prev, refreshWorkspacesForRepoId]));
+        }
+      } finally {
+        onWorkspacesRefreshed?.();
+      }
+    };
+
+    fetchWorkspacesForRepo();
+  }, [refreshWorkspacesForRepoId, onWorkspacesRefreshed]);
 
   const toggleRepo = useCallback(async (repoId: string) => {
     if (expandedRepos.has(repoId)) {

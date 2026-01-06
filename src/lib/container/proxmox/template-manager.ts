@@ -188,6 +188,7 @@ export interface CreateTemplateProgress {
 }
 
 export type ProgressCallback = (progress: CreateTemplateProgress) => void;
+export type LogCallback = (type: 'stdout' | 'stderr', data: string) => void;
 
 /**
  * Manages Proxmox LXC templates for Session Hub
@@ -357,6 +358,9 @@ export class ProxmoxTemplateManager {
 
   /**
    * Create a new template with SSH keys pre-configured
+   * @param stopAtStaging - If true, keeps container running for manual customization
+   * @param parentVmid - If provided, clone from this parent template instead of base OS
+   * @returns Container IP if staging mode, otherwise void
    */
   async createTemplate(
     vmid: number,
@@ -365,10 +369,13 @@ export class ProxmoxTemplateManager {
       storage?: string;
       node?: string;
       techStacks?: string[];
+      stopAtStaging?: boolean;
+      parentVmid?: number; // Clone from parent template instead of base OS
       onProgress?: ProgressCallback;
+      onLog?: LogCallback;
     } = {}
-  ): Promise<void> {
-    const { name, storage, onProgress, techStacks = [] } = options;
+  ): Promise<{ containerIp?: string }> {
+    const { name, storage, onProgress, techStacks = [], parentVmid } = options;
     const settingsService = getSettingsService();
 
     // Get settings from database
@@ -386,42 +393,68 @@ export class ProxmoxTemplateManager {
       onProgress?.({ step, progress: pct, message: msg });
     };
 
-    // Step 1: Get SSH public key
-    progress('ssh-key', 5, 'Reading SSH public key...');
-    const sshPublicKey = this.getSSHPublicKey();
-    if (!sshPublicKey) {
-      throw new Error('No SSH public key found. Please ensure SSH keys are mounted.');
-    }
-
-    // Step 2: Ensure OS template exists (always on 'local' storage)
-    progress('os-template', 10, 'Checking OS template...');
-    const osTemplate = await this.ensureOsTemplate();
-    progress('os-template', 15, `Using OS template: ${osTemplate}`);
-
-    // Step 3: Create container with SSH keys
-    progress('create', 20, 'Creating container...');
     // Generate hostname from name (sanitize for valid hostname)
     const hostname = (name || 'session-hub-template')
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/^-+|-+$/g, '')
       .substring(0, 63) || 'session-hub-template';
-    const upid = await this.client.createLxcWithSSHKeys(vmid, osTemplate, {
-      hostname,
-      description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
-      storage: storageId,
-      memory,
-      cores,
-      sshPublicKeys: sshPublicKey,
-      rootPassword: 'SessionHub2024!',
-      vlanTag,
-      features: needsNesting ? 'nesting=1' : undefined,
-    });
 
-    await pollTaskUntilComplete(this.client, upid, {
-      timeoutMs: 120000,
-      onProgress: (status) => progress('create', 25, status),
-    });
+    // Determine if we're cloning from a parent template or creating from base OS
+    if (parentVmid) {
+      // Clone from parent template
+      progress('clone', 5, `Cloning from parent template VMID ${parentVmid}...`);
+
+      const cloneUpid = await this.client.cloneLxc(parentVmid, vmid, {
+        hostname,
+        description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
+        storage: storageId,
+        full: true, // Full clone for templates
+      });
+
+      await pollTaskUntilComplete(this.client, cloneUpid, {
+        timeoutMs: 300000, // 5 minutes for clone
+        onProgress: (status) => progress('clone', 20, status),
+      });
+
+      // Update container config if nesting is needed (e.g., for Docker)
+      if (needsNesting) {
+        progress('config', 25, 'Enabling LXC nesting for Docker support...');
+        await this.client.setLxcConfig(vmid, { features: 'nesting=1' });
+      }
+    } else {
+      // Create from base OS template (original flow)
+      // Step 1: Get SSH public key
+      progress('ssh-key', 5, 'Reading SSH public key...');
+      const sshPublicKey = this.getSSHPublicKey();
+      if (!sshPublicKey) {
+        throw new Error('No SSH public key found. Please ensure SSH keys are mounted.');
+      }
+
+      // Step 2: Ensure OS template exists (always on 'local' storage)
+      progress('os-template', 10, 'Checking OS template...');
+      const osTemplate = await this.ensureOsTemplate();
+      progress('os-template', 15, `Using OS template: ${osTemplate}`);
+
+      // Step 3: Create container with SSH keys
+      progress('create', 20, 'Creating container...');
+      const upid = await this.client.createLxcWithSSHKeys(vmid, osTemplate, {
+        hostname,
+        description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
+        storage: storageId,
+        memory,
+        cores,
+        sshPublicKeys: sshPublicKey,
+        rootPassword: 'SessionHub2024!',
+        vlanTag,
+        features: needsNesting ? 'nesting=1' : undefined,
+      });
+
+      await pollTaskUntilComplete(this.client, upid, {
+        timeoutMs: 120000,
+        onProgress: (status) => progress('create', 25, status),
+      });
+    }
 
     // Step 4: Start container
     progress('start', 30, 'Starting container...');
@@ -435,11 +468,31 @@ export class ProxmoxTemplateManager {
     progress('network', 40, `Container IP: ${containerIp}`);
 
     // Step 6: Provision the container via SSH
-    progress('provision', 45, 'Provisioning container (this may take several minutes)...');
+    // If cloning from parent, skip core provisioning (already done in parent) and only install new tech stacks
+    // If staging mode, skip cleanup so user can do manual customization first
     try {
-      await this.provisionContainer(containerIp, techStacks, (msg) => {
-        progress('provision', 70, msg);
-      });
+      if (parentVmid) {
+        // Cloned from parent - only install new tech stacks (if any)
+        if (techStacks.length > 0) {
+          progress('provision', 45, `Installing additional tech stacks: ${techStacks.join(', ')}...`);
+          await this.provisionTechStacksOnly(containerIp, techStacks, (msg) => {
+            progress('provision', 70, msg);
+          }, options.stopAtStaging, options.onLog);
+        } else {
+          progress('provision', 70, 'No additional software to install (using parent configuration)');
+          // Still run cleanup if not staging
+          if (!options.stopAtStaging) {
+            progress('provision', 75, 'Cleaning up...');
+            await this.runCleanup(containerIp, options.onLog);
+          }
+        }
+      } else {
+        // New template from base OS - full provisioning
+        progress('provision', 45, 'Provisioning container (this may take several minutes)...');
+        await this.provisionContainer(containerIp, techStacks, (msg) => {
+          progress('provision', 70, msg);
+        }, options.stopAtStaging, options.onLog); // Skip cleanup if staging
+      }
     } catch (error) {
       // Cleanup on failure
       console.error('Provisioning failed, cleaning up...', error);
@@ -450,6 +503,12 @@ export class ProxmoxTemplateManager {
         // Ignore cleanup errors
       }
       throw error;
+    }
+
+    // Check if we should stop at staging for manual customization
+    if (options.stopAtStaging) {
+      progress('staging', 80, 'Container ready for staging - connect via SSH to customize');
+      return { containerIp };
     }
 
     // Step 7: Stop container
@@ -478,15 +537,69 @@ export class ProxmoxTemplateManager {
     });
 
     progress('complete', 100, 'Template created successfully!');
+    return {};
+  }
+
+  /**
+   * Finalize a staging template by running cleanup, stopping it, and converting to template
+   */
+  async finalizeTemplate(
+    vmid: number,
+    options: {
+      node?: string;
+      containerIp?: string;
+      onProgress?: ProgressCallback;
+      onLog?: LogCallback;
+    } = {}
+  ): Promise<void> {
+    const progress = (step: string, pct: number, msg: string) => {
+      console.log(`[${pct}%] ${step}: ${msg}`);
+      options.onProgress?.({ step, progress: pct, message: msg });
+    };
+
+    // Step 1: Run cleanup script if we have the container IP
+    if (options.containerIp) {
+      progress('cleanup', 10, 'Running cleanup script...');
+      try {
+        await this.runCleanup(options.containerIp, options.onLog);
+        progress('cleanup', 30, 'Cleanup complete');
+      } catch (error) {
+        console.warn('Cleanup script failed (non-fatal):', error);
+        progress('cleanup', 30, 'Cleanup skipped (container may not be accessible)');
+      }
+    }
+
+    // Step 2: Stop container
+    progress('stop', 40, 'Stopping staging container...');
+    const stopUpid = await this.client.shutdownLxc(vmid, 30);
+    await pollTaskUntilComplete(this.client, stopUpid, { timeoutMs: 60000 });
+
+    // Wait for container to fully stop
+    for (let i = 0; i < 30; i++) {
+      const status = await this.client.getLxcStatus(vmid);
+      if (status.status === 'stopped') break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    progress('stop', 60, 'Container stopped');
+
+    // Step 3: Convert to template
+    progress('template', 80, 'Converting to template...');
+    await this.client.convertToTemplate(vmid);
+
+    progress('complete', 100, 'Template finalized successfully!');
   }
 
   /**
    * Provision the container with required software via SSH
+   * @param skipCleanup - If true, skips the cleanup step (for staging mode)
+   * @param onLog - Callback for real-time log output
    */
   private async provisionContainer(
     containerIp: string,
     techStacks: string[] = [],
-    onProgress?: (message: string) => void
+    onProgress?: (message: string) => void,
+    skipCleanup: boolean = false,
+    onLog?: LogCallback
   ): Promise<void> {
     const sshUser = 'root';
 
@@ -511,7 +624,7 @@ export class ProxmoxTemplateManager {
     let result = await execSSHCommand(
       { host: containerIp, username: sshUser },
       ['bash', '-c', CORE_PROVISIONING_SCRIPT],
-      { workingDir: '/' }
+      { workingDir: '/', onOutput: onLog }
     );
 
     if (result.exitCode !== 0) {
@@ -527,7 +640,7 @@ export class ProxmoxTemplateManager {
       result = await execSSHCommand(
         { host: containerIp, username: sshUser },
         ['bash', '-c', techStackScript],
-        { workingDir: '/' }
+        { workingDir: '/', onOutput: onLog }
       );
 
       if (result.exitCode !== 0) {
@@ -541,9 +654,15 @@ export class ProxmoxTemplateManager {
         await execSSHCommand(
           { host: containerIp, username: sshUser },
           ['bash', '-c', 'usermod -aG docker kobozo || true'],
-          { workingDir: '/' }
+          { workingDir: '/', onOutput: onLog }
         );
       }
+    }
+
+    // Skip cleanup if staging mode (user will do manual customization, then cleanup happens on finalize)
+    if (skipCleanup) {
+      onProgress?.('Provisioning complete (cleanup skipped for staging)');
+      return;
     }
 
     // Cleanup
@@ -551,10 +670,95 @@ export class ProxmoxTemplateManager {
     await execSSHCommand(
       { host: containerIp, username: sshUser },
       ['bash', '-c', CLEANUP_SCRIPT],
-      { workingDir: '/' }
+      { workingDir: '/', onOutput: onLog }
     );
 
     onProgress?.('Provisioning complete');
+  }
+
+  /**
+   * Install only tech stacks (for cloned templates that already have core packages)
+   * @param skipCleanup - If true, skips the cleanup step (for staging mode)
+   * @param onLog - Callback for real-time log output
+   */
+  private async provisionTechStacksOnly(
+    containerIp: string,
+    techStacks: string[] = [],
+    onProgress?: (message: string) => void,
+    skipCleanup: boolean = false,
+    onLog?: LogCallback
+  ): Promise<void> {
+    const sshUser = 'root';
+
+    // Wait for SSH to be available
+    onProgress?.('Waiting for SSH...');
+    for (let i = 0; i < 30; i++) {
+      try {
+        await execSSHCommand(
+          { host: containerIp, username: sshUser },
+          ['echo', 'SSH ready'],
+          { workingDir: '/' }
+        );
+        break;
+      } catch {
+        if (i === 29) throw new Error('SSH not available after 60 seconds');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
+    // Install selected tech stacks
+    if (techStacks.length > 0) {
+      onProgress?.(`Installing tech stacks: ${techStacks.join(', ')}...`);
+      const techStackScript = generateInstallScript(techStacks);
+
+      const result = await execSSHCommand(
+        { host: containerIp, username: sshUser },
+        ['bash', '-c', techStackScript],
+        { workingDir: '/', onOutput: onLog }
+      );
+
+      if (result.exitCode !== 0) {
+        console.error('Tech stack installation stderr:', result.stderr);
+        throw new Error(`Tech stack installation failed with exit code ${result.exitCode}`);
+      }
+
+      // If Docker was installed, add kobozo to docker group
+      if (techStacks.includes('docker')) {
+        onProgress?.('Configuring Docker for kobozo user...');
+        await execSSHCommand(
+          { host: containerIp, username: sshUser },
+          ['bash', '-c', 'usermod -aG docker kobozo || true'],
+          { workingDir: '/', onOutput: onLog }
+        );
+      }
+    }
+
+    // Skip cleanup if staging mode
+    if (skipCleanup) {
+      onProgress?.('Tech stack installation complete (cleanup skipped for staging)');
+      return;
+    }
+
+    // Cleanup
+    onProgress?.('Cleaning up...');
+    await execSSHCommand(
+      { host: containerIp, username: sshUser },
+      ['bash', '-c', CLEANUP_SCRIPT],
+      { workingDir: '/', onOutput: onLog }
+    );
+
+    onProgress?.('Tech stack installation complete');
+  }
+
+  /**
+   * Run cleanup script on a container (used after staging)
+   */
+  async runCleanup(containerIp: string, onLog?: LogCallback): Promise<void> {
+    await execSSHCommand(
+      { host: containerIp, username: 'root' },
+      ['bash', '-c', CLEANUP_SCRIPT],
+      { workingDir: '/', onOutput: onLog }
+    );
   }
 
   /**

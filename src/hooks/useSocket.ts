@@ -48,11 +48,43 @@ export function useSocket(options: UseSocketOptions): UseSocketReturn {
 
     // Reuse existing socket if token matches (even if still connecting)
     if (globalSocket && globalSocketToken === token) {
+      console.log('[useSocket] Reusing global socket', {
+        connected: globalSocket.connected,
+        id: globalSocket.id
+      });
       setSocket(globalSocket);
+
+      // Set initial connected state based on actual socket state
       if (globalSocket.connected) {
+        console.log('[useSocket] Global socket already connected, setting isConnected=true');
         setIsConnected(true);
       }
-      return;
+
+      // Still need to listen for future connect/disconnect events on the reused socket
+      const handleConnect = () => {
+        if (mountedRef.current) {
+          console.log('[useSocket] Reused socket - connect event');
+          setIsConnected(true);
+          setError(null);
+          onConnectRef.current?.();
+        }
+      };
+
+      const handleDisconnect = (reason: string) => {
+        if (mountedRef.current) {
+          console.log('[useSocket] Reused socket - disconnect event:', reason);
+          setIsConnected(false);
+          onDisconnectRef.current?.();
+        }
+      };
+
+      globalSocket.on('connect', handleConnect);
+      globalSocket.on('disconnect', handleDisconnect);
+
+      return () => {
+        globalSocket.off('connect', handleConnect);
+        globalSocket.off('disconnect', handleDisconnect);
+      };
     }
 
     // Disconnect existing socket if token changed

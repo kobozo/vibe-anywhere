@@ -7,15 +7,17 @@ import {
   withErrorHandling,
   ValidationError,
 } from '@/lib/api-utils';
+import { TECH_STACKS } from '@/lib/container/proxmox/tech-stacks';
 
-// Valid tech stack IDs
-const validTechStacks = ['nodejs', 'python', 'go', 'rust', 'docker'] as const;
+// Valid tech stack IDs - dynamically from tech-stacks.ts
+const validTechStackIds = TECH_STACKS.map(s => s.id) as [string, ...string[]];
 
 const createTemplateSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional(),
-  techStacks: z.array(z.enum(validTechStacks)).optional().default([]),
+  techStacks: z.array(z.enum(validTechStackIds)).optional().default([]),
   isDefault: z.boolean().optional().default(false),
+  parentTemplateId: z.string().uuid().optional(), // Clone from this parent template
 });
 
 /**
@@ -48,6 +50,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     description: result.data.description,
     techStacks: result.data.techStacks,
     isDefault: result.data.isDefault,
+    parentTemplateId: result.data.parentTemplateId,
   });
 
   return successResponse({ template }, 201);

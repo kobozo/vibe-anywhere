@@ -10,12 +10,15 @@ import { RepositoryTree } from '@/components/repositories/repository-tree';
 import { AddRepositoryDialog } from '@/components/repositories/add-repository-dialog';
 import { EditRepositoryDialog } from '@/components/repositories/edit-repository-dialog';
 import { CreateWorkspaceDialog } from '@/components/workspaces/create-workspace-dialog';
-import { TabBar } from '@/components/tabs/tab-bar';
+import { TabBar, TabBarRef } from '@/components/tabs/tab-bar';
+import { useOpenAISettings } from '@/hooks/useOpenAISettings';
+import { useSocket } from '@/hooks/useSocket';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { GitPanel } from '@/components/git';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
+import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
 import type { Repository, Workspace, ProxmoxTemplate } from '@/lib/db/schema';
 import type { TabInfo } from '@/hooks/useTabs';
 
@@ -51,9 +54,11 @@ function Dashboard() {
     createTemplate,
     updateTemplate,
     deleteTemplate,
+    finalizeTemplate,
     startProvisionInBackground,
     startRecreateInBackground,
     isTemplateProvisioning,
+    provisionLogs,
   } = useTemplates();
 
   // Fetch repositories on mount
@@ -79,9 +84,13 @@ function Dashboard() {
   const [editingRepository, setEditingRepository] = useState<Repository | null>(null);
   const [isEditRepoLoading, setIsEditRepoLoading] = useState(false);
 
+  // Workspace refresh trigger (set after creating a workspace to refresh the sidebar)
+  const [refreshWorkspacesForRepoId, setRefreshWorkspacesForRepoId] = useState<string | null>(null);
+
   // Template dialog state
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ProxmoxTemplate | null>(null);
+  const [cloningTemplate, setCloningTemplate] = useState<ProxmoxTemplate | null>(null); // Parent template for clone mode
   const [isTemplateDialogLoading, setIsTemplateDialogLoading] = useState(false);
 
   // Template details modal state (for viewing status, errors, actions)
@@ -90,10 +99,50 @@ function Dashboard() {
   const [templateProgress, setTemplateProgress] = useState<Map<string, ProvisionProgress>>(new Map());
   const [templateErrors, setTemplateErrors] = useState<Map<string, string>>(new Map());
 
+  // Staging terminal modal state - store just the ID to always get fresh data from templates array
+  const [stagingTemplateId, setStagingTemplateId] = useState<string | null>(null);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+
+  // Look up the actual template from templates array to ensure we have fresh data
+  const stagingTemplate = stagingTemplateId ? templates.find(t => t.id === stagingTemplateId) || null : null;
+
   // Terminal state
   const [isTerminalConnected, setIsTerminalConnected] = useState(false);
   const deleteTabRef = useRef<((tabId: string) => Promise<void>) | null>(null);
   const workspaceTabsRef = useRef<TabInfo[]>([]);
+  const tabBarRef = useRef<TabBarRef>(null);
+
+  // Whisper/Voice state
+  const { isConfigured: whisperEnabled, fetchSettings: fetchWhisperSettings } = useOpenAISettings();
+  const { token } = useAuth();
+  const { socket } = useSocket({ token });
+
+  // Fetch whisper settings on mount
+  useEffect(() => {
+    fetchWhisperSettings();
+  }, [fetchWhisperSettings]);
+
+  // Handle voice transcription - send to active terminal
+  const handleVoiceTranscription = useCallback((text: string) => {
+    if (socket && selectedTab && isTerminalConnected) {
+      socket.emit('terminal:input', { data: text });
+    }
+  }, [socket, selectedTab, isTerminalConnected]);
+
+  // Ctrl+M keyboard shortcut for voice recording
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'm') {
+        e.preventDefault();
+        if (whisperEnabled && selectedWorkspace && selectedTab && tabBarRef.current) {
+          tabBarRef.current.toggleVoice();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [whisperEnabled, selectedWorkspace, selectedTab]);
 
   const handleSelectWorkspace = useCallback((workspace: Workspace | null, repository: Repository) => {
     setSelectedRepository(repository);
@@ -143,13 +192,13 @@ function Dashboard() {
         throw new Error(error?.message || 'Failed to create workspace');
       }
 
-      // Refresh repositories to get updated workspaces
-      await fetchRepositories();
+      // Trigger sidebar workspace refresh for this repo
+      setRefreshWorkspacesForRepoId(workspaceRepoId);
       setIsAddWorkspaceOpen(false);
     } finally {
       setActionLoading(false);
     }
-  }, [workspaceRepoId, fetchRepositories]);
+  }, [workspaceRepoId]);
 
   const handleCloneRepo = useCallback(async (name: string, url: string, description?: string, sshKeyId?: string, techStack?: string[], templateId?: string, cloneDepth?: number) => {
     setActionLoading(true);
@@ -203,12 +252,15 @@ function Dashboard() {
     description?: string;
     techStacks?: string[];
     isDefault?: boolean;
+    staging?: boolean;
+    parentTemplateId?: string;
   }) => {
     setIsTemplateDialogLoading(true);
     try {
       const template = await createTemplate(input);
       setIsTemplateDialogOpen(false);
       setEditingTemplate(null);
+      setCloningTemplate(null); // Clear cloning state
 
       // Clear any previous errors for this template
       setTemplateErrors((prev) => {
@@ -220,7 +272,7 @@ function Dashboard() {
       // Auto-start provisioning in background (non-blocking)
       startProvisionInBackground(
         template.id,
-        undefined,
+        { staging: input.staging },
         // onProgress - update progress for this specific template
         (progress) => {
           setTemplateProgress((prev) => new Map(prev).set(template.id, progress));
@@ -241,14 +293,21 @@ function Dashboard() {
             next.delete(template.id);
             return next;
           });
-        }
+        },
+        // onStaging - template is ready for staging customization
+        input.staging ? async () => {
+          // Fetch updated templates to get the staging container IP
+          await fetchTemplates();
+          // Set the staging template ID - template will be looked up from templates array
+          setStagingTemplateId(template.id);
+        } : undefined
       );
 
       return template;
     } finally {
       setIsTemplateDialogLoading(false);
     }
-  }, [createTemplate, startProvisionInBackground]);
+  }, [createTemplate, startProvisionInBackground, fetchTemplates]);
 
   const handleUpdateTemplate = useCallback(async (id: string, updates: {
     name?: string;
@@ -348,6 +407,46 @@ function Dashboard() {
     await fetchRepositories(); // Refresh to update any repos that had this template
   }, [deleteTemplate, fetchRepositories]);
 
+  // Clone a template (open dialog with parent template set)
+  const handleCloneTemplate = useCallback((template: ProxmoxTemplate) => {
+    setSelectedTemplate(null); // Close details modal
+    setEditingTemplate(null); // Not editing
+    setCloningTemplate(template); // Set parent for cloning
+    setIsTemplateDialogOpen(true);
+  }, []);
+
+  // Open staging terminal for a template
+  const handleOpenStagingTerminal = useCallback((template: ProxmoxTemplate) => {
+    setSelectedTemplate(null); // Close details modal if open
+    setStagingTemplateId(template.id);
+  }, []);
+
+  // Finalize a staging template
+  const handleFinalizeTemplate = useCallback(async () => {
+    if (!stagingTemplateId) return;
+
+    setIsFinalizing(true);
+    try {
+      await finalizeTemplate(stagingTemplateId, (progress) => {
+        setTemplateProgress((prev) => new Map(prev).set(stagingTemplateId, progress));
+      });
+      setStagingTemplateId(null);
+      await fetchTemplates();
+    } catch (err) {
+      setTemplateErrors((prev) => new Map(prev).set(
+        stagingTemplateId,
+        err instanceof Error ? err.message : 'Failed to finalize template'
+      ));
+    } finally {
+      setIsFinalizing(false);
+      setTemplateProgress((prev) => {
+        const next = new Map(prev);
+        next.delete(stagingTemplateId);
+        return next;
+      });
+    }
+  }, [stagingTemplateId, finalizeTemplate, fetchTemplates]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -424,6 +523,8 @@ function Dashboard() {
               isLoading={reposLoading}
               error={reposError}
               onDeleteRepository={deleteRepository}
+              refreshWorkspacesForRepoId={refreshWorkspacesForRepoId}
+              onWorkspacesRefreshed={() => setRefreshWorkspacesForRepoId(null)}
             />
           </div>
           <TemplateSection
@@ -443,11 +544,14 @@ function Dashboard() {
             <>
               {/* Tab bar */}
               <TabBar
+                ref={tabBarRef}
                 workspaceId={selectedWorkspace.id}
                 selectedTabId={selectedTab?.id || null}
                 onSelectTab={setSelectedTab}
                 onTabsChange={(tabs) => { workspaceTabsRef.current = tabs; }}
                 onExposeDeleteTab={(fn) => { deleteTabRef.current = fn; }}
+                whisperEnabled={whisperEnabled}
+                onVoiceTranscription={handleVoiceTranscription}
               />
 
               {/* Terminal/Git area */}
@@ -537,7 +641,12 @@ function Dashboard() {
 
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          // Re-fetch whisper settings in case user configured the API key
+          fetchWhisperSettings();
+        }}
+        onVoiceSettingsChange={fetchWhisperSettings}
       />
 
       {/* Edit Repository Dialog */}
@@ -550,14 +659,17 @@ function Dashboard() {
         isLoading={isEditRepoLoading}
       />
 
-      {/* Template Dialog (Create/Edit) */}
+      {/* Template Dialog (Create/Edit/Clone) */}
       <TemplateDialog
         isOpen={isTemplateDialogOpen}
         onClose={() => {
           setIsTemplateDialogOpen(false);
           setEditingTemplate(null);
+          setCloningTemplate(null);
         }}
         template={editingTemplate}
+        parentTemplate={cloningTemplate}
+        templates={templates}
         onSave={async (input) => {
           if (editingTemplate) {
             await handleUpdateTemplate(editingTemplate.id, input);
@@ -572,6 +684,7 @@ function Dashboard() {
       <TemplateDetailsModal
         isOpen={!!selectedTemplate}
         template={selectedTemplate}
+        templates={templates}
         onClose={() => {
           // Always allow closing - provisioning continues in background
           setSelectedTemplate(null);
@@ -580,9 +693,22 @@ function Dashboard() {
         onProvision={handleProvisionTemplate}
         onRecreate={handleRecreateTemplate}
         onDelete={handleDeleteTemplate}
+        onClone={handleCloneTemplate}
+        onOpenStagingTerminal={handleOpenStagingTerminal}
+        onFinalize={handleOpenStagingTerminal} // Opens terminal for manual finalize
         isProvisioning={selectedTemplate ? isTemplateProvisioning(selectedTemplate.id) : false}
         provisionProgress={selectedTemplate ? templateProgress.get(selectedTemplate.id) || null : null}
         provisionError={selectedTemplate ? templateErrors.get(selectedTemplate.id) || null : null}
+        provisionLogs={provisionLogs}
+      />
+
+      {/* Staging Terminal Modal */}
+      <StagingTerminalModal
+        isOpen={!!stagingTemplateId}
+        template={stagingTemplate}
+        onClose={() => setStagingTemplateId(null)}
+        onFinalize={handleFinalizeTemplate}
+        isFinalizing={isFinalizing}
       />
     </div>
   );

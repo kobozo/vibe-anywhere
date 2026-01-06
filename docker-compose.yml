@@ -44,24 +44,6 @@ services:
       # Claude API
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
 
-      # Proxmox (if using proxmox backend)
-      PROXMOX_HOST: ${PROXMOX_HOST:-}
-      PROXMOX_PORT: ${PROXMOX_PORT:-8006}
-      PROXMOX_TOKEN_ID: ${PROXMOX_TOKEN_ID:-}
-      PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET:-}
-      PROXMOX_NODE: ${PROXMOX_NODE:-pve}
-      PROXMOX_TEMPLATE_VMID: ${PROXMOX_TEMPLATE_VMID:-}
-      PROXMOX_STORAGE: ${PROXMOX_STORAGE:-local-lvm}
-      PROXMOX_BRIDGE: ${PROXMOX_BRIDGE:-vmbr0}
-      PROXMOX_VLAN_TAG: ${PROXMOX_VLAN_TAG:-}
-      PROXMOX_SSH_USER: ${PROXMOX_SSH_USER:-root}
-      # SSH key path inside container (host keys mounted to /home/sessionhub/.ssh)
-      PROXMOX_SSH_PRIVATE_KEY_PATH: /home/sessionhub/.ssh/id_ed25519
-      PROXMOX_VMID_MIN: ${PROXMOX_VMID_MIN:-200}
-      PROXMOX_VMID_MAX: ${PROXMOX_VMID_MAX:-299}
-      PROXMOX_MEMORY_MB: ${PROXMOX_MEMORY_MB:-2048}
-      PROXMOX_CORES: ${PROXMOX_CORES:-2}
-
       # Session Hub URL (for Proxmox agents to connect back)
       SESSION_HUB_URL: ${SESSION_HUB_URL:-http://localhost:3000}
 

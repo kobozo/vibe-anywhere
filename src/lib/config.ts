@@ -155,6 +155,10 @@ export const config = {
     };
   },
 
+  /**
+   * Static Proxmox config from .env (fallback values)
+   * For runtime config that includes DB settings, use getProxmoxRuntimeConfig()
+   */
   get proxmox() {
     const cfg = getConfig();
     return {
@@ -179,3 +183,131 @@ export const config = {
     };
   },
 };
+
+/**
+ * Runtime Proxmox configuration (DB-first with .env fallback)
+ */
+export interface ProxmoxRuntimeConfig {
+  host?: string;
+  port: number;
+  tokenId?: string;
+  tokenSecret?: string;
+  node?: string;
+  storage: string;
+  bridge: string;
+  vlanTag?: number;
+  sshUser: string;
+  sshPrivateKeyPath?: string;
+  memoryMb: number;
+  cores: number;
+  claudeConfigPath?: string;
+  templateVmid: number;
+  vmidRange: {
+    min: number;
+    max: number;
+  };
+}
+
+// Import settings service lazily to avoid circular dependencies
+let _settingsServiceModule: typeof import('./services/settings-service') | null = null;
+
+async function getSettingsServiceModule() {
+  if (!_settingsServiceModule) {
+    _settingsServiceModule = await import('./services/settings-service');
+  }
+  return _settingsServiceModule;
+}
+
+/**
+ * Get Proxmox runtime configuration.
+ * Checks database first, falls back to .env values.
+ * Use this for all runtime Proxmox operations.
+ */
+export async function getProxmoxRuntimeConfig(): Promise<ProxmoxRuntimeConfig> {
+  const envConfig = config.proxmox;
+
+  try {
+    const settingsModule = await getSettingsServiceModule();
+    const settingsService = settingsModule.getSettingsService();
+
+    // Get DB settings
+    const dbConnection = await settingsService.getProxmoxConnectionSettings();
+    const dbSettings = await settingsService.getProxmoxSettings();
+
+    // If DB has connection settings, prefer DB values
+    if (dbConnection?.host) {
+      return {
+        // Connection from DB (required if DB is configured)
+        host: dbConnection.host,
+        port: dbConnection.port,
+        tokenId: dbConnection.tokenId,
+        tokenSecret: dbConnection.tokenSecret,
+        node: dbConnection.node,
+
+        // Other settings from DB with .env fallback
+        storage: dbSettings.defaultStorage ?? envConfig.storage,
+        bridge: dbSettings.bridge ?? envConfig.bridge,
+        vlanTag: dbSettings.vlanTag ?? envConfig.vlanTag,
+        sshUser: dbSettings.sshUser ?? envConfig.sshUser,
+        sshPrivateKeyPath: dbSettings.sshPrivateKeyPath ?? envConfig.sshPrivateKeyPath,
+        memoryMb: dbSettings.defaultMemory ?? envConfig.memoryMb,
+        cores: dbSettings.defaultCpuCores ?? envConfig.cores,
+        claudeConfigPath: dbSettings.claudeConfigPath ?? envConfig.claudeConfigPath,
+        templateVmid: envConfig.templateVmid, // Template VMID managed separately
+        vmidRange: {
+          min: dbSettings.vmidMin ?? envConfig.vmidRange.min,
+          max: dbSettings.vmidMax ?? envConfig.vmidRange.max,
+        },
+      };
+    }
+
+    // No DB connection settings, use .env values but merge any DB general settings
+    return {
+      host: envConfig.host,
+      port: envConfig.port,
+      tokenId: envConfig.tokenId,
+      tokenSecret: envConfig.tokenSecret,
+      node: envConfig.node,
+      storage: dbSettings.defaultStorage ?? envConfig.storage,
+      bridge: dbSettings.bridge ?? envConfig.bridge,
+      vlanTag: dbSettings.vlanTag ?? envConfig.vlanTag,
+      sshUser: dbSettings.sshUser ?? envConfig.sshUser,
+      sshPrivateKeyPath: dbSettings.sshPrivateKeyPath ?? envConfig.sshPrivateKeyPath,
+      memoryMb: dbSettings.defaultMemory ?? envConfig.memoryMb,
+      cores: dbSettings.defaultCpuCores ?? envConfig.cores,
+      claudeConfigPath: dbSettings.claudeConfigPath ?? envConfig.claudeConfigPath,
+      templateVmid: envConfig.templateVmid,
+      vmidRange: {
+        min: dbSettings.vmidMin ?? envConfig.vmidRange.min,
+        max: dbSettings.vmidMax ?? envConfig.vmidRange.max,
+      },
+    };
+  } catch {
+    // If DB fails, fall back to .env config entirely
+    return {
+      host: envConfig.host,
+      port: envConfig.port,
+      tokenId: envConfig.tokenId,
+      tokenSecret: envConfig.tokenSecret,
+      node: envConfig.node,
+      storage: envConfig.storage,
+      bridge: envConfig.bridge,
+      vlanTag: envConfig.vlanTag,
+      sshUser: envConfig.sshUser,
+      sshPrivateKeyPath: envConfig.sshPrivateKeyPath,
+      memoryMb: envConfig.memoryMb,
+      cores: envConfig.cores,
+      claudeConfigPath: envConfig.claudeConfigPath,
+      templateVmid: envConfig.templateVmid,
+      vmidRange: envConfig.vmidRange,
+    };
+  }
+}
+
+/**
+ * Check if Proxmox is configured (either in DB or .env)
+ */
+export async function isProxmoxConfigured(): Promise<boolean> {
+  const runtimeConfig = await getProxmoxRuntimeConfig();
+  return !!(runtimeConfig.host && runtimeConfig.tokenId && runtimeConfig.tokenSecret && runtimeConfig.node);
+}

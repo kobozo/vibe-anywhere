@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useTabs, TabInfo } from '@/hooks/useTabs';
 import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
 import { CreateTabDialog } from './create-tab-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { VoiceButton, VoiceButtonRef } from '@/components/voice/voice-button';
 
 interface TabBarProps {
   workspaceId: string | null;
@@ -12,15 +13,23 @@ interface TabBarProps {
   onSelectTab: (tab: TabInfo | null) => void;
   onTabsChange?: (tabs: TabInfo[]) => void;
   onExposeDeleteTab?: (deleteTab: (tabId: string) => Promise<void>) => void;
+  whisperEnabled?: boolean;
+  onVoiceTranscription?: (text: string) => void;
 }
 
-export function TabBar({
+export interface TabBarRef {
+  toggleVoice: () => Promise<string | null>;
+}
+
+export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
   workspaceId,
   selectedTabId,
   onSelectTab,
   onTabsChange,
   onExposeDeleteTab,
-}: TabBarProps) {
+  whisperEnabled,
+  onVoiceTranscription,
+}, ref) {
   const {
     tabs,
     isLoading,
@@ -36,6 +45,14 @@ export function TabBar({
   const [tabToDelete, setTabToDelete] = useState<TabInfo | null>(null);
   const [agentUpdating, setAgentUpdating] = useState(false);
   const prevAgentUpdating = useRef(false);
+  const voiceButtonRef = useRef<VoiceButtonRef>(null);
+
+  // Expose toggleVoice method to parent
+  useImperativeHandle(ref, () => ({
+    toggleVoice: async () => {
+      return voiceButtonRef.current?.toggle() ?? null;
+    },
+  }), []);
 
   // Handle workspace state updates (agent updating status)
   const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
@@ -203,6 +220,32 @@ export function TabBar({
         </div>
       ))}
 
+      {/* Voice button */}
+      {whisperEnabled && onVoiceTranscription && (() => {
+        const selectedTab = tabs.find(t => t.id === selectedTabId);
+        const isTerminalTab = selectedTab && selectedTab.tabType !== 'git';
+        const isRunning = selectedTab?.status === 'running';
+        const isDisabled = !selectedTabId || !isTerminalTab || !isRunning;
+
+        let disabledReason: string | undefined;
+        if (!selectedTabId) {
+          disabledReason = 'Select a tab first';
+        } else if (!isTerminalTab) {
+          disabledReason = 'Voice input only works with terminal tabs';
+        } else if (!isRunning) {
+          disabledReason = 'Start the tab first';
+        }
+
+        return (
+          <VoiceButton
+            ref={voiceButtonRef}
+            onTranscription={onVoiceTranscription}
+            disabled={isDisabled}
+            disabledReason={disabledReason}
+          />
+        );
+      })()}
+
       {/* New tab button */}
       <button
         onClick={() => setIsCreateDialogOpen(true)}
@@ -232,4 +275,4 @@ export function TabBar({
       />
     </div>
   );
-}
+});

@@ -74,9 +74,10 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => ({}));
-  const { storage, node } = body as {
+  const { storage, node, staging } = body as {
     storage?: string;
     node?: string;
+    staging?: boolean;
   };
 
   const templateManager = getProxmoxTemplateManager();
@@ -107,35 +108,72 @@ export async function POST(
         const templateVmid = await templateService.allocateTemplateVmid();
         sendEvent('progress', { step: 'init', progress: 0, message: `Allocated VMID ${templateVmid}` });
 
+        // Get parent VMID if this template is based on another
+        let parentVmid: number | undefined;
+        if (template.parentTemplateId) {
+          const fetchedParentVmid = await templateService.getParentVmid(id);
+          if (!fetchedParentVmid) {
+            throw new Error('Parent template VMID not found');
+          }
+          parentVmid = fetchedParentVmid;
+          sendEvent('progress', { step: 'init', progress: 2, message: `Cloning from parent template VMID ${parentVmid}` });
+        }
+
         // Get available nodes
         const status = await templateManager.getTemplateStatus();
         const targetNode = node || status.selectedNode || undefined;
 
-        // Create template with progress updates
-        await templateManager.createTemplate(templateVmid, {
+        // Create template with progress updates and log streaming
+        const result = await templateManager.createTemplate(templateVmid, {
           name: template.name,
           storage,
           node: targetNode,
-          techStacks: template.techStacks || [],
+          techStacks: template.techStacks || [], // Only NEW stacks (service already filtered inherited ones)
+          stopAtStaging: staging,
+          parentVmid, // Clone from parent if specified
           onProgress: (progress) => {
             sendEvent('progress', progress);
           },
+          onLog: (type, content) => {
+            sendEvent('log', { type, content, timestamp: Date.now() });
+          },
         });
 
-        // Update template record with success
-        await templateService.updateTemplateStatus(
-          id,
-          'ready',
-          templateVmid,
-          targetNode || status.selectedNode || undefined,
-          storage || 'local'
-        );
+        // Handle staging mode vs full provisioning
+        if (staging && result.containerIp) {
+          // Template is in staging mode - container is running for manual customization
+          await templateService.updateTemplateStatus(
+            id,
+            'staging',
+            templateVmid,
+            targetNode || status.selectedNode || undefined,
+            storage || 'local',
+            undefined,
+            result.containerIp
+          );
 
-        sendEvent('complete', {
-          success: true,
-          vmid: templateVmid,
-          message: 'Template provisioned successfully',
-        });
+          sendEvent('staging', {
+            success: true,
+            vmid: templateVmid,
+            containerIp: result.containerIp,
+            message: 'Container ready for staging customization',
+          });
+        } else {
+          // Update template record with success
+          await templateService.updateTemplateStatus(
+            id,
+            'ready',
+            templateVmid,
+            targetNode || status.selectedNode || undefined,
+            storage || 'local'
+          );
+
+          sendEvent('complete', {
+            success: true,
+            vmid: templateVmid,
+            message: 'Template provisioned successfully',
+          });
+        }
       } catch (error) {
         console.error('Template provisioning error:', error);
 

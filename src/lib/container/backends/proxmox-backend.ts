@@ -1,4 +1,4 @@
-import { config } from '@/lib/config';
+import { config, getProxmoxRuntimeConfig, type ProxmoxRuntimeConfig } from '@/lib/config';
 import { randomBytes } from 'crypto';
 import type { Duplex } from 'stream';
 import type {
@@ -9,7 +9,7 @@ import type {
   ExecResult,
   ContainerBackendType,
 } from '../interfaces';
-import { getProxmoxClient, ProxmoxClient } from '../proxmox/client';
+import { getProxmoxClientAsync, ProxmoxClient, resetProxmoxClient } from '../proxmox/client';
 import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } from '../proxmox/task-poller';
 import { createSSHStream, execSSHCommand, syncWorkspaceToContainer, syncWorkspaceFromContainer, syncSSHKeyToContainer, cloneRepoInContainer, setupContainerSSHAccess } from '../proxmox/ssh-stream';
 import { getSettingsService } from '@/lib/services/settings-service';
@@ -22,19 +22,34 @@ import { generateInstallScript, getTechStacks } from '../proxmox/tech-stacks';
 export class ProxmoxBackend implements IContainerBackend {
   readonly backendType: ContainerBackendType = 'proxmox';
 
-  private client: ProxmoxClient;
+  private client: ProxmoxClient | null = null;
   private containerIps: Map<string, string> = new Map(); // vmid -> IP cache
   private workspacePaths: Map<string, string> = new Map(); // vmid -> local workspace path
 
-  constructor() {
-    this.client = getProxmoxClient();
+  /**
+   * Get the Proxmox client (async initialization)
+   */
+  private async getClient(): Promise<ProxmoxClient> {
+    if (!this.client) {
+      this.client = await getProxmoxClientAsync();
+    }
+    return this.client;
+  }
+
+  /**
+   * Get the runtime config from the client
+   */
+  private async getRuntimeConfig(): Promise<ProxmoxRuntimeConfig> {
+    const client = await this.getClient();
+    return client.getRuntimeConfig();
   }
 
   /**
    * Create a new LXC container for a workspace by cloning from template
    */
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
-    const cfg = config.proxmox;
+    const client = await this.getClient();
+    const cfg = await this.getRuntimeConfig();
     const { workspacePath, env = {}, memoryLimit, cpuLimit, reuseVmid, templateId } = containerConfig;
     const settingsService = getSettingsService();
 
@@ -49,7 +64,7 @@ export class ProxmoxBackend implements IContainerBackend {
     console.log(`Creating LXC container ${newVmid} from template ${templateVmid} for workspace ${workspaceId}${reuseVmid ? ' (reusing VMID)' : ''}`);
 
     // Clone the template
-    const upid = await this.client.cloneLxc(templateVmid, newVmid, {
+    const upid = await client.cloneLxc(templateVmid, newVmid, {
       hostname: `session-hub-${workspaceId.substring(0, 8)}`,
       description: `Session Hub workspace: ${workspaceId}`,
       storage: cfg.storage,
@@ -57,7 +72,7 @@ export class ProxmoxBackend implements IContainerBackend {
     });
 
     // Wait for clone to complete
-    await pollTaskUntilComplete(this.client, upid, {
+    await pollTaskUntilComplete(client, upid, {
       timeoutMs: 120000, // 2 minutes for clone
       onProgress: (status) => {
         console.log(`Clone task status: ${status}`);
@@ -90,7 +105,7 @@ export class ProxmoxBackend implements IContainerBackend {
 
     // Apply configuration
     try {
-      await this.client.setLxcConfig(newVmid, containerConfig2);
+      await client.setLxcConfig(newVmid, containerConfig2);
     } catch (error) {
       console.warn(`Could not apply container config for ${newVmid}:`, error);
       // Continue anyway - template defaults should work
@@ -109,24 +124,25 @@ export class ProxmoxBackend implements IContainerBackend {
    * Start an LXC container
    */
   async startContainer(containerId: string): Promise<void> {
+    const client = await this.getClient();
+    const cfg = await this.getRuntimeConfig();
     const vmid = parseInt(containerId, 10);
     console.log(`Starting LXC container ${vmid}`);
 
-    const upid = await this.client.startLxc(vmid);
-    await pollTaskUntilComplete(this.client, upid, { timeoutMs: 60000 });
+    const upid = await client.startLxc(vmid);
+    await pollTaskUntilComplete(client, upid, { timeoutMs: 60000 });
 
     // Wait for container to be running
-    await waitForContainerRunning(this.client, vmid);
+    await waitForContainerRunning(client, vmid);
 
     // Wait for IP and cache it
     try {
-      const ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      const ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
       console.log(`LXC container ${vmid} started with IP: ${ip}`);
 
       // Setup SSH access to the container via pct exec on Proxmox host
       // This must happen before any SSH-based operations (rsync, agent provisioning)
-      const cfg = config.proxmox;
       if (cfg.host) {
         try {
           await setupContainerSSHAccess(cfg.host, vmid);
@@ -144,18 +160,19 @@ export class ProxmoxBackend implements IContainerBackend {
    * Stop an LXC container
    */
   async stopContainer(containerId: string, timeout = 30): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
     console.log(`Stopping LXC container ${vmid}`);
 
     try {
       // Try graceful shutdown first
-      const upid = await this.client.shutdownLxc(vmid, timeout);
-      await pollTaskUntilComplete(this.client, upid, { timeoutMs: (timeout + 10) * 1000 });
+      const upid = await client.shutdownLxc(vmid, timeout);
+      await pollTaskUntilComplete(client, upid, { timeoutMs: (timeout + 10) * 1000 });
     } catch (error) {
       // If shutdown fails, force stop
       console.warn(`Graceful shutdown failed for ${vmid}, forcing stop:`, error);
-      const upid = await this.client.stopLxc(vmid, 5);
-      await pollTaskUntilComplete(this.client, upid, { timeoutMs: 30000 });
+      const upid = await client.stopLxc(vmid, 5);
+      await pollTaskUntilComplete(client, upid, { timeoutMs: 30000 });
     }
 
     // Clear cached IP
@@ -167,12 +184,13 @@ export class ProxmoxBackend implements IContainerBackend {
    * Remove an LXC container
    */
   async removeContainer(containerId: string): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
     console.log(`Removing LXC container ${vmid}`);
 
     try {
       // Ensure container is stopped first
-      const status = await this.client.getLxcStatus(vmid);
+      const status = await client.getLxcStatus(vmid);
       if (status.status !== 'stopped') {
         await this.stopContainer(containerId);
       }
@@ -181,8 +199,8 @@ export class ProxmoxBackend implements IContainerBackend {
     }
 
     try {
-      const upid = await this.client.deleteLxc(vmid, true);
-      await pollTaskUntilComplete(this.client, upid, { timeoutMs: 60000 });
+      const upid = await client.deleteLxc(vmid, true);
+      await pollTaskUntilComplete(client, upid, { timeoutMs: 60000 });
       console.log(`LXC container ${vmid} removed`);
     } catch (error) {
       // Container might not exist
@@ -197,10 +215,11 @@ export class ProxmoxBackend implements IContainerBackend {
    * Get container status
    */
   async getContainerInfo(containerId: string): Promise<ContainerInfo | null> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
 
     try {
-      const status = await this.client.getLxcStatus(vmid);
+      const status = await client.getLxcStatus(vmid);
 
       // Map Proxmox status to our status
       let containerStatus: ContainerInfo['status'];
@@ -219,7 +238,7 @@ export class ProxmoxBackend implements IContainerBackend {
       let ipAddress = this.containerIps.get(containerId);
       if (!ipAddress && status.status === 'running') {
         try {
-          ipAddress = await waitForContainerIp(this.client, vmid, { timeoutMs: 5000 });
+          ipAddress = await waitForContainerIp(client, vmid, { timeoutMs: 5000 });
           this.containerIps.set(containerId, ipAddress);
         } catch {
           // IP not available yet
@@ -248,6 +267,8 @@ export class ProxmoxBackend implements IContainerBackend {
    * Execute an interactive command in the container via SSH
    */
   async execCommand(containerId: string, command?: string[] | null): Promise<ContainerStream> {
+    const client = await this.getClient();
+    const cfg = await this.getRuntimeConfig();
     const vmid = parseInt(containerId, 10);
     const cmd = command && command.length > 0 ? command : ['/bin/bash'];
 
@@ -257,7 +278,7 @@ export class ProxmoxBackend implements IContainerBackend {
     let ip = this.containerIps.get(containerId);
     if (!ip) {
       // Try to get IP
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 10000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 10000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -272,7 +293,6 @@ export class ProxmoxBackend implements IContainerBackend {
     }
 
     // Create SSH stream - use configured SSH user (defaults to kobozo)
-    const cfg = config.proxmox;
     const streamResult = await createSSHStream(
       { host: ip, username: cfg.sshUser },
       {
@@ -293,12 +313,14 @@ export class ProxmoxBackend implements IContainerBackend {
    * Execute a command and return the result
    */
   async executeCommand(containerId: string, command: string[]): Promise<ExecResult> {
+    const client = await this.getClient();
+    const cfg = await this.getRuntimeConfig();
     const vmid = parseInt(containerId, 10);
 
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 10000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 10000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -309,7 +331,6 @@ export class ProxmoxBackend implements IContainerBackend {
     }
 
     // Use configured SSH user (defaults to kobozo)
-    const cfg = config.proxmox;
     return execSSHCommand(
       { host: ip, username: cfg.sshUser },
       command,
@@ -356,12 +377,14 @@ export class ProxmoxBackend implements IContainerBackend {
     remotePath: string = '/workspace',
     options: { branchName?: string; remoteUrl?: string } = {}
   ): Promise<void> {
+    const client = await this.getClient();
+    const cfg = await this.getRuntimeConfig();
     const vmid = parseInt(containerId, 10);
 
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -400,8 +423,7 @@ export class ProxmoxBackend implements IContainerBackend {
         `;
         try {
           // Use configured SSH user for git operations (kobozo owns /workspace)
-          const proxmoxCfg = config.proxmox;
-          await execSSHCommand({ host: ip, username: proxmoxCfg.sshUser }, ['bash', '-c', gitSetupScript], { workingDir: '/' });
+          await execSSHCommand({ host: ip, username: cfg.sshUser }, ['bash', '-c', gitSetupScript], { workingDir: '/' });
           console.log(`Git repo initialized in container ${vmid}`);
         } catch (gitError) {
           console.warn(`Could not setup git in container ${vmid}:`, gitError);
@@ -419,12 +441,13 @@ export class ProxmoxBackend implements IContainerBackend {
    * This saves any changes made inside the container back to the worktree
    */
   async syncWorkspaceBack(containerId: string, remotePath: string, localPath: string): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
 
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 10000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 10000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -457,12 +480,13 @@ export class ProxmoxBackend implements IContainerBackend {
    * Sync an SSH key to the container for git operations
    */
   async syncSSHKey(containerId: string, privateKey: string, keyName: string = 'id_ed25519'): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
 
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -474,12 +498,13 @@ export class ProxmoxBackend implements IContainerBackend {
    * Called after container starts to ensure it gets an IP
    */
   async configureNetworking(containerId: string): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
 
     // Get container IP (will trigger DHCP if needed)
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 90000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 90000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -529,12 +554,13 @@ EOF
     branchName: string,
     sshKeyContent?: string
   ): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
 
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -554,13 +580,13 @@ EOF
     workspaceId: string,
     agentToken: string
   ): Promise<void> {
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
-    const cfg = config.proxmox;
 
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
     }
 
@@ -669,6 +695,7 @@ EOF
       return;
     }
 
+    const client = await this.getClient();
     const vmid = parseInt(containerId, 10);
     const stacks = getTechStacks(techStackIds);
 
@@ -680,7 +707,7 @@ EOF
     // Get container IP
     let ip = this.containerIps.get(containerId);
     if (!ip) {
-      ip = await waitForContainerIp(this.client, vmid, { timeoutMs: 30000 });
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
       this.containerIps.set(containerId, ip);
     }
 

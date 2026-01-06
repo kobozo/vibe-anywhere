@@ -63,6 +63,7 @@ export const portForwardProtocolEnum = pgEnum('port_forward_protocol', [
 export const templateStatusEnum = pgEnum('template_status', [
   'pending',
   'provisioning',
+  'staging',
   'ready',
   'error',
 ]);
@@ -83,15 +84,18 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
+  parentTemplateId: uuid('parent_template_id'), // Self-reference for template inheritance
   name: text('name').notNull(),
   description: text('description'),
   vmid: integer('vmid').unique(), // Actual Proxmox VMID (null until created)
   node: text('node'), // Proxmox node
   storage: text('storage'), // Storage used
   status: templateStatusEnum('status').default('pending').notNull(),
-  techStacks: jsonb('tech_stacks').$type<string[]>().default([]),
+  techStacks: jsonb('tech_stacks').$type<string[]>().default([]), // New tech stacks added to this template
+  inheritedTechStacks: jsonb('inherited_tech_stacks').$type<string[]>().default([]), // Tech stacks inherited from parent
   isDefault: boolean('is_default').default(false).notNull(),
   errorMessage: text('error_message'), // Error details if status is 'error'
+  stagingContainerIp: text('staging_container_ip'), // IP address when in staging mode
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -312,6 +316,14 @@ export const proxmoxTemplatesRelations = relations(proxmoxTemplates, ({ one, man
   user: one(users, {
     fields: [proxmoxTemplates.userId],
     references: [users.id],
+  }),
+  parentTemplate: one(proxmoxTemplates, {
+    fields: [proxmoxTemplates.parentTemplateId],
+    references: [proxmoxTemplates.id],
+    relationName: 'templateInheritance',
+  }),
+  childTemplates: many(proxmoxTemplates, {
+    relationName: 'templateInheritance',
   }),
   repositories: many(repositories),
 }));

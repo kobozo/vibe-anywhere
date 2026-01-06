@@ -1,5 +1,5 @@
 import proxmoxApi from 'proxmox-api';
-import { config } from '@/lib/config';
+import { config, getProxmoxRuntimeConfig, type ProxmoxRuntimeConfig } from '@/lib/config';
 
 export interface ProxmoxNode {
   node: string;
@@ -43,13 +43,14 @@ export interface ProxmoxTaskStatus {
 export class ProxmoxClient {
   private proxmox: ReturnType<typeof proxmoxApi>;
   private node: string;
+  private runtimeConfig: ProxmoxRuntimeConfig;
 
-  constructor() {
-    const cfg = config.proxmox;
+  constructor(runtimeConfig: ProxmoxRuntimeConfig) {
+    this.runtimeConfig = runtimeConfig;
 
-    if (!cfg.host || !cfg.tokenId || !cfg.tokenSecret || !cfg.node) {
+    if (!runtimeConfig.host || !runtimeConfig.tokenId || !runtimeConfig.tokenSecret || !runtimeConfig.node) {
       throw new Error(
-        'Proxmox configuration incomplete. Required: PROXMOX_HOST, PROXMOX_TOKEN_ID, PROXMOX_TOKEN_SECRET, PROXMOX_NODE'
+        'Proxmox configuration incomplete. Required: host, tokenId, tokenSecret, node'
       );
     }
 
@@ -57,13 +58,20 @@ export class ProxmoxClient {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
     this.proxmox = proxmoxApi({
-      host: cfg.host,
-      port: cfg.port,
-      tokenID: cfg.tokenId,
-      tokenSecret: cfg.tokenSecret,
+      host: runtimeConfig.host,
+      port: runtimeConfig.port,
+      tokenID: runtimeConfig.tokenId,
+      tokenSecret: runtimeConfig.tokenSecret,
     });
 
-    this.node = cfg.node;
+    this.node = runtimeConfig.node;
+  }
+
+  /**
+   * Get the runtime config used by this client
+   */
+  getRuntimeConfig(): ProxmoxRuntimeConfig {
+    return this.runtimeConfig;
   }
 
   /**
@@ -105,7 +113,7 @@ export class ProxmoxClient {
       newid: newVmid,
       hostname: options.hostname,
       description: options.description,
-      storage: options.storage || config.proxmox.storage,
+      storage: options.storage || this.runtimeConfig.storage,
       full: options.full ?? true,
     });
 
@@ -129,7 +137,7 @@ export class ProxmoxClient {
       mp0?: string;  // Mount point for workspace
     } = {}
   ): Promise<string> {
-    const cfg = config.proxmox;
+    const cfg = this.runtimeConfig;
 
     // Build network configuration
     let net0 = options.net0 || `name=eth0,bridge=${cfg.bridge},ip=dhcp`;
@@ -227,7 +235,7 @@ export class ProxmoxClient {
    * Find the next available VMID in the configured range
    */
   async getNextVmid(): Promise<number> {
-    const cfg = config.proxmox;
+    const cfg = this.runtimeConfig;
     const containers = await this.getLxcContainers();
     const usedVmids = new Set(containers.map(c => c.vmid));
 
@@ -246,7 +254,7 @@ export class ProxmoxClient {
    * Check if the template VMID exists
    */
   async templateExists(): Promise<boolean> {
-    const templateVmid = config.proxmox.templateVmid;
+    const templateVmid = this.runtimeConfig.templateVmid;
     if (!templateVmid) return false;
 
     try {
@@ -284,7 +292,7 @@ export class ProxmoxClient {
       features?: string;    // Optional features (e.g., 'nesting=1')
     }
   ): Promise<string> {
-    const cfg = config.proxmox;
+    const cfg = this.runtimeConfig;
 
     // Build network configuration
     // Use provided vlanTag, fall back to config
@@ -356,7 +364,7 @@ export class ProxmoxClient {
    * Returns UPID for tracking the download task
    */
   async downloadAppliance(template: string, storage?: string): Promise<string> {
-    const storageId = storage || config.proxmox.storage || 'local';
+    const storageId = storage || this.runtimeConfig.storage || 'local';
     return await this.proxmox.nodes.$(this.node).aplinfo.$post({
       storage: storageId,
       template,
@@ -367,7 +375,7 @@ export class ProxmoxClient {
    * Check if a specific appliance template exists in storage
    */
   async applianceTemplateExists(templateName: string, storage?: string): Promise<boolean> {
-    const storageId = storage || config.proxmox.storage || 'local';
+    const storageId = storage || this.runtimeConfig.storage || 'local';
     try {
       // List content in storage looking for vztmpl (container templates)
       const content = await this.proxmox.nodes.$(this.node).storage.$(storageId).content.$get({
@@ -389,7 +397,7 @@ export class ProxmoxClient {
    * Returns format: "storage:vztmpl/template-name.tar.zst"
    */
   async getApplianceTemplatePath(templateName: string, storage?: string): Promise<string | null> {
-    const storageId = storage || config.proxmox.storage || 'local';
+    const storageId = storage || this.runtimeConfig.storage || 'local';
     try {
       const content = await this.proxmox.nodes.$(this.node).storage.$(storageId).content.$get({
         content: 'vztmpl',
@@ -410,9 +418,50 @@ export class ProxmoxClient {
 // Singleton instance
 let proxmoxClientInstance: ProxmoxClient | null = null;
 
-export function getProxmoxClient(): ProxmoxClient {
+/**
+ * Get or create the Proxmox client singleton (async)
+ * Uses runtime config from DB with .env fallback
+ */
+export async function getProxmoxClientAsync(): Promise<ProxmoxClient> {
   if (!proxmoxClientInstance) {
-    proxmoxClientInstance = new ProxmoxClient();
+    const runtimeConfig = await getProxmoxRuntimeConfig();
+    proxmoxClientInstance = new ProxmoxClient(runtimeConfig);
   }
   return proxmoxClientInstance;
+}
+
+/**
+ * @deprecated Use getProxmoxClientAsync() instead
+ * Synchronous getter for backwards compatibility - uses .env config only
+ */
+export function getProxmoxClient(): ProxmoxClient {
+  if (!proxmoxClientInstance) {
+    // Fall back to static .env config for backwards compatibility
+    const staticConfig = config.proxmox;
+    proxmoxClientInstance = new ProxmoxClient({
+      host: staticConfig.host,
+      port: staticConfig.port,
+      tokenId: staticConfig.tokenId,
+      tokenSecret: staticConfig.tokenSecret,
+      node: staticConfig.node,
+      storage: staticConfig.storage,
+      bridge: staticConfig.bridge,
+      vlanTag: staticConfig.vlanTag,
+      sshUser: staticConfig.sshUser,
+      sshPrivateKeyPath: staticConfig.sshPrivateKeyPath,
+      memoryMb: staticConfig.memoryMb,
+      cores: staticConfig.cores,
+      claudeConfigPath: staticConfig.claudeConfigPath,
+      templateVmid: staticConfig.templateVmid,
+      vmidRange: staticConfig.vmidRange,
+    });
+  }
+  return proxmoxClientInstance;
+}
+
+/**
+ * Reset the client singleton (useful for testing or when config changes)
+ */
+export function resetProxmoxClient(): void {
+  proxmoxClientInstance = null;
 }

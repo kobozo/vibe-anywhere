@@ -24,6 +24,8 @@ export function TemplateSection({
         return <span className="text-green-400">&#x2713;</span>;
       case 'provisioning':
         return <span className="animate-spin text-yellow-400">&#x21BB;</span>;
+      case 'staging':
+        return <span className="text-blue-400">&#x25A0;</span>;
       case 'error':
         return <span className="text-red-400">&#x2717;</span>;
       case 'pending':
@@ -38,6 +40,8 @@ export function TemplateSection({
         return 'border-l-2 border-l-green-500/50';
       case 'provisioning':
         return 'border-l-2 border-l-yellow-500/50 bg-yellow-500/5';
+      case 'staging':
+        return 'border-l-2 border-l-blue-500/50 bg-blue-500/5';
       case 'error':
         return 'border-l-2 border-l-red-500/50 bg-red-500/5';
       default:
@@ -108,11 +112,13 @@ export function TemplateSection({
                   <span className={`text-xs ${
                     template.status === 'ready' ? 'text-green-400/70' :
                     template.status === 'provisioning' ? 'text-yellow-400/70' :
+                    template.status === 'staging' ? 'text-blue-400/70' :
                     template.status === 'error' ? 'text-red-400/70' :
                     'text-gray-500'
                   }`}>
                     {template.status === 'ready' && template.vmid ? `VMID: ${template.vmid}` :
                      template.status === 'provisioning' ? 'Provisioning...' :
+                     template.status === 'staging' ? `Staging (${template.stagingContainerIp || 'connecting...'})` :
                      template.status === 'error' ? 'Failed - click for details' :
                      'Not provisioned'}
                   </span>

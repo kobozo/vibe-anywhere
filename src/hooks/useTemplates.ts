@@ -9,6 +9,7 @@ export interface CreateTemplateInput {
   description?: string;
   techStacks?: string[];
   isDefault?: boolean;
+  parentTemplateId?: string; // Clone from this parent template
 }
 
 export interface UpdateTemplateInput {
@@ -23,8 +24,17 @@ export interface ProvisionProgress {
   message: string;
 }
 
+export interface LogEntry {
+  type: 'stdout' | 'stderr';
+  content: string;
+  timestamp: number;
+}
+
 // Track active provisioning streams per template
 const activeProvisionStreams = new Map<string, AbortController>();
+
+// Maximum number of log entries to keep in memory
+const MAX_LOG_ENTRIES = 1000;
 
 export function useTemplates() {
   const { token } = useAuth();
@@ -35,6 +45,26 @@ export function useTemplates() {
   // Track which templates are currently provisioning (for polling)
   const [provisioningTemplates, setProvisioningTemplates] = useState<Set<string>>(new Set());
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Installation logs
+  const [provisionLogs, setProvisionLogs] = useState<LogEntry[]>([]);
+
+  // Clear logs (call when starting new provisioning)
+  const clearProvisionLogs = useCallback(() => {
+    setProvisionLogs([]);
+  }, []);
+
+  // Add log entry with limit
+  const addLogEntry = useCallback((entry: LogEntry) => {
+    setProvisionLogs((prev) => {
+      const next = [...prev, entry];
+      // Keep only the last MAX_LOG_ENTRIES
+      if (next.length > MAX_LOG_ENTRIES) {
+        return next.slice(-MAX_LOG_ENTRIES);
+      }
+      return next;
+    });
+  }, []);
 
   const fetchTemplates = useCallback(async () => {
     if (!token) return;
@@ -134,10 +164,15 @@ export function useTemplates() {
   const provisionTemplate = useCallback(
     async (
       templateId: string,
-      options?: { storage?: string; node?: string },
-      onProgress?: (progress: ProvisionProgress) => void
+      options?: { storage?: string; node?: string; staging?: boolean },
+      onProgress?: (progress: ProvisionProgress) => void,
+      onStaging?: (result: { vmid: number; containerIp: string }) => void,
+      onLog?: (entry: LogEntry) => void
     ): Promise<void> => {
       if (!token) throw new Error('Not authenticated');
+
+      // Clear previous logs when starting new provisioning
+      clearProvisionLogs();
 
       const response = await fetch(`/api/templates/${templateId}/provision`, {
         method: 'POST',
@@ -180,8 +215,16 @@ export function useTemplates() {
 
             if (event === 'progress' && onProgress) {
               onProgress(data as ProvisionProgress);
+            } else if (event === 'log') {
+              const logEntry = data as LogEntry;
+              addLogEntry(logEntry);
+              onLog?.(logEntry);
             } else if (event === 'error') {
               throw new Error(data.message);
+            } else if (event === 'staging' && onStaging) {
+              // Template is in staging mode - refresh and notify
+              await fetchTemplates();
+              onStaging({ vmid: data.vmid, containerIp: data.containerIp });
             } else if (event === 'complete') {
               // Refresh templates to get updated status
               await fetchTemplates();
@@ -190,7 +233,7 @@ export function useTemplates() {
         }
       }
     },
-    [token, fetchTemplates]
+    [token, fetchTemplates, clearProvisionLogs, addLogEntry]
   );
 
   const recreateTemplate = useCallback(
@@ -261,15 +304,20 @@ export function useTemplates() {
   const startProvisionInBackground = useCallback(
     (
       templateId: string,
-      options?: { storage?: string; node?: string },
+      options?: { storage?: string; node?: string; staging?: boolean },
       onProgress?: (progress: ProvisionProgress) => void,
       onComplete?: () => void,
-      onError?: (error: Error) => void
+      onError?: (error: Error) => void,
+      onStaging?: (result: { vmid: number; containerIp: string }) => void,
+      onLog?: (entry: LogEntry) => void
     ): void => {
       if (!token) {
         onError?.(new Error('Not authenticated'));
         return;
       }
+
+      // Clear previous logs when starting new provisioning
+      clearProvisionLogs();
 
       // Cancel any existing stream for this template
       const existingController = activeProvisionStreams.get(templateId);
@@ -327,8 +375,14 @@ export function useTemplates() {
 
                 if (event === 'progress' && onProgress) {
                   onProgress(data as ProvisionProgress);
+                } else if (event === 'log') {
+                  const logEntry = data as LogEntry;
+                  addLogEntry(logEntry);
+                  onLog?.(logEntry);
                 } else if (event === 'error') {
                   throw new Error(data.message);
+                } else if (event === 'staging' && onStaging) {
+                  onStaging({ vmid: data.vmid, containerIp: data.containerIp });
                 } else if (event === 'complete') {
                   onComplete?.();
                 }
@@ -352,7 +406,7 @@ export function useTemplates() {
           fetchTemplates();
         });
     },
-    [token, fetchTemplates]
+    [token, fetchTemplates, clearProvisionLogs, addLogEntry]
   );
 
   /**
@@ -455,6 +509,69 @@ export function useTemplates() {
   );
 
   /**
+   * Finalize a staging template (stop container and convert to template)
+   */
+  const finalizeTemplate = useCallback(
+    async (
+      templateId: string,
+      onProgress?: (progress: ProvisionProgress) => void
+    ): Promise<void> => {
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`/api/templates/${templateId}/finalize`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
+        const { error } = await response.json();
+        throw new Error(error?.message || 'Failed to finalize template');
+      }
+
+      // Handle SSE stream
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          const eventMatch = line.match(/event: (\w+)/);
+          const dataMatch = line.match(/data: (.+)/);
+
+          if (eventMatch && dataMatch) {
+            const event = eventMatch[1];
+            const data = JSON.parse(dataMatch[1]);
+
+            if (event === 'progress' && onProgress) {
+              onProgress(data as ProvisionProgress);
+            } else if (event === 'error') {
+              throw new Error(data.message);
+            } else if (event === 'complete') {
+              // Refresh templates to get updated status
+              await fetchTemplates();
+            }
+          }
+        }
+      }
+    },
+    [token, fetchTemplates]
+  );
+
+  /**
    * Check if a specific template is currently provisioning
    */
   const isTemplateProvisioning = useCallback(
@@ -504,10 +621,14 @@ export function useTemplates() {
     deleteTemplate,
     provisionTemplate,
     recreateTemplate,
+    finalizeTemplate,
     // Background provisioning
     startProvisionInBackground,
     startRecreateInBackground,
     isTemplateProvisioning,
     provisioningTemplates,
+    // Installation logs
+    provisionLogs,
+    clearProvisionLogs,
   };
 }

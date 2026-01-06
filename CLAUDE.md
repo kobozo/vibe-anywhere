@@ -73,6 +73,7 @@ Session Hub is a web application for running persistent Claude Code CLI instance
 | WebSocket Server | `src/lib/websocket/server.ts` |
 | Terminal Component | `src/components/terminal/terminal.tsx` |
 | API Routes | `src/app/api/sessions/` |
+| Tech Stack Definitions | `src/lib/container/proxmox/tech-stacks.ts` |
 
 ## Commands
 
@@ -135,12 +136,21 @@ See `.env.example` for all required variables:
 
 ## Proxmox LXC Configuration
 
+### Tech Stack Installation
+Tech stacks (Node.js, Python, Claude CLI, etc.) are defined in `src/lib/container/proxmox/tech-stacks.ts`.
+
+**Important**: All AI assistants (Claude, Gemini, Codex, etc.) are installed for the `kobozo` user, NOT globally as root. This avoids permission issues with auto-updates and configuration. The install scripts:
+1. Create `~/.npm-global` directory for the user
+2. Configure npm to use this local prefix
+3. Add the path to `~/.bashrc`
+4. Install packages as the `kobozo` user
+
 ### Template (VMID 150)
 The Proxmox LXC template contains:
 - Debian 12 (Bookworm)
 - Node.js 22.x
 - Docker
-- Claude Code CLI
+- Claude Code CLI (installed per-user in `~/.npm-global`)
 - GitHub CLI (gh)
 - tmux, git, vim, jq
 - Session Hub Agent (systemd service)

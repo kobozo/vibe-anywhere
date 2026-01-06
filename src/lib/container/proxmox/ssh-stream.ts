@@ -257,10 +257,11 @@ export async function execSSHCommand(
   options: {
     workingDir?: string;
     env?: Record<string, string>;
+    onOutput?: (type: 'stdout' | 'stderr', data: string) => void;
   } = {}
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const ssh = await createSSHConnection(connectionOptions);
-  const { workingDir = '/workspace', env = {} } = options;
+  const { workingDir = '/workspace', env = {}, onOutput } = options;
 
   return new Promise((resolve, reject) => {
     const cmdString = command.map(arg => {
@@ -290,11 +291,15 @@ export async function execSSHCommand(
       let stderr = '';
 
       channel.on('data', (data: Buffer) => {
-        stdout += data.toString();
+        const text = data.toString();
+        stdout += text;
+        onOutput?.('stdout', text);
       });
 
       channel.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        const text = data.toString();
+        stderr += text;
+        onOutput?.('stderr', text);
       });
 
       channel.on('close', (code: number) => {

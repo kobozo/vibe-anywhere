@@ -12,6 +12,8 @@ import {
 } from '@/lib/services';
 import { getTabStreamManager } from '@/lib/services/tab-stream-manager';
 import { getWorkspaceStateBroadcaster } from '@/lib/services/workspace-state-broadcaster';
+import { getTemplateService } from '@/lib/services/template-service';
+import { createSSHStream } from '@/lib/container/proxmox/ssh-stream';
 import type { ContainerStream } from '@/lib/container';
 
 interface AuthenticatedSocket extends Socket {
@@ -19,6 +21,8 @@ interface AuthenticatedSocket extends Socket {
   tabId?: string;
   sessionId?: string; // Legacy support
   containerStream?: ContainerStream; // Legacy support only
+  stagingTemplateId?: string; // For staging terminal connections
+  stagingStream?: ContainerStream; // SSH stream for staging terminal
 }
 
 // Track pending file uploads for relay between browser and agent
@@ -96,12 +100,28 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
+    // Handle staging template terminal attachment
+    socket.on('staging:attach', async (data: { templateId: string }) => {
+      try {
+        await handleStagingAttach(socket, data.templateId);
+      } catch (error) {
+        console.error('Error attaching to staging template:', error);
+        socket.emit('error', { message: error instanceof Error ? error.message : 'Failed to attach to staging terminal' });
+      }
+    });
+
     // Handle terminal input
     socket.on('terminal:input', (data: { data: string }) => {
       // Try v2 tab stream manager first
       if (socket.tabId) {
         const sent = tabStreamManager.sendInput(socket.tabId, data.data);
         if (sent) return;
+      }
+
+      // Try staging terminal stream
+      if (socket.stagingStream) {
+        socket.stagingStream.stream.write(data.data);
+        return;
       }
 
       // Fall back to legacy socket-attached stream
@@ -116,6 +136,12 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
         // Try v2 tab stream manager first
         if (socket.tabId) {
           await tabStreamManager.resize(socket.tabId, data.cols, data.rows);
+          return;
+        }
+
+        // Try staging terminal stream
+        if (socket.stagingStream) {
+          await socket.stagingStream.resize(data.cols, data.rows);
           return;
         }
 
@@ -330,6 +356,11 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
       // Detach from all tab streams (keeps streams running)
       tabStreamManager.detachFromAll(socket);
+
+      // Close staging terminal stream
+      if (socket.stagingStream) {
+        socket.stagingStream.close().catch(console.error);
+      }
 
       // Legacy: close socket-attached stream
       if (socket.containerStream) {
@@ -654,4 +685,80 @@ async function handleSessionAttach(socket: AuthenticatedSocket, sessionId: strin
 
   // Notify client that attachment is complete
   socket.emit('session:attached', { sessionId });
+}
+
+/**
+ * Handle attachment to a staging template's container for SSH terminal
+ */
+async function handleStagingAttach(socket: AuthenticatedSocket, templateId: string) {
+  console.log(`[StagingAttach] Received request for templateId: ${templateId}`);
+  const templateService = getTemplateService();
+
+  // Get template
+  const template = await templateService.getTemplate(templateId);
+  if (!template) {
+    console.log(`[StagingAttach] Template not found: ${templateId}`);
+    throw new Error('Template not found');
+  }
+  console.log(`[StagingAttach] Template found:`, {
+    id: template.id,
+    name: template.name,
+    status: template.status,
+    stagingContainerIp: template.stagingContainerIp,
+    userId: template.userId,
+  });
+
+  // Verify ownership
+  if (template.userId !== socket.userId) {
+    console.log(`[StagingAttach] Unauthorized: template.userId=${template.userId}, socket.userId=${socket.userId}`);
+    throw new Error('Not authorized');
+  }
+
+  // Verify template is in staging status
+  if (template.status !== 'staging') {
+    console.log(`[StagingAttach] Not in staging mode: ${template.status}`);
+    throw new Error('Template is not in staging mode');
+  }
+
+  // Verify staging container IP is available
+  if (!template.stagingContainerIp) {
+    console.log(`[StagingAttach] No staging container IP available`);
+    throw new Error('Staging container IP not available');
+  }
+
+  // Close any existing staging stream
+  if (socket.stagingStream) {
+    console.log(`[StagingAttach] Closing existing staging stream`);
+    await socket.stagingStream.close().catch(console.error);
+  }
+
+  // Create SSH connection to staging container
+  console.log(`[StagingAttach] Creating SSH connection to ${template.stagingContainerIp}`);
+  const containerStream = await createSSHStream(
+    { host: template.stagingContainerIp, username: 'root' },
+    { cols: 80, rows: 24, workingDir: '/' }
+  );
+  console.log(`[StagingAttach] SSH connection established`);
+
+  socket.stagingTemplateId = templateId;
+  socket.stagingStream = containerStream;
+
+  // Stream output to client
+  containerStream.stream.on('data', (chunk: Buffer) => {
+    socket.emit('terminal:output', { data: chunk.toString() });
+  });
+
+  containerStream.stream.on('end', () => {
+    console.log(`[StagingAttach] Stream ended for template ${templateId}`);
+    socket.emit('terminal:end', { message: 'Staging terminal disconnected' });
+  });
+
+  containerStream.stream.on('error', (error: Error) => {
+    console.error('[StagingAttach] Stream error:', error);
+    socket.emit('error', { message: 'Terminal connection error' });
+  });
+
+  // Notify client that attachment is complete
+  console.log(`[StagingAttach] Emitting staging:attached for ${templateId}`);
+  socket.emit('staging:attached', { templateId });
 }

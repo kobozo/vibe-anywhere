@@ -1,38 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { ProxmoxTemplate } from '@/lib/db/schema';
-import type { ProvisionProgress } from '@/hooks/useTemplates';
+import type { ProvisionProgress, LogEntry } from '@/hooks/useTemplates';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface TemplateDetailsModalProps {
   isOpen: boolean;
   template: ProxmoxTemplate | null;
+  templates?: ProxmoxTemplate[]; // All templates (to find parent by ID)
   onClose: () => void;
   onEdit: (template: ProxmoxTemplate) => void;
   onProvision: (template: ProxmoxTemplate) => void;
   onRecreate: (template: ProxmoxTemplate) => void;
   onDelete: (templateId: string) => Promise<void>;
+  onClone?: (template: ProxmoxTemplate) => void; // Clone this template
+  onOpenStagingTerminal?: (template: ProxmoxTemplate) => void;
+  onFinalize?: (template: ProxmoxTemplate) => void;
   // Provisioning state (passed from parent)
   isProvisioning?: boolean;
   provisionProgress?: ProvisionProgress | null;
   provisionError?: string | null;
+  provisionLogs?: LogEntry[];
 }
 
 export function TemplateDetailsModal({
   isOpen,
   template,
+  templates = [],
   onClose,
   onEdit,
   onProvision,
   onRecreate,
   onDelete,
+  onClone,
+  onOpenStagingTerminal,
+  onFinalize,
   isProvisioning = false,
   provisionProgress = null,
   provisionError = null,
+  provisionLogs = [],
 }: TemplateDetailsModalProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  const hasAutoExpandedRef = useRef(false);
+
+  // Find parent template if this template has one
+  const parentTemplate = template?.parentTemplateId
+    ? templates.find((t) => t.id === template.parentTemplateId)
+    : null;
+
+  // Auto-scroll to bottom when new logs arrive
+  useEffect(() => {
+    if (showLogs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [provisionLogs, showLogs]);
+
+  // Reset auto-expand tracking when provisioning stops
+  useEffect(() => {
+    if (!isProvisioning) {
+      hasAutoExpandedRef.current = false;
+    }
+  }, [isProvisioning]);
+
+  // Auto-expand logs once when provisioning starts (user can minimize and it stays minimized)
+  useEffect(() => {
+    if (isProvisioning && provisionLogs.length > 0 && !hasAutoExpandedRef.current) {
+      setShowLogs(true);
+      hasAutoExpandedRef.current = true;
+    }
+  }, [isProvisioning, provisionLogs.length]);
 
   if (!isOpen || !template) return null;
 
@@ -40,6 +80,7 @@ export function TemplateDetailsModal({
     switch (template.status) {
       case 'ready': return 'text-green-400';
       case 'provisioning': return 'text-yellow-400';
+      case 'staging': return 'text-blue-400';
       case 'error': return 'text-red-400';
       default: return 'text-gray-400';
     }
@@ -49,6 +90,7 @@ export function TemplateDetailsModal({
     switch (template.status) {
       case 'ready': return 'bg-green-500/20';
       case 'provisioning': return 'bg-yellow-500/20';
+      case 'staging': return 'bg-blue-500/20';
       case 'error': return 'bg-red-500/20';
       default: return 'bg-gray-500/20';
     }
@@ -58,6 +100,7 @@ export function TemplateDetailsModal({
     switch (template.status) {
       case 'ready': return 'Ready';
       case 'provisioning': return 'Provisioning...';
+      case 'staging': return 'Staging';
       case 'error': return 'Error';
       default: return 'Not Provisioned';
     }
@@ -103,6 +146,8 @@ export function TemplateDetailsModal({
                 <span className="animate-spin text-yellow-400">&#x21BB;</span>
               ) : template.status === 'ready' ? (
                 <span className="text-green-400">&#x2713;</span>
+              ) : template.status === 'staging' ? (
+                <span className="text-blue-400">&#x25A0;</span>
               ) : template.status === 'error' ? (
                 <span className="text-red-400">&#x2717;</span>
               ) : (
@@ -112,6 +157,24 @@ export function TemplateDetailsModal({
                 {isProvisioning ? 'Provisioning...' : getStatusText()}
               </span>
             </div>
+
+            {/* Staging Info */}
+            {template.status === 'staging' && template.stagingContainerIp && (
+              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-400">&#x2139;</span>
+                  <div>
+                    <p className="text-blue-400 font-medium">Container Running in Staging Mode</p>
+                    <p className="text-sm text-blue-300 mt-1">
+                      IP: {template.stagingContainerIp} | VMID: {template.vmid}
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Open the terminal to customize, then finalize to convert to template.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Provisioning Progress */}
             {(isProvisioning || template.status === 'provisioning') && (
@@ -128,6 +191,37 @@ export function TemplateDetailsModal({
                 </div>
                 {provisionProgress?.message && (
                   <p className="text-sm text-gray-400 mt-2">{provisionProgress.message}</p>
+                )}
+
+                {/* Expandable Logs Panel */}
+                {provisionLogs.length > 0 && (
+                  <div className="mt-3 border-t border-gray-600 pt-3">
+                    <button
+                      onClick={() => setShowLogs(!showLogs)}
+                      className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-300 transition-colors"
+                    >
+                      <span className={`transform transition-transform ${showLogs ? 'rotate-90' : ''}`}>
+                        &#x25B6;
+                      </span>
+                      <span>{showLogs ? 'Hide' : 'Show'} Installation Logs ({provisionLogs.length} lines)</span>
+                    </button>
+
+                    {showLogs && (
+                      <div className="mt-2 bg-gray-900 rounded border border-gray-700 max-h-64 overflow-y-auto font-mono text-xs">
+                        {provisionLogs.map((log, index) => (
+                          <div
+                            key={index}
+                            className={`px-2 py-0.5 ${
+                              log.type === 'stderr' ? 'text-red-400 bg-red-900/10' : 'text-gray-300'
+                            } whitespace-pre-wrap break-all`}
+                          >
+                            {log.content}
+                          </div>
+                        ))}
+                        <div ref={logsEndRef} />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -181,15 +275,46 @@ export function TemplateDetailsModal({
                 </span>
               </div>
 
-              {/* Tech Stacks */}
+              {/* Parent Template (for cloned templates) */}
+              {template.parentTemplateId && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Based On</span>
+                  <span className="text-purple-400">
+                    {parentTemplate?.name || 'Unknown'}
+                  </span>
+                </div>
+              )}
+
+              {/* Inherited Tech Stacks */}
+              {template.inheritedTechStacks && template.inheritedTechStacks.length > 0 && (
+                <div>
+                  <span className="text-gray-400 text-sm">Inherited Tech Stacks</span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(template.inheritedTechStacks as string[]).map((stack) => (
+                      <span
+                        key={stack}
+                        className="px-2 py-1 bg-purple-500/20 text-purple-400 text-sm rounded"
+                      >
+                        {stack}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tech Stacks (own stacks, not inherited) */}
               {template.techStacks && template.techStacks.length > 0 && (
                 <div>
-                  <span className="text-gray-400 text-sm">Tech Stacks</span>
+                  <span className="text-gray-400 text-sm">
+                    {template.inheritedTechStacks && template.inheritedTechStacks.length > 0
+                      ? 'Additional Tech Stacks'
+                      : 'Tech Stacks'}
+                  </span>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {(template.techStacks as string[]).map((stack) => (
                       <span
                         key={stack}
-                        className="px-2 py-1 bg-purple-500/20 text-purple-400 text-sm rounded"
+                        className="px-2 py-1 bg-blue-500/20 text-blue-400 text-sm rounded"
                       >
                         {stack}
                       </span>
@@ -217,6 +342,38 @@ export function TemplateDetailsModal({
                   className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded transition-colors"
                 >
                   {template.status === 'error' ? 'Retry Provision' : 'Provision'}
+                </button>
+              )}
+
+              {/* Staging actions - Open Terminal and Finalize */}
+              {template.status === 'staging' && !isProvisioning && (
+                <>
+                  {onOpenStagingTerminal && (
+                    <button
+                      onClick={() => onOpenStagingTerminal(template)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+                    >
+                      Open Terminal
+                    </button>
+                  )}
+                  {onFinalize && (
+                    <button
+                      onClick={() => onFinalize(template)}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded transition-colors"
+                    >
+                      Finalize
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* Clone - for ready status */}
+              {template.status === 'ready' && !isProvisioning && onClone && (
+                <button
+                  onClick={() => onClone(template)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors"
+                >
+                  Clone
                 </button>
               )}
 
