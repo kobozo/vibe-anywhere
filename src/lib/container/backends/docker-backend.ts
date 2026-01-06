@@ -42,11 +42,6 @@ export class DockerBackend implements IContainerBackend {
       COLORTERM: 'truecolor',
     };
 
-    // Add Anthropic API key if available
-    if (config.anthropic.apiKey) {
-      containerEnv.ANTHROPIC_API_KEY = config.anthropic.apiKey;
-    }
-
     const container = await this.docker.createContainer({
       name: `session-hub-workspace-${workspaceId}`,
       Image: containerConfig.image || this.claudeImage,
@@ -201,7 +196,7 @@ export class DockerBackend implements IContainerBackend {
       AttachStderr: true,
       Tty: true,
       WorkingDir: '/workspace',
-      Env: config.anthropic.apiKey ? [`ANTHROPIC_API_KEY=${config.anthropic.apiKey}`] : [],
+      Env: [],
     });
 
     const stream = (await exec.start({

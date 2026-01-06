@@ -231,7 +231,6 @@ create_env_file() {
     local container_backend="$3"
     local base_repo_path="$4"
     local worktree_base_path="$5"
-    local anthropic_api_key="$6"
 
     log_info "Creating configuration file..."
 
@@ -256,15 +255,6 @@ WORKTREE_BASE_PATH=${worktree_base_path}
 # Container Backend
 CONTAINER_BACKEND=${container_backend}
 EOF
-
-    # Add Anthropic API key if provided
-    if [ -n "$anthropic_api_key" ]; then
-        cat >> "$INSTALL_DIR/.env" <<EOF
-
-# Claude API (optional - can use OAuth instead)
-ANTHROPIC_API_KEY=${anthropic_api_key}
-EOF
-    fi
 
     # Add Docker-specific config
     if [ "$container_backend" = "docker" ]; then
@@ -446,11 +436,6 @@ main() {
     BASE_REPO_PATH=$(prompt "Base repository path" "/home/$SERVICE_USER/repos")
     WORKTREE_BASE_PATH=$(prompt "Worktree base path" "/home/$SERVICE_USER/worktrees")
 
-    # Anthropic API key (optional)
-    echo ""
-    echo "Anthropic API key is optional - you can use Claude's OAuth flow instead."
-    ANTHROPIC_API_KEY=$(prompt "Anthropic API key (press Enter to skip)" "")
-
     # Proxmox configuration
     if [ "$BACKEND" = "proxmox" ]; then
         echo ""
@@ -508,7 +493,7 @@ main() {
     chown -R $SERVICE_USER:$SERVICE_GROUP "$INSTALL_DIR"
 
     # Create configuration
-    create_env_file "$DB_PASSWORD" "$AUTH_SECRET" "$BACKEND" "$BASE_REPO_PATH" "$WORKTREE_BASE_PATH" "$ANTHROPIC_API_KEY"
+    create_env_file "$DB_PASSWORD" "$AUTH_SECRET" "$BACKEND" "$BASE_REPO_PATH" "$WORKTREE_BASE_PATH"
 
     # Add Proxmox config if needed
     if [ "$BACKEND" = "proxmox" ]; then

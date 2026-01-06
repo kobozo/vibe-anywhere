@@ -79,13 +79,9 @@ Copy `.env.example` to `.env` and configure:
 DATABASE_URL=postgresql://sessionhub:password@localhost:5432/sessionhub
 AUTH_SECRET=your-secure-random-string
 
-# Git paths
+# Git paths (deprecated - repos are now cloned in containers)
 BASE_REPO_PATH=/path/to/your/git/project
 WORKTREE_BASE_PATH=/path/to/worktrees
-
-# Claude authentication (choose one)
-ANTHROPIC_API_KEY=your-api-key  # Option 1: API key
-# Or use OAuth flow (no key needed)
 
 # Container backend
 CONTAINER_BACKEND=docker  # or "proxmox"

@@ -41,9 +41,6 @@ services:
       DOCKER_SOCKET: /var/run/docker.sock
       CLAUDE_IMAGE: ${CLAUDE_IMAGE:-session-hub/claude-instance:latest}
 
-      # Claude API
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
-
       # Session Hub URL (for Proxmox agents to connect back)
       SESSION_HUB_URL: ${SESSION_HUB_URL:-http://localhost:3000}
 

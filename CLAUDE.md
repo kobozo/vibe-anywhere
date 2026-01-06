@@ -123,9 +123,8 @@ npm run start            # Start production server
 See `.env.example` for all required variables:
 - `DATABASE_URL` - PostgreSQL connection string
 - `AUTH_SECRET` - Secret for token generation
-- `BASE_REPO_PATH` - Git repository to create worktrees from
-- `WORKTREE_BASE_PATH` - Where to store worktrees
-- `ANTHROPIC_API_KEY` - Claude API key for containers
+- `BASE_REPO_PATH` - Git repository to create worktrees from (deprecated)
+- `WORKTREE_BASE_PATH` - Where to store worktrees (deprecated)
 
 ## API Endpoints
 

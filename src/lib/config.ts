@@ -44,9 +44,6 @@ const envSchema = z.object({
   PROXMOX_VMID_MIN: z.string().default('200').transform(Number),
   PROXMOX_VMID_MAX: z.string().default('299').transform(Number),
 
-  // Anthropic API (passed to containers)
-  ANTHROPIC_API_KEY: z.string().optional(),
-
   // Container resource limits (Docker)
   CONTAINER_MEMORY_LIMIT: z.string().default('2g'),
   CONTAINER_CPU_LIMIT: z.string().default('2').transform(Number),
@@ -133,12 +130,6 @@ export const config = {
       claudeImage: getConfig().CLAUDE_IMAGE,
       memoryLimit: getConfig().CONTAINER_MEMORY_LIMIT,
       cpuLimit: getConfig().CONTAINER_CPU_LIMIT,
-    };
-  },
-
-  get anthropic() {
-    return {
-      apiKey: getConfig().ANTHROPIC_API_KEY,
     };
   },
 
