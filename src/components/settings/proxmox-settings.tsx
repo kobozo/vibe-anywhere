@@ -404,11 +404,13 @@ export function ProxmoxSettings() {
             { key: 'defaultStorage', label: 'Storage', type: 'text', placeholder: 'local-lvm' },
             { key: 'defaultMemory', label: 'Memory (MB)', type: 'number', placeholder: '2048', min: 256 },
             { key: 'defaultCpuCores', label: 'CPU Cores', type: 'number', placeholder: '2', min: 1 },
+            { key: 'defaultDiskSize', label: 'Disk Size (GB)', type: 'number', placeholder: '50', min: 1 },
           ]}
           values={{
             defaultStorage: settings?.resources?.defaultStorage,
             defaultMemory: settings?.resources?.defaultMemory,
             defaultCpuCores: settings?.resources?.defaultCpuCores,
+            defaultDiskSize: settings?.resources?.defaultDiskSize,
           }}
           onSave={saveResourceSettings}
           isLoading={isLoading}

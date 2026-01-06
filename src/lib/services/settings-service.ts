@@ -81,6 +81,7 @@ export interface ProxmoxSettings {
   defaultStorage?: string;    // Default storage ID
   defaultMemory?: number;     // Default memory in MB
   defaultCpuCores?: number;   // Default CPU cores
+  defaultDiskSize?: number;   // Default disk size in GB (e.g., 50)
 
   // SSH/Container access
   sshUser?: string;           // SSH user for container access

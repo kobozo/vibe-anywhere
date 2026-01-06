@@ -27,6 +27,7 @@ interface ProxmoxSettingsResponse {
     defaultStorage?: string;
     defaultMemory?: number;
     defaultCpuCores?: number;
+    defaultDiskSize?: number;
   };
 }
 
@@ -73,6 +74,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
       defaultStorage: dbSettings.defaultStorage,
       defaultMemory: dbSettings.defaultMemory,
       defaultCpuCores: dbSettings.defaultCpuCores,
+      defaultDiskSize: dbSettings.defaultDiskSize,
     },
   };
 
@@ -164,6 +166,12 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
       }
       settings.defaultCpuCores = body.resources.defaultCpuCores ?? undefined;
     }
+    if (body.resources.defaultDiskSize !== undefined) {
+      if (body.resources.defaultDiskSize !== null && (typeof body.resources.defaultDiskSize !== 'number' || body.resources.defaultDiskSize < 1)) {
+        return errorResponse('INVALID_DISK_SIZE', 'Default disk size must be a number >= 1 GB', 400);
+      }
+      settings.defaultDiskSize = body.resources.defaultDiskSize ?? undefined;
+    }
   }
 
   // Legacy flat format support (backwards compatibility)
@@ -171,6 +179,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   if (body.defaultStorage !== undefined) settings.defaultStorage = body.defaultStorage ?? undefined;
   if (body.defaultMemory !== undefined) settings.defaultMemory = body.defaultMemory ?? undefined;
   if (body.defaultCpuCores !== undefined) settings.defaultCpuCores = body.defaultCpuCores ?? undefined;
+  if (body.defaultDiskSize !== undefined) settings.defaultDiskSize = body.defaultDiskSize ?? undefined;
 
   // Merge with existing settings and save
   const mergedSettings = { ...existingSettings, ...settings };

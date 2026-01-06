@@ -81,6 +81,23 @@ export class ProxmoxBackend implements IContainerBackend {
 
     console.log(`LXC container ${newVmid} cloned successfully`);
 
+    // Resize disk to configured size
+    const proxmoxSettings = await settingsService.getProxmoxSettings();
+    const diskSize = proxmoxSettings.defaultDiskSize || 50;
+    try {
+      const resizeUpid = await client.resizeLxcDisk(newVmid, diskSize);
+      await pollTaskUntilComplete(client, resizeUpid, {
+        timeoutMs: 60000, // 1 minute for resize
+        onProgress: (status) => {
+          console.log(`Resize task status: ${status}`);
+        },
+      });
+      console.log(`Resized container ${newVmid} disk to ${diskSize}GB`);
+    } catch (resizeError) {
+      console.warn(`Could not resize disk for ${newVmid}:`, resizeError);
+      // Continue anyway - container will use template's disk size
+    }
+
     // Configure the container resources (skip bind mounts - API tokens can't use them)
     // For workspace files, we'll use rsync/scp after container starts
     const containerConfig2: Record<string, unknown> = {

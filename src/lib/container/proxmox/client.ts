@@ -197,6 +197,19 @@ export class ProxmoxClient {
   }
 
   /**
+   * Resize an LXC container's root filesystem
+   * @param vmid - Container VMID
+   * @param sizeGb - New size in GB
+   * @returns UPID for the resize task
+   */
+  async resizeLxcDisk(vmid: number, sizeGb: number): Promise<string> {
+    return await this.proxmox.nodes.$(this.node).lxc.$(vmid).resize.$put({
+      disk: 'rootfs',
+      size: `${sizeGb}G`,
+    });
+  }
+
+  /**
    * Get LXC container configuration
    */
   async getLxcConfig(vmid: number): Promise<Record<string, unknown>> {

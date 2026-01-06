@@ -22,6 +22,7 @@ export interface ProxmoxSettingsData {
     defaultStorage?: string;
     defaultMemory?: number;
     defaultCpuCores?: number;
+    defaultDiskSize?: number;
   };
 }
 
