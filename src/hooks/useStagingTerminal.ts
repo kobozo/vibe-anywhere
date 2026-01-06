@@ -40,32 +40,19 @@ export function useStagingTerminal(options: UseStagingTerminalOptions): UseStagi
   const { socket, isConnected } = useSocket({
     token,
     onConnect: () => {
-      console.log('[StagingTerminal] Socket connected callback fired');
       onConnect?.();
     },
     onDisconnect: () => {
-      console.log('[StagingTerminal] Socket disconnected callback fired');
       onDisconnect?.();
     },
     onError: (err) => {
-      console.log('[StagingTerminal] Socket error callback fired', err);
       setError(err);
     },
   });
 
-  // Debug: log socket state changes
-  console.log('[StagingTerminal] Socket state:', { hasSocket: !!socket, isConnected, socketConnected: socket?.connected });
-
   // Attach to staging terminal when connected
   const attach = useCallback(() => {
-    console.log('[StagingTerminal] attach called', {
-      hasSocket: !!socket,
-      isConnected,
-      templateId,
-      alreadyAttached: attachedRef.current
-    });
     if (socket && isConnected && templateId && !attachedRef.current) {
-      console.log('[StagingTerminal] Emitting staging:attach', { templateId });
       socket.emit('staging:attach', { templateId });
       attachedRef.current = true;
     }
@@ -74,14 +61,10 @@ export function useStagingTerminal(options: UseStagingTerminalOptions): UseStagi
   // Set up event listeners
   useEffect(() => {
     if (!socket) {
-      console.log('[StagingTerminal] No socket available for event listeners');
       return;
     }
 
-    console.log('[StagingTerminal] Setting up event listeners');
-
     const handleAttached = (data: { templateId: string }) => {
-      console.log('[StagingTerminal] Received staging:attached', data);
       if (data.templateId === templateId) {
         setIsAttached(true);
         setError(null);
@@ -89,19 +72,16 @@ export function useStagingTerminal(options: UseStagingTerminalOptions): UseStagi
     };
 
     const handleOutput = (data: { data: string }) => {
-      console.log('[StagingTerminal] Received terminal:output', { length: data.data.length });
       onOutputRef.current?.(data.data);
     };
 
     const handleEnd = (data: { message: string }) => {
-      console.log('[StagingTerminal] Received terminal:end', data);
       setIsAttached(false);
       attachedRef.current = false;
       onEndRef.current?.(data.message);
     };
 
     const handleError = (data: { message: string }) => {
-      console.log('[StagingTerminal] Received error', data);
       setError(new Error(data.message));
     };
 

@@ -105,10 +105,10 @@ export function TabGroupIcon({
         onContextMenu={handleContextMenu}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-t cursor-pointer group
           ${isActive
-            ? 'bg-background text-foreground'
+            ? 'bg-background text-foreground ring-2 ring-primary'
             : 'bg-background-tertiary/50 text-foreground-secondary hover:bg-background-tertiary hover:text-foreground'
           }`}
-        title={`${group.name} (${group.members.length} tabs) - Right-click for options`}
+        title={`${group.name} (${group.members.length} tabs) - ${isActive ? 'Click to close' : 'Click to open'} - Right-click for options`}
       >
         {/* Layout icon */}
         <span className="text-primary">

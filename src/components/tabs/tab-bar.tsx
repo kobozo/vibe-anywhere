@@ -203,9 +203,20 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
       onExitMultiSelectMode?.();
     }
 
-    // Clear single tab selection and activate group
-    onSelectTab(null);
-    onSelectGroup?.(group.id);
+    // Toggle group - if already active, deselect it
+    if (activeGroupId === group.id) {
+      onSelectGroup?.(null);
+      // Select the first tab from the group
+      const firstMember = group.members[0];
+      if (firstMember) {
+        const tab = tabs.find(t => t.id === firstMember.tabId);
+        if (tab) onSelectTab(tab);
+      }
+    } else {
+      // Clear single tab selection and activate group
+      onSelectTab(null);
+      onSelectGroup?.(group.id);
+    }
   };
 
   if (!workspaceId) {

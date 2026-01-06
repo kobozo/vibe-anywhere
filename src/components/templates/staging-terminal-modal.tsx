@@ -11,8 +11,9 @@ const loadXterm = async () => {
     import('@xterm/addon-fit'),
     import('@xterm/addon-web-links'),
   ]);
-  // CSS import doesn't need await - it's just a side effect
-  import('@xterm/xterm/css/xterm.css');
+  // Load CSS as side effect
+  // @ts-ignore - CSS import has no types
+  await import('@xterm/xterm/css/xterm.css').catch(() => {});
   return { Terminal, FitAddon, WebLinksAddon };
 };
 
@@ -35,15 +36,6 @@ export function StagingTerminalModal({
   const xtermRef = useRef<InstanceType<typeof import('@xterm/xterm').Terminal> | null>(null);
   const fitAddonRef = useRef<InstanceType<typeof import('@xterm/addon-fit').FitAddon> | null>(null);
   const [localFinalizing, setLocalFinalizing] = useState(false);
-
-  // Debug: log template state
-  console.log('[StagingTerminalModal] Render:', {
-    isOpen,
-    templateId: template?.id,
-    templateName: template?.name,
-    templateStatus: template?.status,
-    stagingContainerIp: template?.stagingContainerIp,
-  });
 
   const handleOutput = useCallback((data: string) => {
     if (xtermRef.current) {
@@ -153,24 +145,10 @@ export function StagingTerminalModal({
 
   // Attach to staging terminal when connected
   useEffect(() => {
-    console.log('[StagingTerminalModal] Attach effect check:', {
-      isOpen,
-      isConnected,
-      templateId: template?.id,
-      templateStatus: template?.status,
-      stagingContainerIp: template?.stagingContainerIp,
-      isAttached
-    });
     if (isOpen && isConnected && template?.id && !isAttached) {
-      console.log('[StagingTerminalModal] Calling attach()');
       attach();
     }
   }, [isOpen, isConnected, template?.id, isAttached, attach]);
-
-  // Extra debug: watch for isConnected changes
-  useEffect(() => {
-    console.log('[StagingTerminalModal] isConnected changed to:', isConnected);
-  }, [isConnected]);
 
   // Handle terminal input
   useEffect(() => {

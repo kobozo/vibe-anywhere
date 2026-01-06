@@ -113,9 +113,12 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
 
     console.log('Setting up socket event listeners for socket:', socket.id);
 
-    // Handle terminal output
-    const handleOutput = (data: { data: string }) => {
-      console.log('Received terminal output:', data.data.substring(0, 100));
+    // Handle terminal output (filter by tabId)
+    const handleOutput = (data: { tabId?: string; data: string }) => {
+      // Only process output for this specific tab
+      if (data.tabId && data.tabId !== tabId) {
+        return;
+      }
       if (xtermRef.current) {
         xtermRef.current.write(data.data);
       }
@@ -202,7 +205,7 @@ export function Terminal({ tabId, onConnectionChange, onEnd }: TerminalProps) {
       socket.off('terminal:end', handleEnd);
       socket.off('error', handleError);
     };
-  }, [socket, onEnd]);
+  }, [socket, tabId, onEnd]);
 
   // Handle terminal input and resize (requires xterm to be ready)
   useEffect(() => {
