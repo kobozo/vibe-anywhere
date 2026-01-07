@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Workspace, Repository } from '@/lib/db/schema';
 
 interface AgentInfo {
@@ -456,13 +456,13 @@ export function DashboardPanel({
           ) : envVars.length > 0 ? (
             <div className="grid grid-cols-[auto_auto_1fr_auto] gap-x-2 gap-y-1 text-sm font-mono items-baseline">
               {envVars.map((env) => (
-                <>
-                  <span key={`${env.key}-key`} className="text-foreground">{env.key}</span>
-                  <span key={`${env.key}-eq`} className="text-foreground-tertiary">=</span>
-                  <span key={`${env.key}-val`} className="text-foreground-secondary break-all">
+                <React.Fragment key={env.key}>
+                  <span className="text-foreground">{env.key}</span>
+                  <span className="text-foreground-tertiary">=</span>
+                  <span className="text-foreground-secondary break-all">
                     {env.encrypted ? '********' : env.value}
                   </span>
-                  <span key={`${env.key}-badges`} className="flex items-center gap-1">
+                  <span className="flex items-center gap-1">
                     {env.inherited && (
                       <span className="text-xs text-foreground-tertiary">(inherited)</span>
                     )}
@@ -470,7 +470,7 @@ export function DashboardPanel({
                       <span className="text-xs text-warning">locked</span>
                     )}
                   </span>
-                </>
+                </React.Fragment>
               ))}
             </div>
           ) : (
