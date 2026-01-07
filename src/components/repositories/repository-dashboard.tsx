@@ -43,9 +43,10 @@ interface RepositoryDetails {
 
 interface RepositoryDashboardProps {
   repository: Repository;
+  onBranchClick?: (branch: string) => void;
 }
 
-export function RepositoryDashboard({ repository }: RepositoryDashboardProps) {
+export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDashboardProps) {
   const [details, setDetails] = useState<RepositoryDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -319,18 +320,22 @@ export function RepositoryDashboard({ repository }: RepositoryDashboardProps) {
                 </span>
               )}
             </h2>
+            <p className="text-xs text-foreground-tertiary mb-3">
+              Click a branch to create a new workspace
+            </p>
             <div className="flex flex-wrap gap-2">
               {liveBranches.slice(0, 20).map((branch) => (
-                <span
+                <button
                   key={branch}
-                  className={`px-2 py-1 text-xs rounded ${
+                  onClick={() => onBranchClick?.(branch)}
+                  className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${
                     branch === repository.defaultBranch
-                      ? 'bg-primary/20 text-primary border border-primary/30'
-                      : 'bg-background-tertiary text-foreground'
+                      ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
+                      : 'bg-background-tertiary text-foreground hover:bg-background-input'
                   }`}
                 >
                   {branch}
-                </span>
+                </button>
               ))}
               {liveBranches.length > 20 && (
                 <span className="px-2 py-1 text-xs text-foreground-tertiary">

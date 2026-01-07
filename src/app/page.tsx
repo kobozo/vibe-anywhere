@@ -85,6 +85,7 @@ function Dashboard() {
   const [isAddWorkspaceOpen, setIsAddWorkspaceOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [workspaceRepoId, setWorkspaceRepoId] = useState<string | null>(null);
+  const [preselectedBranch, setPreselectedBranch] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Edit repository state
@@ -410,8 +411,9 @@ function Dashboard() {
     onUpdate: handleWorkspaceUpdate,
   });
 
-  const handleAddWorkspace = useCallback((repositoryId: string) => {
+  const handleAddWorkspace = useCallback((repositoryId: string, branch?: string) => {
     setWorkspaceRepoId(repositoryId);
+    setPreselectedBranch(branch || null);
     setIsAddWorkspaceOpen(true);
   }, []);
 
@@ -966,7 +968,10 @@ function Dashboard() {
             </WorkspaceContent>
           ) : selectedRepository ? (
             // Show repository dashboard when repo is selected but no workspace
-            <RepositoryDashboard repository={selectedRepository} />
+            <RepositoryDashboard
+              repository={selectedRepository}
+              onBranchClick={(branch) => handleAddWorkspace(selectedRepository.id, branch)}
+            />
           ) : (
             <div className="flex-1 flex items-center justify-center text-foreground-tertiary">
               <div className="text-center">
@@ -992,9 +997,11 @@ function Dashboard() {
       <CreateWorkspaceDialog
         isOpen={isAddWorkspaceOpen}
         repositoryId={workspaceRepoId}
+        initialBranch={preselectedBranch}
         onClose={() => {
           setIsAddWorkspaceOpen(false);
           setWorkspaceRepoId(null);
+          setPreselectedBranch(null);
         }}
         onCreate={handleCreateWorkspace}
         isLoading={actionLoading}

@@ -6,6 +6,7 @@ import { useRepositoryBranches } from '@/hooks/useRepositoryBranches';
 interface CreateWorkspaceDialogProps {
   isOpen: boolean;
   repositoryId: string | null;
+  initialBranch?: string | null; // Pre-select this branch as "use existing"
   onClose: () => void;
   onCreate: (name: string, branchName: string, baseBranch?: string) => Promise<void>;
   isLoading: boolean;
@@ -14,6 +15,7 @@ interface CreateWorkspaceDialogProps {
 export function CreateWorkspaceDialog({
   isOpen,
   repositoryId,
+  initialBranch,
   onClose,
   onCreate,
   isLoading,
@@ -23,6 +25,7 @@ export function CreateWorkspaceDialog({
   const [baseBranch, setBaseBranch] = useState('');
   const [branchType, setBranchType] = useState<'new' | 'existing'>('new');
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   // Handle branch updates from WebSocket without closing dropdown
   const handleBranchesUpdated = useCallback((newBranches: string[]) => {
@@ -48,12 +51,34 @@ export function CreateWorkspaceDialog({
     onBranchesUpdated: handleBranchesUpdated,
   });
 
-  // Set initial baseBranch when branches first load
+  // Initialize state when dialog opens
   useEffect(() => {
-    if (branches.length > 0 && !baseBranch) {
+    if (isOpen && !initialized) {
+      // If initialBranch provided, use "existing" mode with that branch
+      if (initialBranch) {
+        setBranchType('existing');
+        setBaseBranch(initialBranch);
+      } else {
+        setBranchType('new');
+      }
+      setInitialized(true);
+    }
+    // Reset initialized flag when dialog closes
+    if (!isOpen) {
+      setInitialized(false);
+      setName('');
+      setBranchName('');
+      setBaseBranch('');
+      setError(null);
+    }
+  }, [isOpen, initialBranch, initialized]);
+
+  // Set initial baseBranch when branches first load (only if no initialBranch)
+  useEffect(() => {
+    if (branches.length > 0 && !baseBranch && !initialBranch) {
       setBaseBranch(branches.includes('main') ? 'main' : branches[0]);
     }
-  }, [branches, baseBranch]);
+  }, [branches, baseBranch, initialBranch]);
 
   if (!isOpen) return null;
 
