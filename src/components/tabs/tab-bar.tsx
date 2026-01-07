@@ -385,7 +385,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
             <span className="text-sm whitespace-nowrap">{tab.name}</span>
             {actionLoading === tab.id ? (
               <span className="text-xs animate-spin">⏳</span>
-            ) : !tab.isPinned && !multiSelectMode && (
+            ) : !tab.isPinned && !multiSelectMode && tab.tabType !== 'dashboard' && (
               <button
                 onClick={(e) => handleDeleteTabClick(e, tab)}
                 className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error ml-1"

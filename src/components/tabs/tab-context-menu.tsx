@@ -77,15 +77,17 @@ export function TabContextMenu({
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
       {/* Tab Actions */}
-      <button
-        onClick={() => {
-          onClose();
-          onDelete();
-        }}
-        className={`${menuItemClass} text-error`}
-      >
-        Close
-      </button>
+      {tab.tabType !== 'dashboard' && (
+        <button
+          onClick={() => {
+            onClose();
+            onDelete();
+          }}
+          className={`${menuItemClass} text-error`}
+        >
+          Close
+        </button>
+      )}
 
       {tab.tabType !== 'git' && tab.tabType !== 'docker' && (
         <button
