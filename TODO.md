@@ -8,7 +8,7 @@
 
 ## Git Hooks
 
-- [ ] **Repository-level hook sync** - Sync git hooks to repository level so new workspaces deploy hooks by default. Only needs to be configured once per repository.
+- [x] **Repository-level hook sync** - Sync git hooks to repository level so new workspaces deploy hooks by default. Only needs to be configured once per repository.
 
 - [ ] **Hook sync on close** - Same sync behavior for hooks when closing/destroying a workspace (prompt to sync if there are changes).
 

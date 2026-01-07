@@ -5,6 +5,7 @@ import { getRepositoryService, RepositoryService } from './repository-service';
 import { getSSHKeyService } from './ssh-key-service';
 import { getTemplateService } from './template-service';
 import { getEnvVarService } from './env-var-service';
+import { getGitHooksService } from './git-hooks-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { gitCloneInContainer, getGitStatusInContainer, isRepoClonedInContainer, type GitStatusResult } from '@/lib/container/proxmox/ssh-stream';
@@ -462,6 +463,20 @@ export class WorkspaceService {
         }
       } catch (error) {
         console.error('Failed to inject environment variables:', error);
+        // Don't fail the container startup, just log the error
+      }
+
+      // Inject git hooks from repository
+      try {
+        const gitHooksService = getGitHooksService();
+        const repoHooks = await gitHooksService.getRepositoryGitHooks(workspace.repositoryId);
+
+        if (Object.keys(repoHooks).length > 0 && containerIp) {
+          await gitHooksService.writeHooksToContainer(containerIp, repoHooks);
+          console.log(`Injected ${Object.keys(repoHooks).length} git hooks into container ${containerId}`);
+        }
+      } catch (error) {
+        console.error('Failed to inject git hooks:', error);
         // Don't fail the container startup, just log the error
       }
 
