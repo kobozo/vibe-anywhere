@@ -131,7 +131,12 @@ export function GitHooksModal({ workspaceId, isOpen, onClose }: GitHooksModalPro
                       }`} />
                       <span className="text-sm text-foreground">{hook.name}</span>
                       {hook.exists && !hook.executable && (
-                        <span className="text-xs text-warning" title="Hook exists but is not executable">!</span>
+                        <span className="relative group cursor-help">
+                          <span className="text-xs text-warning">!</span>
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 px-2 py-1 text-xs bg-background-secondary border border-border rounded shadow-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
+                            Hook exists but is not executable
+                          </div>
+                        </span>
                       )}
                       {hook.isSample && (
                         <span className="text-xs text-foreground-tertiary">.sample</span>
