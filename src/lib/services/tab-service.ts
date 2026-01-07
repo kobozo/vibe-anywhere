@@ -1,4 +1,4 @@
-import { eq, desc, asc, sql } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { tabs, type Tab, type NewTab, type SessionStatus, type TabType } from '@/lib/db/schema';
 import { getWorkspaceService, WorkspaceService } from './workspace-service';
@@ -336,6 +336,42 @@ export class TabService {
       updatedAt: tab.updatedAt,
       lastActivityAt: tab.lastActivityAt,
     };
+  }
+
+  /**
+   * Batch update sortOrder for multiple tabs
+   * Used for drag-and-drop reordering
+   * Uses transaction for atomicity
+   */
+  async batchUpdateSortOrder(
+    workspaceId: string,
+    updates: Array<{ id: string; sortOrder: number }>
+  ): Promise<void> {
+    if (updates.length === 0) return;
+
+    // Verify all tabs belong to workspace
+    const tabIds = updates.map(u => u.id);
+    const existingTabs = await db
+      .select()
+      .from(tabs)
+      .where(and(
+        eq(tabs.workspaceId, workspaceId),
+        inArray(tabs.id, tabIds)
+      ));
+
+    if (existingTabs.length !== updates.length) {
+      throw new Error('One or more tabs not found or do not belong to this workspace');
+    }
+
+    // Batch update using transaction for atomicity
+    await db.transaction(async (tx) => {
+      for (const { id, sortOrder } of updates) {
+        await tx
+          .update(tabs)
+          .set({ sortOrder, updatedAt: new Date() })
+          .where(eq(tabs.id, id));
+      }
+    });
   }
 }
 

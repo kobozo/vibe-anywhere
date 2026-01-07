@@ -433,6 +433,42 @@ export class TabGroupService {
       members: memberInfos.filter(m => m.tab !== null),
     };
   }
+
+  /**
+   * Batch update sortOrder for multiple groups
+   * Used for drag-and-drop reordering
+   * Uses transaction for atomicity
+   */
+  async batchUpdateSortOrder(
+    workspaceId: string,
+    updates: Array<{ id: string; sortOrder: number }>
+  ): Promise<void> {
+    if (updates.length === 0) return;
+
+    // Verify all groups belong to workspace
+    const groupIds = updates.map(u => u.id);
+    const existingGroups = await db
+      .select()
+      .from(tabGroups)
+      .where(and(
+        eq(tabGroups.workspaceId, workspaceId),
+        inArray(tabGroups.id, groupIds)
+      ));
+
+    if (existingGroups.length !== updates.length) {
+      throw new Error('One or more groups not found or do not belong to this workspace');
+    }
+
+    // Batch update using transaction for atomicity
+    await db.transaction(async (tx) => {
+      for (const { id, sortOrder } of updates) {
+        await tx
+          .update(tabGroups)
+          .set({ sortOrder, updatedAt: new Date() })
+          .where(eq(tabGroups.id, id));
+      }
+    });
+  }
 }
 
 // Singleton instance

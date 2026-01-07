@@ -36,7 +36,15 @@
 
 - [x] **Dashboard tab not closeable** - Make the dashboard tab permanently visible (cannot be closed).
 
-- [ ] **Drag and drop tab ordering** - Allow reordering tabs via drag and drop.
+- [x] **Drag and drop tab ordering** - Allow reordering tabs via drag and drop.
+
+- [ ] **Terminal right-click context menu** - Add right-click context menu in terminal with split pane options. Include submenu for split direction (right, left, top, bottom) with choice to add an existing tab/group or start a new template tab.
+
+## Sidebar
+
+- [ ] **Alphabetical ordering by default** - Sort repositories alphabetically in the sidebar by default.
+
+- [ ] **Filters and custom sort orders** - Add filtering options and custom sort orders for repositories in the sidebar.
 
 ## New Features
 

@@ -137,6 +137,7 @@ function Dashboard() {
     deleteGroup,
     updatePaneSizes,
     groupedTabIds,
+    setGroups,
   } = useTabGroups(selectedWorkspace?.id || null);
 
   // Create group dialog state
@@ -906,6 +907,9 @@ function Dashboard() {
                 onEnterMultiSelectMode={enterMultiSelectMode}
                 onExitMultiSelectMode={exitMultiSelectMode}
                 onCreateGroupClick={() => setIsCreateGroupDialogOpen(true)}
+                // Drag and drop reordering props
+                onGroupsUpdate={setGroups}
+                onRefetch={fetchGroups}
               />
 
               {/* Terminal/Git/Split View area */}
