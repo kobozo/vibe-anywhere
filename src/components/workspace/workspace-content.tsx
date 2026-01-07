@@ -1,33 +1,37 @@
 'use client';
 
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useStartupProgress } from '@/hooks/useStartupProgress';
 import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
 import { StartupProgress } from './startup-progress';
 import type { Workspace } from '@/lib/db/schema';
 
+// Operations that show progress UI (deploy creates container, redeploy recreates it)
+export type ContainerOperation = 'deploy' | 'redeploy' | null;
+
 interface WorkspaceContentProps {
   workspace: Workspace;
   children: React.ReactNode;
-  onContainerStart?: () => void;
+  activeOperation?: ContainerOperation;
+  onOperationComplete?: () => void;
   onContainerStatusChange?: (status: string, agentConnected: boolean) => void;
 }
 
 /**
  * Wrapper component that handles container startup state
- * Shows startup progress or "Start Container" button when container is not ready
+ * Shows startup progress when an operation (deploy/redeploy) is in progress
+ * Shows children (Dashboard/terminals) for all other states
  */
 export function WorkspaceContent({
   workspace,
   children,
-  onContainerStart,
+  activeOperation,
+  onOperationComplete,
   onContainerStatusChange,
 }: WorkspaceContentProps) {
   // Track container status locally for real-time updates
   const [containerStatus, setContainerStatus] = useState(workspace.containerStatus);
   const [agentConnected, setAgentConnected] = useState(!!workspace.agentConnectedAt);
-  const [isManuallyStarting, setIsManuallyStarting] = useState(false);
-  const startTimeRef = useRef<number | null>(null);
 
   // Update local state when workspace prop changes (workspace switch)
   useEffect(() => {
@@ -38,8 +42,6 @@ export function WorkspaceContent({
     });
     setContainerStatus(workspace.containerStatus);
     setAgentConnected(!!workspace.agentConnectedAt);
-    setIsManuallyStarting(false);
-    startTimeRef.current = null;
   }, [workspace.id, workspace.containerStatus, workspace.agentConnectedAt]);
 
   // Subscribe to workspace state updates
@@ -53,13 +55,13 @@ export function WorkspaceContent({
         }
         if (update.agentConnected !== undefined) {
           setAgentConnected(update.agentConnected);
-          // When agent connects, startup is complete and container must be running
+          // When agent connects, startup is complete
           if (update.agentConnected) {
-            console.log('[WorkspaceContent] Agent connected - startup complete');
-            setIsManuallyStarting(false);
-            startTimeRef.current = null;
+            console.log('[WorkspaceContent] Agent connected - operation complete');
             // Agent can only connect if container is running - sync the status
             setContainerStatus('running');
+            // Notify parent that operation is complete
+            onOperationComplete?.();
           }
         }
         onContainerStatusChange?.(
@@ -67,76 +69,24 @@ export function WorkspaceContent({
           update.agentConnected ?? agentConnected
         );
       },
-      [containerStatus, agentConnected, onContainerStatusChange]
+      [containerStatus, agentConnected, onContainerStatusChange, onOperationComplete]
     ),
   });
 
   // Subscribe to startup progress (for displaying actual progress steps)
-  const { progress, isStarting: hasActiveProgress, hasError } = useStartupProgress({
+  const { hasError } = useStartupProgress({
     workspaceId: workspace.id,
   });
 
-  // Log progress updates
-  useEffect(() => {
-    if (progress) {
-      console.log('[WorkspaceContent] Progress update:', progress);
-    }
-  }, [progress]);
-
-  // Handle manual start
-  const handleStart = useCallback(async () => {
-    console.log('[WorkspaceContent] Starting container...');
-    setIsManuallyStarting(true);
-    startTimeRef.current = Date.now();
-
-    try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/start`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-      });
-
-      const data = await response.json();
-      console.log('[WorkspaceContent] Start API response:', data);
-
-      if (!response.ok) {
-        // If container is already running, that's okay - wait for agent
-        if (data.error?.message?.includes('already running')) {
-          console.log('[WorkspaceContent] Container already running, waiting for agent...');
-          return;
-        }
-        throw new Error(data.error?.message || 'Failed to start container');
-      }
-
-      console.log('[WorkspaceContent] Container started, waiting for agent connection...');
-      onContainerStart?.();
-    } catch (error) {
-      console.error('[WorkspaceContent] Failed to start container:', error);
-      setIsManuallyStarting(false);
-      startTimeRef.current = null;
-    }
-  }, [workspace.id, onContainerStart]);
-
-  // Handle retry after error
-  const handleRetry = useCallback(() => {
-    handleStart();
-  }, [handleStart]);
-
-  // Determine states
-  const isContainerRunning = containerStatus === 'running';
   // Agent can only connect if container is running, so agentConnected implies container is ready
-  // (handles race condition where agent connects before containerStatus updates to 'running')
   const isContainerReady = agentConnected;
 
   // Debug logging
   console.log('[WorkspaceContent] Render:', {
     containerStatus,
     agentConnected,
-    isManuallyStarting,
-    hasActiveProgress,
+    activeOperation,
     hasError,
-    progressStep: progress?.currentStep,
     isContainerReady,
   });
 
@@ -145,57 +95,31 @@ export function WorkspaceContent({
     return <>{children}</>;
   }
 
-  // PRIORITY 2: We're in a manual start process - show progress UI
-  // This takes priority over everything else to avoid flickering
-  if (isManuallyStarting) {
+  // PRIORITY 2: Active progress operation (deploy/redeploy) - show StartupProgress
+  if (activeOperation) {
     return (
       <StartupProgress
         workspaceId={workspace.id}
-        onRetry={handleRetry}
+        onRetry={() => {
+          // Clear operation on retry - user can click Deploy again
+          onOperationComplete?.();
+        }}
       />
     );
   }
 
-  // PRIORITY 3: We have active server-side progress - show it
-  if (hasActiveProgress || (progress && !hasError && progress.currentStep !== 'ready')) {
+  // PRIORITY 3: Show error state during progress operation
+  if (hasError && (containerStatus === 'creating' || containerStatus === 'running')) {
     return (
       <StartupProgress
         workspaceId={workspace.id}
-        onRetry={handleRetry}
+        onRetry={() => onOperationComplete?.()}
       />
     );
   }
 
-  // PRIORITY 4: Show error state with retry
-  if (hasError) {
-    return (
-      <StartupProgress
-        workspaceId={workspace.id}
-        onRetry={handleRetry}
-      />
-    );
-  }
-
-  // PRIORITY 5: Container is running but agent not connected - show connecting state
-  if (isContainerRunning && !agentConnected) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-background-secondary text-foreground-tertiary gap-4">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-foreground-secondary mb-2">
-            Connecting to Agent
-          </h3>
-          <p className="text-sm mb-4">
-            Container is running, waiting for agent connection...
-          </p>
-          <div className="flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // PRIORITY 6: Container not running (stopped/exited/none)
-  // Show children - Dashboard has Start/Deploy buttons, terminals show "Stopped" message
+  // PRIORITY 4: All other cases - show children
+  // Dashboard has Start/Deploy/Restart/Shutdown/Destroy buttons
+  // Terminals show "Stopped" message when container not running
   return <>{children}</>;
 }

@@ -24,7 +24,7 @@ import { RepositoryDashboard } from '@/components/repositories/repository-dashbo
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
 import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
 import { SplitViewContainer, CreateGroupDialog } from '@/components/split-view';
-import { WorkspaceContent } from '@/components/workspace';
+import { WorkspaceContent, type ContainerOperation } from '@/components/workspace';
 import type { Repository, Workspace, ProxmoxTemplate } from '@/lib/db/schema';
 import type { TabInfo } from '@/hooks/useTabs';
 
@@ -79,6 +79,9 @@ function Dashboard() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
   const [selectedTab, setSelectedTab] = useState<TabInfo | null>(null);
   const [workspaceTechStacks, setWorkspaceTechStacks] = useState<string[]>([]);
+
+  // Container operation state - tracks if deploy/redeploy is in progress
+  const [activeOperation, setActiveOperation] = useState<ContainerOperation>(null);
 
   // Dialog state
   const [isAddRepoOpen, setIsAddRepoOpen] = useState(false);
@@ -384,6 +387,7 @@ function Dashboard() {
     setSelectedWorkspace(workspace);
     setSelectedTab(null); // Will be auto-selected by TabBar
     setActiveGroupId(null); // Clear active group when switching workspace
+    setActiveOperation(null); // Clear any pending operation when switching workspace
   }, [setActiveGroupId]);
 
   // Handle workspace state updates - update selectedWorkspace with new container status
@@ -421,6 +425,7 @@ function Dashboard() {
   // Container operation handlers for DashboardPanel
   const handleRedeployContainer = useCallback(async () => {
     if (!selectedWorkspace) return;
+    setActiveOperation('redeploy'); // Set intent BEFORE API call
     try {
       const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/redeploy`, {
         method: 'POST',
@@ -429,10 +434,12 @@ function Dashboard() {
       if (!response.ok) {
         const { error } = await response.json();
         console.error('Failed to redeploy container:', error?.message);
+        setActiveOperation(null); // Clear on error
       }
-      // Workspace state will update via WebSocket
+      // Workspace state will update via WebSocket, operation cleared when agent connects
     } catch (error) {
       console.error('Error redeploying container:', error);
+      setActiveOperation(null); // Clear on error
     }
   }, [selectedWorkspace]);
 
@@ -472,6 +479,12 @@ function Dashboard() {
 
   const handleStartContainer = useCallback(async () => {
     if (!selectedWorkspace) return;
+    // If no container exists, this is a deploy (show progress)
+    // If container exists (just exited), this is a start (stay on dashboard)
+    const isDeploy = !selectedWorkspace.containerId || selectedWorkspace.containerStatus === 'none';
+    if (isDeploy) {
+      setActiveOperation('deploy');
+    }
     try {
       const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/start`, {
         method: 'POST',
@@ -480,10 +493,12 @@ function Dashboard() {
       if (!response.ok) {
         const { error } = await response.json();
         console.error('Failed to start container:', error?.message);
+        if (isDeploy) setActiveOperation(null);
       }
       // Workspace and tab states will update via WebSocket
     } catch (error) {
       console.error('Error starting container:', error);
+      if (isDeploy) setActiveOperation(null);
     }
   }, [selectedWorkspace]);
 
@@ -551,13 +566,28 @@ function Dashboard() {
         throw new Error(error?.message || 'Failed to create workspace');
       }
 
+      const { data } = await response.json();
+      const newWorkspace = data.workspace as Workspace;
+
+      // Find the repository for this workspace
+      const repo = repositories.find(r => r.id === workspaceRepoId);
+
+      // Close modal immediately, select the new workspace, and trigger deploy
+      setIsAddWorkspaceOpen(false);
+      if (repo) {
+        setSelectedRepository(repo);
+        setSelectedWorkspace(newWorkspace);
+        setSelectedTab(null);
+        setActiveGroupId(null);
+        setActiveOperation('deploy'); // Show progress UI
+      }
+
       // Trigger sidebar workspace refresh for this repo
       setRefreshWorkspacesForRepoId(workspaceRepoId);
-      setIsAddWorkspaceOpen(false);
     } finally {
       setActionLoading(false);
     }
-  }, [workspaceRepoId]);
+  }, [workspaceRepoId, repositories, setActiveGroupId]);
 
   const handleCloneRepo = useCallback(async (
     name: string,
@@ -938,7 +968,11 @@ function Dashboard() {
         {/* Main area - Tabs + Terminal */}
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {selectedWorkspace ? (
-            <WorkspaceContent workspace={selectedWorkspace}>
+            <WorkspaceContent
+              workspace={selectedWorkspace}
+              activeOperation={activeOperation}
+              onOperationComplete={() => setActiveOperation(null)}
+            >
               {/* Tab bar */}
               <TabBar
                 ref={tabBarRef}

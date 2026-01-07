@@ -63,10 +63,12 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
   const workspaceService = await getWorkspaceService();
   const workspace = await workspaceService.createWorkspace(id, result.data);
 
-  // Start the container automatically
-  // This is done async - the workspace is returned immediately
-  // The container will be ready when the user opens a tab
-  const startedWorkspace = await workspaceService.startContainer(workspace.id);
+  // Start the container in the background (don't await)
+  // Progress will be tracked via WebSocket
+  workspaceService.startContainer(workspace.id).catch((error) => {
+    console.error(`Failed to start container for workspace ${workspace.id}:`, error);
+  });
 
-  return successResponse({ workspace: startedWorkspace }, 201);
+  // Return workspace immediately - container will start in background
+  return successResponse({ workspace }, 201);
 });

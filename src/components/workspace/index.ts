@@ -1,2 +1,2 @@
 export { StartupProgress, WorkspaceStopped } from './startup-progress';
-export { WorkspaceContent } from './workspace-content';
+export { WorkspaceContent, type ContainerOperation } from './workspace-content';

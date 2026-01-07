@@ -67,6 +67,12 @@ export function DashboardPanel({
   const [showShutdownConfirm, setShowShutdownConfirm] = useState(false);
   const [isShuttingDown, setIsShuttingDown] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [showRedeployConfirm, setShowRedeployConfirm] = useState(false);
+  const [isRedeploying, setIsRedeploying] = useState(false);
+  const [showDestroyConfirm, setShowDestroyConfirm] = useState(false);
+  const [isDestroying, setIsDestroying] = useState(false);
+  const [showDeleteWorkspaceConfirm, setShowDeleteWorkspaceConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Env var sync check before container operations
   const {
@@ -277,6 +283,39 @@ export function DashboardPanel({
     }
   };
 
+  const handleRedeployConfirm = async () => {
+    if (!onRedeployContainer) return;
+    setIsRedeploying(true);
+    setShowRedeployConfirm(false);
+    try {
+      await onRedeployContainer();
+    } finally {
+      setIsRedeploying(false);
+    }
+  };
+
+  const handleDestroyConfirm = async () => {
+    if (!onDestroyContainer) return;
+    setIsDestroying(true);
+    setShowDestroyConfirm(false);
+    try {
+      await onDestroyContainer();
+    } finally {
+      setIsDestroying(false);
+    }
+  };
+
+  const handleDeleteWorkspaceConfirm = async () => {
+    if (!onDeleteWorkspace) return;
+    setIsDeleting(true);
+    setShowDeleteWorkspaceConfirm(false);
+    try {
+      await onDeleteWorkspace();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const formatDate = (dateStr: string | Date | null) => {
     if (!dateStr) return 'Never';
     const date = new Date(dateStr);
@@ -373,27 +412,27 @@ export function DashboardPanel({
                     onClick={() => {
                       if (onRedeployContainer) {
                         checkBeforeOperation(workspace.id, 'redeploy', async () => {
-                          onRedeployContainer();
+                          setShowRedeployConfirm(true);
                         });
                       }
                     }}
-                    disabled={isEnvCheckLoading}
+                    disabled={isEnvCheckLoading || isRedeploying}
                     className="px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors disabled:opacity-50"
                   >
-                    {isEnvCheckLoading && envSyncOperation === 'redeploy' ? 'Checking...' : 'Redeploy'}
+                    {isRedeploying ? 'Redeploying...' : isEnvCheckLoading && envSyncOperation === 'redeploy' ? 'Checking...' : 'Redeploy'}
                   </button>
                   <button
                     onClick={() => {
                       if (onDestroyContainer) {
                         checkBeforeOperation(workspace.id, 'destroy', async () => {
-                          onDestroyContainer();
+                          setShowDestroyConfirm(true);
                         });
                       }
                     }}
-                    disabled={isEnvCheckLoading}
+                    disabled={isEnvCheckLoading || isDestroying}
                     className="px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-foreground transition-colors disabled:opacity-50"
                   >
-                    {isEnvCheckLoading && envSyncOperation === 'destroy' ? 'Checking...' : 'Destroy'}
+                    {isDestroying ? 'Destroying...' : isEnvCheckLoading && envSyncOperation === 'destroy' ? 'Checking...' : 'Destroy'}
                   </button>
                 </>
               ) : (
@@ -532,14 +571,14 @@ export function DashboardPanel({
                 onClick={() => {
                   if (onDeleteWorkspace) {
                     checkBeforeOperation(workspace.id, 'delete', async () => {
-                      onDeleteWorkspace();
+                      setShowDeleteWorkspaceConfirm(true);
                     });
                   }
                 }}
-                disabled={isEnvCheckLoading}
+                disabled={isEnvCheckLoading || isDeleting}
                 className="w-full px-3 py-2 bg-error hover:bg-error/80 rounded text-sm text-foreground transition-colors disabled:opacity-50"
               >
-                {isEnvCheckLoading && envSyncOperation === 'delete' ? 'Checking...' : 'Delete Workspace'}
+                {isDeleting ? 'Deleting...' : isEnvCheckLoading && envSyncOperation === 'delete' ? 'Checking...' : 'Delete Workspace'}
               </button>
             </div>
           </div>
@@ -673,6 +712,90 @@ export function DashboardPanel({
         onConfirm={handleShutdownConfirm}
         onCancel={() => setShowShutdownConfirm(false)}
         isLoading={isShuttingDown}
+      />
+
+      {/* Redeploy Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showRedeployConfirm}
+        title="Redeploy Container"
+        message={
+          <div className="space-y-3">
+            <p>Are you sure you want to redeploy the container?</p>
+            <div className="text-sm space-y-2">
+              <p className="text-error">
+                <strong>Warning:</strong> This will destroy the current container and create a fresh one.
+              </p>
+              <p className="text-warning">
+                All terminal state, command history, and uncommitted changes will be lost.
+              </p>
+              <p className="text-foreground-secondary">
+                The repository will be re-cloned from the remote.
+              </p>
+            </div>
+          </div>
+        }
+        confirmLabel="Redeploy"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleRedeployConfirm}
+        onCancel={() => setShowRedeployConfirm(false)}
+        isLoading={isRedeploying}
+      />
+
+      {/* Destroy Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDestroyConfirm}
+        title="Destroy Container"
+        message={
+          <div className="space-y-3">
+            <p>Are you sure you want to destroy the container?</p>
+            <div className="text-sm space-y-2">
+              <p className="text-error">
+                <strong>Warning:</strong> This will permanently remove the container.
+              </p>
+              <p className="text-warning">
+                All terminal state, command history, and uncommitted changes will be lost.
+              </p>
+              <p className="text-foreground-secondary">
+                You can deploy a new container later using the Deploy button.
+              </p>
+            </div>
+          </div>
+        }
+        confirmLabel="Destroy"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleDestroyConfirm}
+        onCancel={() => setShowDestroyConfirm(false)}
+        isLoading={isDestroying}
+      />
+
+      {/* Delete Workspace Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteWorkspaceConfirm}
+        title="Delete Workspace"
+        message={
+          <div className="space-y-3">
+            <p>Are you sure you want to delete this workspace?</p>
+            <div className="text-sm space-y-2">
+              <p className="text-error">
+                <strong>Warning:</strong> This action cannot be undone.
+              </p>
+              <p className="text-warning">
+                The workspace, its container, and all uncommitted changes will be permanently deleted.
+              </p>
+              <p className="text-foreground-secondary">
+                The Git branch and remote changes are not affected.
+              </p>
+            </div>
+          </div>
+        }
+        confirmLabel="Delete Workspace"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleDeleteWorkspaceConfirm}
+        onCancel={() => setShowDeleteWorkspaceConfirm(false)}
+        isLoading={isDeleting}
       />
     </div>
   );
