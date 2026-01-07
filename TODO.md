@@ -16,13 +16,13 @@
 
 - [ ] **Git user configuration** - When adding a new repository, allow specifying git username and email. Add ability to create and manage git identities in settings, with option to set a default.
 
-- [ ] **Default project name** - When adding a new repository, default the project name to the repo name if user hasn't specified a custom one.
+- [x] **Default project name** - When adding a new repository, default the project name to the repo name if user hasn't specified a custom one.
 
 - [ ] **Multi-step repository wizard** - Convert the "add repository" modal from one large form to a tabbed/wizard approach with Next/Next/Finish flow.
 
 ## Workspace Management
 
-- [ ] **Default workspace name** - When adding a workspace, auto-populate the name after creating or selecting a branch (don't leave it empty).
+- [x] **Default workspace name** - When adding a workspace, auto-populate the name after creating or selecting a branch (don't leave it empty).
 
 - [ ] **Rename "Restart" to "Redeploy"** - Current restart behavior actually redeploys the workspace. Rename button/action accordingly.
 
