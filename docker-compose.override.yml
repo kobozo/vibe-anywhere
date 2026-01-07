@@ -41,8 +41,8 @@ services:
       # Git repositories from host (for local/symlinked repos)
       - ${HOST_REPO_PATH:-./repos}:/repos:rw
 
-      # SSH keys (optional)
-      - ${HOST_SSH_PATH:-~/.ssh}:/home/sessionhub/.ssh:ro
+      # SSH keys (optional) - mounted to devops user home
+      - ${HOST_SSH_PATH:-~/.ssh}:/home/devops/.ssh:ro
     # Remove health check in dev for faster startup
     healthcheck:
       disable: true
