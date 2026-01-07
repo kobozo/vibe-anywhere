@@ -386,7 +386,7 @@ function Dashboard() {
     setActiveGroupId(null); // Clear active group when switching workspace
   }, [setActiveGroupId]);
 
-  // Handle container destruction - clear tabs when container is destroyed
+  // Handle workspace state updates - update selectedWorkspace with new container status
   const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
     if (selectedWorkspace && update.workspaceId === selectedWorkspace.id) {
       // If container was destroyed (status changed to 'none'), clear tabs
@@ -394,7 +394,20 @@ function Dashboard() {
         setSelectedTab(null);
         // Deselect workspace to show repository dashboard
         setSelectedWorkspace(null);
+        return;
       }
+
+      // Update selectedWorkspace with new container status/info
+      setSelectedWorkspace(prev => {
+        if (!prev || prev.id !== update.workspaceId) return prev;
+        return {
+          ...prev,
+          ...(update.containerStatus !== undefined && { containerStatus: update.containerStatus }),
+          ...(update.containerId !== undefined && { containerId: update.containerId }),
+          ...(update.containerIp !== undefined && { containerIp: update.containerIp }),
+          ...(update.agentConnected !== undefined && { agentConnectedAt: update.agentConnected ? new Date() : null }),
+        };
+      });
     }
   }, [selectedWorkspace]);
 
