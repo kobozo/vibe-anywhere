@@ -128,12 +128,21 @@ export class RepositoryService {
     // Validate resource values if provided
     this.validateResourceValues(updates);
 
+    // If cloneUrl is changing, invalidate the branch cache
+    const shouldInvalidateCache = updates.cloneUrl !== undefined;
+    const updateData: Record<string, unknown> = {
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    if (shouldInvalidateCache) {
+      updateData.cachedBranches = [];
+      updateData.branchesCachedAt = null;
+    }
+
     const [updated] = await db
       .update(repositories)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(repositories.id, repoId))
       .returning();
 
@@ -142,6 +151,94 @@ export class RepositoryService {
     }
 
     return updated;
+  }
+
+  /**
+   * Cache staleness threshold (5 minutes)
+   */
+  private readonly CACHE_STALE_MS = 5 * 60 * 1000;
+
+  /**
+   * Update cached branches for a repository
+   * Also updates defaultBranch if current value is 'main' and remote reports different
+   */
+  async updateCachedBranches(
+    repoId: string,
+    branches: string[],
+    detectedDefaultBranch?: string | null
+  ): Promise<Repository> {
+    const repo = await this.getRepository(repoId);
+    if (!repo) {
+      throw new Error(`Repository ${repoId} not found`);
+    }
+
+    const updates: Record<string, unknown> = {
+      cachedBranches: branches,
+      branchesCachedAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Update defaultBranch if:
+    // 1. We detected one from remote
+    // 2. Current value is placeholder 'main'
+    // 3. The detected branch exists in branches list
+    if (
+      detectedDefaultBranch &&
+      repo.defaultBranch === 'main' &&
+      branches.includes(detectedDefaultBranch)
+    ) {
+      updates.defaultBranch = detectedDefaultBranch;
+    }
+
+    const [updated] = await db
+      .update(repositories)
+      .set(updates)
+      .where(eq(repositories.id, repoId))
+      .returning();
+
+    return updated;
+  }
+
+  /**
+   * Get cached branches with staleness info
+   */
+  async getCachedBranches(repoId: string): Promise<{
+    branches: string[];
+    cachedAt: Date | null;
+    isStale: boolean;
+  }> {
+    const repo = await this.getRepository(repoId);
+    if (!repo) {
+      throw new Error(`Repository ${repoId} not found`);
+    }
+
+    const cachedBranches = (repo.cachedBranches as string[] | null) || [];
+    const branchesCachedAt = repo.branchesCachedAt;
+
+    // Determine if cache is stale
+    const isStale =
+      !branchesCachedAt ||
+      Date.now() - new Date(branchesCachedAt).getTime() > this.CACHE_STALE_MS;
+
+    return {
+      branches: cachedBranches,
+      cachedAt: branchesCachedAt,
+      isStale,
+    };
+  }
+
+  /**
+   * Invalidate branch cache (called when cloneUrl changes)
+   */
+  async invalidateBranchCache(repoId: string): Promise<void> {
+    await db
+      .update(repositories)
+      .set({
+        cachedBranches: [],
+        branchesCachedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(repositories.id, repoId));
   }
 
   /**

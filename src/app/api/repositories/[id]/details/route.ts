@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getRepositoryService, getSSHKeyService } from '@/lib/services';
+import { getGitHooksService } from '@/lib/services/git-hooks-service';
 import { db } from '@/lib/db';
 import { proxmoxTemplates } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -58,14 +59,36 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     }];
   }
 
+  // Get git hooks stored at repository level
+  const gitHooksService = getGitHooksService();
+  const repoHooks = await gitHooksService.getRepositoryGitHooks(id);
+  const hooks = Object.entries(repoHooks).map(([name, entry]) => ({
+    name,
+    path: `.git/hooks/${name}`,
+    enabled: entry.executable,
+  }));
+
+  // Get cached branches or fall back to default branch
+  const cacheInfo = await repoService.getCachedBranches(id);
+  const branches =
+    cacheInfo.branches.length > 0
+      ? cacheInfo.branches
+      : repository.defaultBranch
+        ? [repository.defaultBranch]
+        : ['main'];
+
   return successResponse({
     repository,
-    branches: repository.defaultBranch ? [repository.defaultBranch] : ['main'],
+    branches,
     sshKey,
     template,
-    hooks: [], // Git hooks not available - would need to query from container
+    hooks,
     remotes,
     lastCommit: null, // Commit info not available - would need to query from container
     stats: null, // Stats not available - would need to query from container
+    branchesMeta: {
+      cachedAt: cacheInfo.cachedAt?.toISOString() || null,
+      isStale: cacheInfo.isStale,
+    },
   });
 });

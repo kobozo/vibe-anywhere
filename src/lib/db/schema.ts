@@ -85,6 +85,13 @@ export interface EnvVarEntry {
 }
 export type EnvVarsJson = Record<string, EnvVarEntry>;
 
+// Git hook entry type for JSONB storage
+export interface GitHookEntry {
+  content: string;      // Hook script content (base64 encoded)
+  executable: boolean;  // Whether hook should be executable
+}
+export type GitHooksJson = Record<string, GitHookEntry>;
+
 // Users table
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -134,6 +141,10 @@ export const repositories = pgTable('repositories', {
   defaultBranch: text('default_branch').default('main'),
   techStack: jsonb('tech_stack').$type<string[]>().default([]), // Tech stack IDs to install on workspaces (override template)
   envVars: jsonb('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers (overrides template)
+  gitHooks: jsonb('git_hooks').$type<GitHooksJson>().default({}), // Git hooks to sync to workspaces
+  // Cached branch info from remote (fetched via git ls-remote)
+  cachedBranches: jsonb('cached_branches').$type<string[]>().default([]),
+  branchesCachedAt: timestamp('branches_cached_at', { withTimezone: true }),
   // Resource overrides (null = use global defaults from settings)
   resourceMemory: integer('resource_memory'), // Memory in MB
   resourceCpuCores: integer('resource_cpu_cores'), // CPU cores

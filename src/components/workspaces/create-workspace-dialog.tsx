@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRepositories } from '@/hooks/useRepositories';
+import { useState, useEffect, useCallback } from 'react';
+import { useRepositoryBranches } from '@/hooks/useRepositoryBranches';
 
 interface CreateWorkspaceDialogProps {
   isOpen: boolean;
@@ -18,29 +18,42 @@ export function CreateWorkspaceDialog({
   onCreate,
   isLoading,
 }: CreateWorkspaceDialogProps) {
-  const { getRepositoryWithBranches } = useRepositories();
   const [name, setName] = useState('');
   const [branchName, setBranchName] = useState('');
   const [baseBranch, setBaseBranch] = useState('');
-  const [branches, setBranches] = useState<string[]>([]);
   const [branchType, setBranchType] = useState<'new' | 'existing'>('new');
   const [error, setError] = useState<string | null>(null);
 
+  // Handle branch updates from WebSocket without closing dropdown
+  const handleBranchesUpdated = useCallback((newBranches: string[]) => {
+    // Preserve selection if still valid, otherwise select first branch
+    setBaseBranch((current) => {
+      if (current && newBranches.includes(current)) {
+        return current;
+      }
+      // Try to select default branch or first available
+      if (newBranches.includes('main')) return 'main';
+      if (newBranches.includes('master')) return 'master';
+      return newBranches[0] || '';
+    });
+  }, []);
+
+  // Use the new hook for fetching branches with WebSocket updates
+  const {
+    branches,
+    isLoading: branchesLoading,
+    isRefreshing,
+  } = useRepositoryBranches({
+    repositoryId: isOpen ? repositoryId : null,
+    onBranchesUpdated: handleBranchesUpdated,
+  });
+
+  // Set initial baseBranch when branches first load
   useEffect(() => {
-    if (isOpen && repositoryId) {
-      // Fetch branches for the repository
-      getRepositoryWithBranches(repositoryId)
-        .then(({ branches }) => {
-          // De-duplicate branches (remote branches may have duplicates with local)
-          const uniqueBranches = [...new Set(branches)];
-          setBranches(uniqueBranches);
-          if (uniqueBranches.length > 0) {
-            setBaseBranch(uniqueBranches.includes('main') ? 'main' : uniqueBranches[0]);
-          }
-        })
-        .catch(console.error);
+    if (branches.length > 0 && !baseBranch) {
+      setBaseBranch(branches.includes('main') ? 'main' : branches[0]);
     }
-  }, [isOpen, repositoryId, getRepositoryWithBranches]);
+  }, [branches, baseBranch]);
 
   if (!isOpen) return null;
 
@@ -146,31 +159,62 @@ export function CreateWorkspaceDialog({
                   required
                   className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary mb-3"
                 />
-                <label className="block text-sm text-foreground-secondary mb-1">Base Branch</label>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="text-sm text-foreground-secondary">Base Branch</label>
+                  {isRefreshing && (
+                    <span className="text-xs text-foreground-tertiary animate-pulse">
+                      Refreshing...
+                    </span>
+                  )}
+                </div>
                 <select
                   value={baseBranch}
                   onChange={(e) => setBaseBranch(e.target.value)}
-                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
+                  disabled={branchesLoading}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground disabled:opacity-50"
                 >
-                  {branches.map((branch) => (
-                    <option key={branch} value={branch}>
-                      {branch}
-                    </option>
-                  ))}
+                  {branchesLoading && branches.length === 0 ? (
+                    <option value="">Loading branches...</option>
+                  ) : branches.length === 0 ? (
+                    <option value="">No branches available</option>
+                  ) : (
+                    branches.map((branch) => (
+                      <option key={branch} value={branch}>
+                        {branch}
+                      </option>
+                    ))
+                  )}
                 </select>
               </>
             ) : (
-              <select
-                value={baseBranch}
-                onChange={(e) => setBaseBranch(e.target.value)}
-                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground"
-              >
-                {branches.map((branch) => (
-                  <option key={branch} value={branch}>
-                    {branch}
-                  </option>
-                ))}
-              </select>
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="text-sm text-foreground-secondary sr-only">Select Branch</label>
+                  {isRefreshing && (
+                    <span className="text-xs text-foreground-tertiary animate-pulse">
+                      Refreshing...
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={baseBranch}
+                  onChange={(e) => setBaseBranch(e.target.value)}
+                  disabled={branchesLoading}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground disabled:opacity-50"
+                >
+                  {branchesLoading && branches.length === 0 ? (
+                    <option value="">Loading branches...</option>
+                  ) : branches.length === 0 ? (
+                    <option value="">No branches available</option>
+                  ) : (
+                    branches.map((branch) => (
+                      <option key={branch} value={branch}>
+                        {branch}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </>
             )}
           </div>
         </form>

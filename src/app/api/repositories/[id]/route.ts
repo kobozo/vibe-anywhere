@@ -47,11 +47,23 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     throw new NotFoundError('Repository', id);
   }
 
-  // Return default branch as the only known branch
-  // Full branch list would require querying from a running container
-  const branches = repository.defaultBranch ? [repository.defaultBranch] : ['main'];
+  // Get cached branches or fall back to default branch
+  const cacheInfo = await repoService.getCachedBranches(id);
+  const branches =
+    cacheInfo.branches.length > 0
+      ? cacheInfo.branches
+      : repository.defaultBranch
+        ? [repository.defaultBranch]
+        : ['main'];
 
-  return successResponse({ repository, branches });
+  return successResponse({
+    repository,
+    branches,
+    branchesMeta: {
+      cachedAt: cacheInfo.cachedAt?.toISOString() || null,
+      isStale: cacheInfo.isStale,
+    },
+  });
 });
 
 /**
