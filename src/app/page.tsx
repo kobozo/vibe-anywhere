@@ -389,15 +389,8 @@ function Dashboard() {
   // Handle workspace state updates - update selectedWorkspace with new container status
   const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
     if (selectedWorkspace && update.workspaceId === selectedWorkspace.id) {
-      // If container was destroyed (status changed to 'none'), clear tabs
-      if (update.containerStatus === 'none') {
-        setSelectedTab(null);
-        // Deselect workspace to show repository dashboard
-        setSelectedWorkspace(null);
-        return;
-      }
-
       // Update selectedWorkspace with new container status/info
+      // Don't deselect workspace on 'none' status - Dashboard handles it with Deploy button
       setSelectedWorkspace(prev => {
         if (!prev || prev.id !== update.workspaceId) return prev;
         return {
