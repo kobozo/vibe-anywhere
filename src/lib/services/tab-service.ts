@@ -1,6 +1,6 @@
-import { eq, desc, asc, sql, and, inArray } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, inArray, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { tabs, type Tab, type NewTab, type SessionStatus, type TabType } from '@/lib/db/schema';
+import { tabs, tabGroups, type Tab, type NewTab, type SessionStatus, type TabType } from '@/lib/db/schema';
 import { getWorkspaceService, WorkspaceService } from './workspace-service';
 import { config } from '@/lib/config';
 
@@ -372,6 +372,54 @@ export class TabService {
           .where(eq(tabs.id, id));
       }
     });
+  }
+
+  /**
+   * Delete all tabs except Dashboard for a workspace
+   * Also deletes all tab groups (members cascade-deleted automatically)
+   * Ensures Dashboard tab exists after cleanup
+   * Used during redeploy/destroy operations
+   */
+  async deleteAllTabsExceptDashboard(workspaceId: string): Promise<Tab> {
+    await db.transaction(async (tx) => {
+      // 1. Delete all tab groups (CASCADE deletes tabGroupMembers)
+      await tx.delete(tabGroups).where(eq(tabGroups.workspaceId, workspaceId));
+
+      // 2. Delete all non-dashboard tabs
+      await tx.delete(tabs).where(
+        and(
+          eq(tabs.workspaceId, workspaceId),
+          ne(tabs.tabType, 'dashboard')
+        )
+      );
+    });
+
+    // 3. Ensure Dashboard tab exists (create if missing)
+    const existingTabs = await this.listTabs(workspaceId);
+    const dashboardTab = existingTabs.find(t => t.tabType === 'dashboard');
+
+    if (dashboardTab) {
+      return dashboardTab;
+    }
+
+    // Create Dashboard tab if it doesn't exist
+    const [tab] = await db
+      .insert(tabs)
+      .values({
+        workspaceId,
+        name: 'Dashboard',
+        command: [],
+        status: 'running',
+        tabType: 'dashboard',
+        icon: 'dashboard',
+        isPinned: false,
+        sortOrder: -101,
+        outputBuffer: [],
+        outputBufferSize: 0,
+      })
+      .returning();
+
+    return tab;
   }
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRepositoryService, getWorkspaceService } from '@/lib/services';
+import { getRepositoryService, getWorkspaceService, getTabService } from '@/lib/services';
 import { getTabStreamManager } from '@/lib/services/tab-stream-manager';
 import {
   requireAuth,
@@ -67,7 +67,11 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
   // Close all tab streams for this workspace
   const tabStreamManager = getTabStreamManager();
-  tabStreamManager.closeAllForWorkspace(id);
+  await tabStreamManager.closeAllForWorkspace(id);
+
+  // Delete all tabs except Dashboard (tab groups also deleted)
+  const tabService = getTabService();
+  await tabService.deleteAllTabsExceptDashboard(id);
 
   // Destroy the container (keeps workspace record)
   const updatedWorkspace = await workspaceService.destroyContainer(id);
