@@ -32,6 +32,8 @@
 
 - [ ] **Close tabs on redeploy** - When redeploying a workspace, automatically close ALL tabs except dashboard.
 
+- [ ] **Advanced workspace creation options** - Extend the "add workspace" modal with a tabbed approach. Include advanced options tab for overwrites: static IP, force VMID, override image template.
+
 ## Tab System
 
 - [x] **Dashboard tab not closeable** - Make the dashboard tab permanently visible (cannot be closed).
