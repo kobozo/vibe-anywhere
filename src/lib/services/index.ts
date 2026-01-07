@@ -13,6 +13,7 @@ export { TemplateService, getTemplateService } from './template-service';
 export { getTabStreamManager } from './tab-stream-manager';
 export { AgentRegistry, getAgentRegistry } from './agent-registry';
 export { ContainerStatusSyncService, getContainerStatusSyncService } from './container-status-sync';
+export { EnvVarSyncService, getEnvVarSyncService } from './env-var-sync-service';
 
 // Container backend (abstraction layer)
 export {

@@ -2,7 +2,7 @@
 
 ## Environment Variables
 
-- [ ] **Sync detection on container operations** - When restarting, destroying a container, or deleting a workspace, detect if there are differences between workspace `.env` and repository-level synced values. Show a modal asking to sync changes before proceeding.
+- [x] **Sync detection on container operations** - When restarting, destroying a container, or deleting a workspace, detect if there are differences between workspace `.env` and repository-level synced values. Show a modal asking to sync changes before proceeding.
 
 - [ ] **Live update environment variables** - Push environment variable changes to running workspaces without losing sessions. Variables should be live-updated in the container.
 

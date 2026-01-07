@@ -411,6 +411,63 @@ function Dashboard() {
     onUpdate: handleWorkspaceUpdate,
   });
 
+  // Container operation handlers for DashboardPanel
+  const handleRestartContainer = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    try {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/restart`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        console.error('Failed to restart container:', error?.message);
+      }
+      // Workspace state will update via WebSocket
+    } catch (error) {
+      console.error('Error restarting container:', error);
+    }
+  }, [selectedWorkspace]);
+
+  const handleDestroyContainer = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    try {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/destroy?force=true`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        console.error('Failed to destroy container:', error?.message);
+      }
+      // Workspace state will update via WebSocket
+    } catch (error) {
+      console.error('Error destroying container:', error);
+    }
+  }, [selectedWorkspace]);
+
+  const handleDeleteWorkspace = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    const repoId = selectedWorkspace.repositoryId;
+    try {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        console.error('Failed to delete workspace:', error?.message);
+        return;
+      }
+      // Clear selection and refresh sidebar
+      setSelectedTab(null);
+      setSelectedWorkspace(null);
+      setRefreshWorkspacesForRepoId(repoId);
+    } catch (error) {
+      console.error('Error deleting workspace:', error);
+    }
+  }, [selectedWorkspace]);
+
   const handleAddWorkspace = useCallback((repositoryId: string, branch?: string) => {
     setWorkspaceRepoId(repositoryId);
     setPreselectedBranch(branch || null);
@@ -914,6 +971,9 @@ function Dashboard() {
                   <DashboardPanel
                     workspace={selectedWorkspace}
                     repository={selectedRepository}
+                    onRestartContainer={handleRestartContainer}
+                    onDestroyContainer={handleDestroyContainer}
+                    onDeleteWorkspace={handleDeleteWorkspace}
                   />
                 ) : selectedTab && selectedTab.tabType === 'git' ? (
                   // Git panel - no terminal needed

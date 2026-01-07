@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Workspace, Repository } from '@/lib/db/schema';
+import { useEnvVarSync } from '@/hooks/useEnvVarSync';
+import { EnvVarSyncDialog } from '@/components/workspaces/env-var-sync-dialog';
 
 interface AgentInfo {
   connected: boolean;
@@ -53,6 +55,19 @@ export function DashboardPanel({
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [envSyncMessage, setEnvSyncMessage] = useState<string | null>(null);
   const [envSyncing, setEnvSyncing] = useState(false);
+
+  // Env var sync check before container operations
+  const {
+    isChecking: isEnvCheckLoading,
+    isSyncing: isEnvSyncLoading,
+    isDialogOpen: isEnvSyncDialogOpen,
+    diff: envDiff,
+    operation: envSyncOperation,
+    checkBeforeOperation,
+    handleSyncAndProceed,
+    handleProceedWithoutSync,
+    handleCancel: handleEnvSyncCancel,
+  } = useEnvVarSync();
 
   const fetchAgentInfo = useCallback(async () => {
     try {
@@ -278,16 +293,30 @@ export function DashboardPanel({
             {hasContainer && (
               <div className="mt-4 flex gap-2">
                 <button
-                  onClick={onRestartContainer}
-                  className="flex-1 px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors"
+                  onClick={() => {
+                    if (onRestartContainer) {
+                      checkBeforeOperation(workspace.id, 'restart', async () => {
+                        onRestartContainer();
+                      });
+                    }
+                  }}
+                  disabled={isEnvCheckLoading}
+                  className="flex-1 px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors disabled:opacity-50"
                 >
-                  Restart
+                  {isEnvCheckLoading && envSyncOperation === 'restart' ? 'Checking...' : 'Restart'}
                 </button>
                 <button
-                  onClick={onDestroyContainer}
-                  className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-foreground transition-colors"
+                  onClick={() => {
+                    if (onDestroyContainer) {
+                      checkBeforeOperation(workspace.id, 'destroy', async () => {
+                        onDestroyContainer();
+                      });
+                    }
+                  }}
+                  disabled={isEnvCheckLoading}
+                  className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-foreground transition-colors disabled:opacity-50"
                 >
-                  Destroy
+                  {isEnvCheckLoading && envSyncOperation === 'destroy' ? 'Checking...' : 'Destroy'}
                 </button>
               </div>
             )}
@@ -414,10 +443,17 @@ export function DashboardPanel({
             </div>
             <div className="mt-4">
               <button
-                onClick={onDeleteWorkspace}
-                className="w-full px-3 py-2 bg-error hover:bg-error/80 rounded text-sm text-foreground transition-colors"
+                onClick={() => {
+                  if (onDeleteWorkspace) {
+                    checkBeforeOperation(workspace.id, 'delete', async () => {
+                      onDeleteWorkspace();
+                    });
+                  }
+                }}
+                disabled={isEnvCheckLoading}
+                className="w-full px-3 py-2 bg-error hover:bg-error/80 rounded text-sm text-foreground transition-colors disabled:opacity-50"
               >
-                Delete Workspace
+                {isEnvCheckLoading && envSyncOperation === 'delete' ? 'Checking...' : 'Delete Workspace'}
               </button>
             </div>
           </div>
@@ -484,6 +520,18 @@ export function DashboardPanel({
         </div>
 
       </div>
+
+      {/* Env Var Sync Dialog */}
+      <EnvVarSyncDialog
+        isOpen={isEnvSyncDialogOpen}
+        workspaceName={workspace.name}
+        operation={envSyncOperation || 'restart'}
+        diff={envDiff}
+        onSyncAndProceed={handleSyncAndProceed}
+        onProceedWithoutSync={handleProceedWithoutSync}
+        onCancel={handleEnvSyncCancel}
+        isLoading={isEnvSyncLoading}
+      />
     </div>
   );
 }

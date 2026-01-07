@@ -3,3 +3,4 @@ export * from './session';
 export * from './container';
 export * from './git';
 export * from './api';
+export * from './env-sync';
