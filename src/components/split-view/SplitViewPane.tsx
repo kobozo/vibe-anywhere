@@ -82,8 +82,8 @@ export function SplitViewPane({
       description: 'The container is restarting. Tab will resume automatically.',
     },
     stopped: {
-      title: 'Tab Stopped',
-      description: 'Click the tab in the bar to restart it.',
+      title: 'Stopped',
+      description: 'The container is stopped. Start the container to resume.',
     },
     error: {
       title: 'Tab Error',

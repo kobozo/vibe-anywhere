@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getRepositoryService, getWorkspaceService } from '@/lib/services';
+import { getRepositoryService, getWorkspaceService, getTabService } from '@/lib/services';
 import {
   requireAuth,
   successResponse,
@@ -40,8 +40,24 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     throw new ValidationError('Container is already running');
   }
 
+  // Only allow starting from valid states
+  const startableStates = ['exited', 'none', 'dead', 'paused'];
+  if (workspace.containerStatus && !startableStates.includes(workspace.containerStatus)) {
+    throw new ValidationError(`Cannot start container in '${workspace.containerStatus}' state`);
+  }
+
   // Start the container
   const updatedWorkspace = await workspaceService.startContainer(id);
+
+  // Recover tabs that were stopped (from previous shutdown)
+  const tabService = getTabService();
+  const tabs = await tabService.listTabs(id);
+  const stoppedTabs = tabs.filter(t => t.tabType === 'terminal' && t.status === 'stopped');
+
+  // Set stopped tabs back to running so they can be reconnected
+  for (const tab of stoppedTabs) {
+    await tabService.updateTab(tab.id, { status: 'running' });
+  }
 
   return successResponse({
     workspace: {
@@ -49,6 +65,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
       containerId: updatedWorkspace.containerId,
       containerStatus: updatedWorkspace.containerStatus,
     },
+    tabsRecovered: stoppedTabs.map(t => t.id),
     message: 'Container started successfully',
   });
 });

@@ -28,7 +28,7 @@
 
 - [x] **Add true restart functionality** - Implement actual container restart that preserves state but restarts services.
 
-- [ ] **Add shutdown functionality** - Add ability to shutdown/stop a workspace without destroying it.
+- [x] **Add shutdown functionality** - Add ability to shutdown/stop a workspace without destroying it.
 
 - [ ] **Close tabs on redeploy** - When redeploying a workspace, automatically close ALL tabs except dashboard.
 

@@ -35,6 +35,8 @@ interface DashboardPanelProps {
   workspace: Workspace;
   repository: Repository | null;
   onRestartContainer?: () => void;
+  onShutdownContainer?: () => void;
+  onStartContainer?: () => void;
   onRedeployContainer?: () => void;
   onDestroyContainer?: () => void;
   onDeleteWorkspace?: () => void;
@@ -44,6 +46,8 @@ export function DashboardPanel({
   workspace,
   repository,
   onRestartContainer,
+  onShutdownContainer,
+  onStartContainer,
   onRedeployContainer,
   onDestroyContainer,
   onDeleteWorkspace,
@@ -60,6 +64,9 @@ export function DashboardPanel({
   const [envSyncing, setEnvSyncing] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
+  const [showShutdownConfirm, setShowShutdownConfirm] = useState(false);
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Env var sync check before container operations
   const {
@@ -249,6 +256,27 @@ export function DashboardPanel({
     }
   };
 
+  const handleShutdownConfirm = async () => {
+    if (!onShutdownContainer) return;
+    setIsShuttingDown(true);
+    setShowShutdownConfirm(false);
+    try {
+      await onShutdownContainer();
+    } finally {
+      setIsShuttingDown(false);
+    }
+  };
+
+  const handleStartContainer = async () => {
+    if (!onStartContainer) return;
+    setIsStarting(true);
+    try {
+      await onStartContainer();
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
   const formatDate = (dateStr: string | Date | null) => {
     if (!dateStr) return 'Never';
     const date = new Date(dateStr);
@@ -306,43 +334,78 @@ export function DashboardPanel({
                 <p className="text-foreground-tertiary italic">No container provisioned</p>
               )}
             </div>
-            {hasContainer && (
-              <div className="mt-4 flex gap-2">
+            {/* Container action buttons - 2x2 grid */}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {/* Row 1: Restart | Shutdown/Start */}
+              {hasContainer && (
+                <>
+                  <button
+                    onClick={() => setShowRestartConfirm(true)}
+                    disabled={workspace.containerStatus !== 'running' || isRestarting}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-foreground transition-colors"
+                  >
+                    {isRestarting ? 'Restarting...' : 'Restart'}
+                  </button>
+                  {workspace.containerStatus === 'running' ? (
+                    <button
+                      onClick={() => setShowShutdownConfirm(true)}
+                      disabled={isShuttingDown}
+                      className="px-3 py-2 bg-foreground-tertiary hover:bg-foreground-tertiary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-foreground transition-colors"
+                    >
+                      {isShuttingDown ? 'Stopping...' : 'Shutdown'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleStartContainer}
+                      disabled={isStarting || workspace.containerStatus === 'creating'}
+                      className="px-3 py-2 bg-success hover:bg-success/80 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-foreground transition-colors"
+                    >
+                      {isStarting ? 'Starting...' : 'Start'}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* Row 2: Redeploy | Destroy/Deploy */}
+              {hasContainer ? (
+                <>
+                  <button
+                    onClick={() => {
+                      if (onRedeployContainer) {
+                        checkBeforeOperation(workspace.id, 'redeploy', async () => {
+                          onRedeployContainer();
+                        });
+                      }
+                    }}
+                    disabled={isEnvCheckLoading}
+                    className="px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors disabled:opacity-50"
+                  >
+                    {isEnvCheckLoading && envSyncOperation === 'redeploy' ? 'Checking...' : 'Redeploy'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onDestroyContainer) {
+                        checkBeforeOperation(workspace.id, 'destroy', async () => {
+                          onDestroyContainer();
+                        });
+                      }
+                    }}
+                    disabled={isEnvCheckLoading}
+                    className="px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-foreground transition-colors disabled:opacity-50"
+                  >
+                    {isEnvCheckLoading && envSyncOperation === 'destroy' ? 'Checking...' : 'Destroy'}
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={() => setShowRestartConfirm(true)}
-                  disabled={workspace.containerStatus !== 'running' || isRestarting}
-                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-foreground transition-colors"
+                  onClick={handleStartContainer}
+                  disabled={isStarting}
+                  className="col-span-2 px-3 py-2 bg-success hover:bg-success/80 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-foreground transition-colors"
                 >
-                  {isRestarting ? 'Restarting...' : 'Restart'}
+                  {isStarting ? 'Deploying...' : 'Deploy'}
                 </button>
-                <button
-                  onClick={() => {
-                    if (onRedeployContainer) {
-                      checkBeforeOperation(workspace.id, 'redeploy', async () => {
-                        onRedeployContainer();
-                      });
-                    }
-                  }}
-                  disabled={isEnvCheckLoading}
-                  className="flex-1 px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors disabled:opacity-50"
-                >
-                  {isEnvCheckLoading && envSyncOperation === 'redeploy' ? 'Checking...' : 'Redeploy'}
-                </button>
-                <button
-                  onClick={() => {
-                    if (onDestroyContainer) {
-                      checkBeforeOperation(workspace.id, 'destroy', async () => {
-                        onDestroyContainer();
-                      });
-                    }
-                  }}
-                  disabled={isEnvCheckLoading}
-                  className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm text-foreground transition-colors disabled:opacity-50"
-                >
-                  {isEnvCheckLoading && envSyncOperation === 'destroy' ? 'Checking...' : 'Destroy'}
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Agent Card */}
@@ -582,6 +645,34 @@ export function DashboardPanel({
         onConfirm={handleRestartConfirm}
         onCancel={() => setShowRestartConfirm(false)}
         isLoading={isRestarting}
+      />
+
+      {/* Shutdown Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showShutdownConfirm}
+        title="Shutdown Container"
+        message={
+          <div className="space-y-3">
+            <p>Are you sure you want to shutdown the container?</p>
+            <div className="text-sm space-y-2">
+              <p className="text-warning">
+                <strong>Warning:</strong> Terminal tab state and command history will be lost.
+              </p>
+              <p className="text-foreground-secondary">
+                All terminal tabs will be stopped. Start the container to resume.
+              </p>
+              <p className="text-success">
+                Files on the filesystem will remain untouched.
+              </p>
+            </div>
+          </div>
+        }
+        confirmLabel="Shutdown"
+        cancelLabel="Cancel"
+        confirmVariant="warning"
+        onConfirm={handleShutdownConfirm}
+        onCancel={() => setShowShutdownConfirm(false)}
+        isLoading={isShuttingDown}
       />
     </div>
   );

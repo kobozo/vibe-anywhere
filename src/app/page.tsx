@@ -447,6 +447,40 @@ function Dashboard() {
     }
   }, [selectedWorkspace]);
 
+  const handleShutdownContainer = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    try {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/shutdown`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        console.error('Failed to shutdown container:', error?.message);
+      }
+      // Workspace and tab states will update via WebSocket
+    } catch (error) {
+      console.error('Error shutting down container:', error);
+    }
+  }, [selectedWorkspace]);
+
+  const handleStartContainer = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    try {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        console.error('Failed to start container:', error?.message);
+      }
+      // Workspace and tab states will update via WebSocket
+    } catch (error) {
+      console.error('Error starting container:', error);
+    }
+  }, [selectedWorkspace]);
+
   const handleDestroyContainer = useCallback(async () => {
     if (!selectedWorkspace) return;
     try {
@@ -993,6 +1027,8 @@ function Dashboard() {
                     workspace={selectedWorkspace}
                     repository={selectedRepository}
                     onRestartContainer={handleRestartContainer}
+                    onShutdownContainer={handleShutdownContainer}
+                    onStartContainer={handleStartContainer}
                     onRedeployContainer={handleRedeployContainer}
                     onDestroyContainer={handleDestroyContainer}
                     onDeleteWorkspace={handleDeleteWorkspace}
