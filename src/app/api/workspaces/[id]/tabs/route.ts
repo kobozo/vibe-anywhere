@@ -50,10 +50,20 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
 
   const tabService = getTabService();
 
-  // Static tabs (dashboard, git, docker) are now created on-demand via CreateTabDialog
-  // No longer auto-created here
-
   const tabs = await tabService.listTabs(id);
+
+  // Auto-create Dashboard tab if no tabs exist for this workspace
+  if (tabs.length === 0) {
+    const dashboardTab = await tabService.createTab(id, {
+      name: 'Dashboard',
+      command: [],
+      tabType: 'dashboard',
+      icon: 'dashboard',
+      sortOrder: -101,
+    });
+    tabs.push(dashboardTab);
+  }
+
   const tabInfos = tabs.map((t) => tabService.toTabInfo(t));
 
   return successResponse({ tabs: tabInfos });
