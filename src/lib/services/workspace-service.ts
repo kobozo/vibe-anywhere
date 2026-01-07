@@ -348,14 +348,15 @@ export class WorkspaceService {
         return workspace; // Already running
       }
       // Container exists but not running - try to start it
-      if (info && info.status !== 'exited' && info.status !== 'dead') {
+      // Start if status is 'exited' (shutdown), 'paused', or 'created'
+      if (info && (info.status === 'exited' || info.status === 'paused' || info.status === 'created')) {
         this.emitProgress(workspaceId, 'starting_container');
         await this.containerBackend.startContainer(workspace.containerId);
         this.emitProgress(workspaceId, 'configuring_network');
         const updatedInfo = await this.containerBackend.getContainerInfo(workspace.containerId);
         const containerIp = updatedInfo?.ipAddress || null;
         await this.updateContainerIp(workspaceId, containerIp);
-        // Ensure repo is cloned after starting
+        // Ensure repo is cloned after starting (may have been started before refactor)
         if (containerIp) {
           this.emitProgress(workspaceId, 'cloning_repository');
           await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, workspace.containerId);
@@ -363,11 +364,13 @@ export class WorkspaceService {
         this.emitProgress(workspaceId, 'connecting');
         return this.updateContainerStatus(workspaceId, workspace.containerId, 'running');
       }
-      // Container is dead/exited - remove and recreate
-      try {
-        await this.containerBackend.removeContainer(workspace.containerId);
-      } catch (e) {
-        console.error('Failed to remove old container:', e);
+      // Container is dead or doesn't exist - remove and recreate
+      if (info?.status === 'dead' || !info) {
+        try {
+          await this.containerBackend.removeContainer(workspace.containerId);
+        } catch (e) {
+          console.error('Failed to remove old container:', e);
+        }
       }
     }
 

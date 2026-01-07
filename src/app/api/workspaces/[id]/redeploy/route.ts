@@ -37,18 +37,18 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
   // Stop all tab streams for this workspace
   const tabStreamManager = getTabStreamManager();
-  // Note: tabs will need to be restarted after container redeploy
+  await tabStreamManager.closeAllForWorkspace(id);
 
-  // Stop the container if running
+  // Destroy the container completely so startContainer creates a fresh one
   if (workspace.containerId) {
     try {
-      await workspaceService.stopContainer(id);
+      await workspaceService.destroyContainer(id);
     } catch (error) {
-      console.error('Error stopping container:', error);
+      console.error('Error destroying container:', error);
     }
   }
 
-  // Start a fresh container
+  // Start a fresh container (will create new since container was destroyed)
   const updatedWorkspace = await workspaceService.startContainer(id);
 
   return successResponse({
