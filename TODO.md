@@ -26,7 +26,7 @@
 
 - [x] **Rename "Restart" to "Redeploy"** - Current restart behavior actually redeploys the workspace. Rename button/action accordingly.
 
-- [ ] **Add true restart functionality** - Implement actual container restart that preserves state but restarts services.
+- [x] **Add true restart functionality** - Implement actual container restart that preserves state but restarts services.
 
 - [ ] **Add shutdown functionality** - Add ability to shutdown/stop a workspace without destroying it.
 
@@ -45,6 +45,8 @@
 - [ ] **Alphabetical ordering by default** - Sort repositories alphabetically in the sidebar by default.
 
 - [ ] **Filters and custom sort orders** - Add filtering options and custom sort orders for repositories in the sidebar.
+
+- [ ] **User menu in sidebar footer** - Move the logged-in user display to the sidebar footer. Clicking on the user opens a submenu with logout and other user options.
 
 ## Onboarding
 
