@@ -8,12 +8,16 @@ interface UIState {
   expandedRepos: string[];
   selectedTabId: string | null;
   activeGroupId: string | null;
+  selectedRepositoryId: string | null;
+  selectedWorkspaceId: string | null;
 }
 
 const defaultState: UIState = {
   expandedRepos: [],
   selectedTabId: null,
   activeGroupId: null,
+  selectedRepositoryId: null,
+  selectedWorkspaceId: null,
 };
 
 function loadState(): UIState {
@@ -73,13 +77,33 @@ export function useUIState() {
     });
   }, []);
 
+  const setSelectedRepositoryId = useCallback((repoId: string | null) => {
+    setState(prev => {
+      const next = { ...prev, selectedRepositoryId: repoId };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
+  const setSelectedWorkspaceId = useCallback((workspaceId: string | null) => {
+    setState(prev => {
+      const next = { ...prev, selectedWorkspaceId: workspaceId };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
   return {
     expandedRepos: state.expandedRepos,
     selectedTabId: state.selectedTabId,
     activeGroupId: state.activeGroupId,
+    selectedRepositoryId: state.selectedRepositoryId,
+    selectedWorkspaceId: state.selectedWorkspaceId,
     isLoaded,
     setExpandedRepos,
     setSelectedTabId,
     setActiveGroupId,
+    setSelectedRepositoryId,
+    setSelectedWorkspaceId,
   };
 }

@@ -151,11 +151,18 @@ function Dashboard() {
     expandedRepos: persistedExpandedRepos,
     selectedTabId: persistedSelectedTabId,
     activeGroupId: persistedActiveGroupId,
+    selectedRepositoryId: persistedRepositoryId,
+    selectedWorkspaceId: persistedWorkspaceId,
     isLoaded: uiStateLoaded,
     setExpandedRepos: persistExpandedRepos,
     setSelectedTabId: persistSelectedTabId,
     setActiveGroupId: persistActiveGroupId,
+    setSelectedRepositoryId: persistSelectedRepositoryId,
+    setSelectedWorkspaceId: persistSelectedWorkspaceId,
   } = useUIState();
+
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Fetch whisper settings on mount
   useEffect(() => {
@@ -183,8 +190,103 @@ function Dashboard() {
     }
   }, [activeGroupId, uiStateLoaded, persistActiveGroupId]);
 
+  // Persist selected repository ID when it changes
+  useEffect(() => {
+    if (uiStateLoaded) {
+      persistSelectedRepositoryId(selectedRepository?.id || null);
+    }
+  }, [selectedRepository?.id, uiStateLoaded, persistSelectedRepositoryId]);
+
+  // Persist selected workspace ID when it changes
+  useEffect(() => {
+    if (uiStateLoaded) {
+      persistSelectedWorkspaceId(selectedWorkspace?.id || null);
+    }
+  }, [selectedWorkspace?.id, uiStateLoaded, persistSelectedWorkspaceId]);
+
   // Track if we've restored the tab selection (to only do it once)
   const [hasRestoredSelection, setHasRestoredSelection] = useState(false);
+
+  // Track if we've restored the repository/workspace selection
+  const [hasRestoredRepoSelection, setHasRestoredRepoSelection] = useState(false);
+
+  // Callback from repository-tree when workspaces are loaded for a repo
+  const [loadedWorkspacesForRepoId, setLoadedWorkspacesForRepoId] = useState<string | null>(null);
+  const [loadedWorkspaces, setLoadedWorkspaces] = useState<Workspace[]>([]);
+
+  // Restore repository selection after repositories are loaded
+  useEffect(() => {
+    if (
+      !hasRestoredRepoSelection &&
+      uiStateLoaded &&
+      persistedRepositoryId &&
+      repositories.length > 0
+    ) {
+      const repo = repositories.find(r => r.id === persistedRepositoryId);
+      if (repo) {
+        setSelectedRepository(repo);
+        setHasRestoredRepoSelection(true);
+      } else {
+        // Repository was deleted
+        setToastMessage('Repository no longer exists');
+        persistSelectedRepositoryId(null);
+        persistSelectedWorkspaceId(null);
+        setHasRestoredRepoSelection(true);
+      }
+    }
+  }, [
+    hasRestoredRepoSelection,
+    uiStateLoaded,
+    persistedRepositoryId,
+    repositories,
+    persistSelectedRepositoryId,
+    persistSelectedWorkspaceId,
+  ]);
+
+  // Restore workspace selection after workspaces are loaded for the selected repo
+  useEffect(() => {
+    if (
+      hasRestoredRepoSelection &&
+      uiStateLoaded &&
+      persistedWorkspaceId &&
+      loadedWorkspacesForRepoId === persistedRepositoryId &&
+      loadedWorkspaces.length > 0
+    ) {
+      const workspace = loadedWorkspaces.find(w => w.id === persistedWorkspaceId);
+      if (workspace) {
+        setSelectedWorkspace(workspace);
+      } else {
+        // Workspace was deleted
+        setToastMessage('Workspace no longer exists');
+        persistSelectedWorkspaceId(null);
+      }
+      // Clear loaded workspaces tracking
+      setLoadedWorkspacesForRepoId(null);
+      setLoadedWorkspaces([]);
+    }
+  }, [
+    hasRestoredRepoSelection,
+    uiStateLoaded,
+    persistedWorkspaceId,
+    persistedRepositoryId,
+    loadedWorkspacesForRepoId,
+    loadedWorkspaces,
+    persistSelectedWorkspaceId,
+  ]);
+
+  // Callback when workspaces are loaded in repository-tree
+  const handleWorkspacesLoaded = useCallback((repoId: string, workspaces: Workspace[]) => {
+    setLoadedWorkspacesForRepoId(repoId);
+    setLoadedWorkspaces(workspaces);
+  }, []);
+
+  // Auto-dismiss toast after 3 seconds
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   // Handle tabs change - store in ref and restore persisted selection
   const handleTabsChange = useCallback((tabs: TabInfo[]) => {
@@ -702,6 +804,7 @@ function Dashboard() {
               onWorkspaceRemoved={handleWorkspaceRemoved}
               initialExpandedRepos={uiStateLoaded ? persistedExpandedRepos : undefined}
               onExpandedReposChange={persistExpandedRepos}
+              onWorkspacesLoaded={handleWorkspacesLoaded}
             />
           </div>
           <TemplateSection
@@ -980,6 +1083,20 @@ function Dashboard() {
         tabs={workspaceTabsRef.current}
         onCreate={handleCreateGroup}
       />
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 bg-background-secondary border border-border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 animate-in slide-in-from-bottom-2 z-50">
+          <span className="text-warning">⚠️</span>
+          <span className="text-sm text-foreground">{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-foreground-tertiary hover:text-foreground ml-2"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

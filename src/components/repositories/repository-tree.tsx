@@ -24,6 +24,8 @@ interface RepositoryTreeProps {
   // UI state persistence
   initialExpandedRepos?: string[];
   onExpandedReposChange?: (repoIds: string[]) => void;
+  // Callback when workspaces are loaded for a repository
+  onWorkspacesLoaded?: (repoId: string, workspaces: Workspace[]) => void;
 }
 
 export function RepositoryTree({
@@ -42,6 +44,7 @@ export function RepositoryTree({
   onWorkspaceRemoved,
   initialExpandedRepos,
   onExpandedReposChange,
+  onWorkspacesLoaded,
 }: RepositoryTreeProps) {
 
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set(initialExpandedRepos || []));
@@ -104,6 +107,44 @@ export function RepositoryTree({
       setIsInitialized(true);
     }
   }, [initialExpandedRepos, isInitialized]);
+
+  // Auto-fetch workspaces for expanded repos on mount (to restore state after page refresh)
+  useEffect(() => {
+    if (!isInitialized || repositories.length === 0) return;
+
+    const fetchWorkspacesForExpandedRepos = async () => {
+      for (const repoId of expandedRepos) {
+        // Skip if already loaded or currently loading
+        if (workspacesByRepo[repoId] || loadingRepos.has(repoId)) continue;
+
+        // Verify repo exists in repositories list
+        if (!repositories.some(r => r.id === repoId)) continue;
+
+        setLoadingRepos(prev => new Set([...prev, repoId]));
+        try {
+          const response = await fetch(`/api/repositories/${repoId}/workspaces`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            setWorkspacesByRepo(prev => ({ ...prev, [repoId]: data.workspaces }));
+            // Notify parent about loaded workspaces
+            onWorkspacesLoaded?.(repoId, data.workspaces);
+          }
+        } finally {
+          setLoadingRepos(prev => {
+            const next = new Set(prev);
+            next.delete(repoId);
+            return next;
+          });
+        }
+      }
+    };
+
+    fetchWorkspacesForExpandedRepos();
+    // Only run on mount (when isInitialized becomes true) and when repositories load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized, repositories.length]);
 
   // Notify parent when expanded repos change (for persistence)
   useEffect(() => {
