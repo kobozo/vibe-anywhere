@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useStartupProgress } from '@/hooks/useStartupProgress';
 import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
-import { StartupProgress, WorkspaceStopped } from './startup-progress';
+import { StartupProgress } from './startup-progress';
 import type { Workspace } from '@/lib/db/schema';
 
 interface WorkspaceContentProps {
@@ -195,11 +195,7 @@ export function WorkspaceContent({
     );
   }
 
-  // PRIORITY 6: Container not running - show start button
-  return (
-    <WorkspaceStopped
-      onStart={handleStart}
-      isStarting={false}
-    />
-  );
+  // PRIORITY 6: Container not running (stopped/exited/none)
+  // Show children - Dashboard has Start/Deploy buttons, terminals show "Stopped" message
+  return <>{children}</>;
 }
