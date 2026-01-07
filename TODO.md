@@ -50,6 +50,8 @@
 
 - [ ] **User menu in sidebar footer** - Move the logged-in user display to the sidebar footer. Clicking on the user opens a submenu with logout and other user options.
 
+- [ ] **Rename "Templates" to "Images"** - Rename the "Templates" section in the sidebar to "Images" for clarity.
+
 ## Onboarding
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
