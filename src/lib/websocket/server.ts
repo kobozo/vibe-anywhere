@@ -861,7 +861,7 @@ async function handleTabAttach(socket: AuthenticatedSocket, tabId: string) {
   // Verify container is actually running
   const containerInfo = await containerBackend.getContainerInfo(workspace.containerId!);
   if (!containerInfo || containerInfo.status !== 'running') {
-    throw new Error('Workspace container is not running. Please restart the workspace.');
+    throw new Error('Workspace container is not running. Please redeploy the workspace.');
   }
 
   // Detach from any previous tab

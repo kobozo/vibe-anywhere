@@ -33,7 +33,7 @@ interface EnvVar {
 interface DashboardPanelProps {
   workspace: Workspace;
   repository: Repository | null;
-  onRestartContainer?: () => void;
+  onRedeployContainer?: () => void;
   onDestroyContainer?: () => void;
   onDeleteWorkspace?: () => void;
 }
@@ -41,7 +41,7 @@ interface DashboardPanelProps {
 export function DashboardPanel({
   workspace,
   repository,
-  onRestartContainer,
+  onRedeployContainer,
   onDestroyContainer,
   onDeleteWorkspace,
 }: DashboardPanelProps) {
@@ -294,16 +294,16 @@ export function DashboardPanel({
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => {
-                    if (onRestartContainer) {
-                      checkBeforeOperation(workspace.id, 'restart', async () => {
-                        onRestartContainer();
+                    if (onRedeployContainer) {
+                      checkBeforeOperation(workspace.id, 'redeploy', async () => {
+                        onRedeployContainer();
                       });
                     }
                   }}
                   disabled={isEnvCheckLoading}
                   className="flex-1 px-3 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors disabled:opacity-50"
                 >
-                  {isEnvCheckLoading && envSyncOperation === 'restart' ? 'Checking...' : 'Restart'}
+                  {isEnvCheckLoading && envSyncOperation === 'redeploy' ? 'Checking...' : 'Redeploy'}
                 </button>
                 <button
                   onClick={() => {
@@ -525,7 +525,7 @@ export function DashboardPanel({
       <EnvVarSyncDialog
         isOpen={isEnvSyncDialogOpen}
         workspaceName={workspace.name}
-        operation={envSyncOperation || 'restart'}
+        operation={envSyncOperation || 'redeploy'}
         diff={envDiff}
         onSyncAndProceed={handleSyncAndProceed}
         onProceedWithoutSync={handleProceedWithoutSync}

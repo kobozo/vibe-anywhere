@@ -13,7 +13,7 @@ interface RouteContext {
 }
 
 /**
- * POST /api/workspaces/[id]/restart - Restart the workspace container
+ * POST /api/workspaces/[id]/redeploy - Redeploy the workspace container
  * This stops all running tab streams, removes the container, and recreates it
  */
 export const POST = withErrorHandling(async (request: NextRequest, context: unknown) => {
@@ -37,7 +37,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
   // Stop all tab streams for this workspace
   const tabStreamManager = getTabStreamManager();
-  // Note: tabs will need to be restarted after container restart
+  // Note: tabs will need to be restarted after container redeploy
 
   // Stop the container if running
   if (workspace.containerId) {
@@ -57,6 +57,6 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
       containerId: updatedWorkspace.containerId,
       containerStatus: updatedWorkspace.containerStatus,
     },
-    message: 'Container restarted successfully. Tabs need to be restarted.',
+    message: 'Container redeployed successfully. Tabs need to be restarted.',
   });
 });

@@ -51,7 +51,7 @@ export function RepositoryTree({
   const [isInitialized, setIsInitialized] = useState(false);
   const [workspacesByRepo, setWorkspacesByRepo] = useState<Record<string, Workspace[]>>({});
   const [loadingRepos, setLoadingRepos] = useState<Set<string>>(new Set());
-  const [restartingWorkspaces, setRestartingWorkspaces] = useState<Set<string>>(new Set());
+  const [redeployingWorkspaces, setRedeployingWorkspaces] = useState<Set<string>>(new Set());
   const [destroyingWorkspaces, setDestroyingWorkspaces] = useState<Set<string>>(new Set());
   const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
@@ -255,7 +255,7 @@ export function RepositoryTree({
   };
 
   const getContainerStatusIcon = (workspace: Workspace) => {
-    if (restartingWorkspaces.has(workspace.id) || destroyingWorkspaces.has(workspace.id)) {
+    if (redeployingWorkspaces.has(workspace.id) || destroyingWorkspaces.has(workspace.id)) {
       return '🔄';
     }
     switch (workspace.containerStatus) {
@@ -273,10 +273,10 @@ export function RepositoryTree({
     }
   };
 
-  const handleRestartContainer = async (workspace: Workspace) => {
-    setRestartingWorkspaces(prev => new Set([...prev, workspace.id]));
+  const handleRedeployContainer = async (workspace: Workspace) => {
+    setRedeployingWorkspaces(prev => new Set([...prev, workspace.id]));
     try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/restart`, {
+      const response = await fetch(`/api/workspaces/${workspace.id}/redeploy`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
       });
@@ -292,13 +292,13 @@ export function RepositoryTree({
         }
       } else {
         const { error } = await response.json();
-        alert(`Failed to restart container: ${error?.message || 'Unknown error'}`);
+        alert(`Failed to redeploy container: ${error?.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error restarting container:', error);
-      alert('Failed to restart container');
+      console.error('Error redeploying container:', error);
+      alert('Failed to redeploy container');
     } finally {
-      setRestartingWorkspaces(prev => {
+      setRedeployingWorkspaces(prev => {
         const next = new Set(prev);
         next.delete(workspace.id);
         return next;

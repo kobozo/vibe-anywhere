@@ -37,13 +37,13 @@ export interface EnvVarDiff {
 /**
  * Container operation types that trigger env var sync check
  */
-export type ContainerOperation = 'restart' | 'destroy' | 'delete';
+export type ContainerOperation = 'redeploy' | 'destroy' | 'delete';
 
 /**
  * Display labels for container operations
  */
 export const operationLabels: Record<ContainerOperation, { action: string; verb: string }> = {
-  restart: { action: 'Restart', verb: 'restarting' },
+  redeploy: { action: 'Redeploy', verb: 'redeploying' },
   destroy: { action: 'Destroy', verb: 'destroying' },
   delete: { action: 'Delete', verb: 'deleting' },
 };

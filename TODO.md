@@ -2,7 +2,7 @@
 
 ## Environment Variables
 
-- [x] **Sync detection on container operations** - When restarting, destroying a container, or deleting a workspace, detect if there are differences between workspace `.env` and repository-level synced values. Show a modal asking to sync changes before proceeding.
+- [x] **Sync detection on container operations** - When redeploying, destroying a container, or deleting a workspace, detect if there are differences between workspace `.env` and repository-level synced values. Show a modal asking to sync changes before proceeding.
 
 - [ ] **Live update environment variables** - Push environment variable changes to running workspaces without losing sessions. Variables should be live-updated in the container.
 
@@ -24,7 +24,7 @@
 
 - [x] **Default workspace name** - When adding a workspace, auto-populate the name after creating or selecting a branch (don't leave it empty).
 
-- [ ] **Rename "Restart" to "Redeploy"** - Current restart behavior actually redeploys the workspace. Rename button/action accordingly.
+- [x] **Rename "Restart" to "Redeploy"** - Current restart behavior actually redeploys the workspace. Rename button/action accordingly.
 
 - [ ] **Add true restart functionality** - Implement actual container restart that preserves state but restarts services.
 
@@ -45,6 +45,10 @@
 - [ ] **Alphabetical ordering by default** - Sort repositories alphabetically in the sidebar by default.
 
 - [ ] **Filters and custom sort orders** - Add filtering options and custom sort orders for repositories in the sidebar.
+
+## Onboarding
+
+- [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
 
 ## New Features
 

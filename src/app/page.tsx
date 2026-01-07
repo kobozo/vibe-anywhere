@@ -413,20 +413,20 @@ function Dashboard() {
   });
 
   // Container operation handlers for DashboardPanel
-  const handleRestartContainer = useCallback(async () => {
+  const handleRedeployContainer = useCallback(async () => {
     if (!selectedWorkspace) return;
     try {
-      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/restart`, {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/redeploy`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
       });
       if (!response.ok) {
         const { error } = await response.json();
-        console.error('Failed to restart container:', error?.message);
+        console.error('Failed to redeploy container:', error?.message);
       }
       // Workspace state will update via WebSocket
     } catch (error) {
-      console.error('Error restarting container:', error);
+      console.error('Error redeploying container:', error);
     }
   }, [selectedWorkspace]);
 
@@ -975,7 +975,7 @@ function Dashboard() {
                   <DashboardPanel
                     workspace={selectedWorkspace}
                     repository={selectedRepository}
-                    onRestartContainer={handleRestartContainer}
+                    onRedeployContainer={handleRedeployContainer}
                     onDestroyContainer={handleDestroyContainer}
                     onDeleteWorkspace={handleDeleteWorkspace}
                   />
