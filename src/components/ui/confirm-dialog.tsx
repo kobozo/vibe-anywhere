@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   confirmVariant?: 'danger' | 'warning' | 'default';
@@ -69,7 +69,7 @@ export function ConfirmDialog({
         className="relative bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
       >
         <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-        <p className="text-foreground mb-6">{message}</p>
+        <div className="text-foreground mb-6">{message}</div>
 
         <div className="flex justify-end gap-3">
           <button

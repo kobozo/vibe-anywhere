@@ -5,10 +5,11 @@
 
 import type { Socket } from 'socket.io';
 import { db } from '@/lib/db';
-import { workspaces } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { workspaces, tabs } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { startupProgressStore } from './startup-progress-store';
+import { getTabService } from './tab-service';
 
 interface TabState {
   tabId: string;
@@ -125,6 +126,23 @@ class AgentRegistry {
     const needsUpdate = this.shouldUpdate(version, EXPECTED_AGENT_VERSION);
     if (needsUpdate) {
       console.log(`Agent ${workspaceId} needs update from ${version} to ${EXPECTED_AGENT_VERSION}`);
+    }
+
+    // Check for tabs that need to be restarted after container restart
+    try {
+      const tabService = getTabService();
+      const workspaceTabs = await tabService.listTabs(workspaceId);
+      const restartingTabs = workspaceTabs.filter(t => t.status === 'restarting');
+
+      if (restartingTabs.length > 0) {
+        console.log(`Found ${restartingTabs.length} tabs to recover after container restart for workspace ${workspaceId}`);
+        for (const tab of restartingTabs) {
+          // Set back to running - they'll reconnect on next attach
+          await tabService.updateTab(tab.id, { status: 'running' });
+        }
+      }
+    } catch (e) {
+      console.error('Error recovering tabs after restart:', e);
     }
 
     return { success: true, needsUpdate };

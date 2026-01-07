@@ -430,6 +430,23 @@ function Dashboard() {
     }
   }, [selectedWorkspace]);
 
+  const handleRestartContainer = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    try {
+      const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/restart`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (!response.ok) {
+        const { error } = await response.json();
+        console.error('Failed to restart container:', error?.message);
+      }
+      // Workspace and tab states will update via WebSocket
+    } catch (error) {
+      console.error('Error restarting container:', error);
+    }
+  }, [selectedWorkspace]);
+
   const handleDestroyContainer = useCallback(async () => {
     if (!selectedWorkspace) return;
     try {
@@ -975,6 +992,7 @@ function Dashboard() {
                   <DashboardPanel
                     workspace={selectedWorkspace}
                     repository={selectedRepository}
+                    onRestartContainer={handleRestartContainer}
                     onRedeployContainer={handleRedeployContainer}
                     onDestroyContainer={handleDestroyContainer}
                     onDeleteWorkspace={handleDeleteWorkspace}

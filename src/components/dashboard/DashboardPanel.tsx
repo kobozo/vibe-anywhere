@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { Workspace, Repository } from '@/lib/db/schema';
 import { useEnvVarSync } from '@/hooks/useEnvVarSync';
 import { EnvVarSyncDialog } from '@/components/workspaces/env-var-sync-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface AgentInfo {
   connected: boolean;
@@ -33,6 +34,7 @@ interface EnvVar {
 interface DashboardPanelProps {
   workspace: Workspace;
   repository: Repository | null;
+  onRestartContainer?: () => void;
   onRedeployContainer?: () => void;
   onDestroyContainer?: () => void;
   onDeleteWorkspace?: () => void;
@@ -41,6 +43,7 @@ interface DashboardPanelProps {
 export function DashboardPanel({
   workspace,
   repository,
+  onRestartContainer,
   onRedeployContainer,
   onDestroyContainer,
   onDeleteWorkspace,
@@ -55,6 +58,8 @@ export function DashboardPanel({
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [envSyncMessage, setEnvSyncMessage] = useState<string | null>(null);
   const [envSyncing, setEnvSyncing] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   // Env var sync check before container operations
   const {
@@ -233,6 +238,17 @@ export function DashboardPanel({
 
   const hasContainer = workspace.containerId && workspace.containerStatus !== 'none';
 
+  const handleRestartConfirm = async () => {
+    if (!onRestartContainer) return;
+    setIsRestarting(true);
+    setShowRestartConfirm(false);
+    try {
+      await onRestartContainer();
+    } finally {
+      setIsRestarting(false);
+    }
+  };
+
   const formatDate = (dateStr: string | Date | null) => {
     if (!dateStr) return 'Never';
     const date = new Date(dateStr);
@@ -292,6 +308,13 @@ export function DashboardPanel({
             </div>
             {hasContainer && (
               <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setShowRestartConfirm(true)}
+                  disabled={workspace.containerStatus !== 'running' || isRestarting}
+                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm text-foreground transition-colors"
+                >
+                  {isRestarting ? 'Restarting...' : 'Restart'}
+                </button>
                 <button
                   onClick={() => {
                     if (onRedeployContainer) {
@@ -531,6 +554,34 @@ export function DashboardPanel({
         onProceedWithoutSync={handleProceedWithoutSync}
         onCancel={handleEnvSyncCancel}
         isLoading={isEnvSyncLoading}
+      />
+
+      {/* Restart Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showRestartConfirm}
+        title="Restart Container"
+        message={
+          <div className="space-y-3">
+            <p>Are you sure you want to restart the container?</p>
+            <div className="text-sm space-y-2">
+              <p className="text-warning">
+                <strong>Warning:</strong> Terminal tab state and command history will be lost.
+              </p>
+              <p className="text-foreground-secondary">
+                All terminal tabs will restart automatically with their configured settings.
+              </p>
+              <p className="text-success">
+                Files on the filesystem will remain untouched.
+              </p>
+            </div>
+          </div>
+        }
+        confirmLabel="Restart"
+        cancelLabel="Cancel"
+        confirmVariant="warning"
+        onConfirm={handleRestartConfirm}
+        onCancel={() => setShowRestartConfirm(false)}
+        isLoading={isRestarting}
       />
     </div>
   );

@@ -94,6 +94,14 @@ export class DockerBackend implements IContainerBackend {
   }
 
   /**
+   * Restart a container (true restart, preserves state)
+   */
+  async restartContainer(containerId: string, timeout = 10): Promise<void> {
+    const container = this.docker.getContainer(containerId);
+    await container.restart({ t: timeout });
+  }
+
+  /**
    * Remove a container
    */
   async removeContainer(containerId: string): Promise<void> {

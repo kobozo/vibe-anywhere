@@ -198,6 +198,22 @@ export class ProxmoxBackend implements IContainerBackend {
   }
 
   /**
+   * Restart an LXC container (true restart, preserves state)
+   */
+  async restartContainer(containerId: string, timeout = 30): Promise<void> {
+    const vmid = parseInt(containerId, 10);
+    console.log(`Restarting LXC container ${vmid}`);
+
+    // Stop the container
+    await this.stopContainer(containerId, timeout);
+
+    // Start it back up
+    await this.startContainer(containerId);
+
+    console.log(`LXC container ${vmid} restarted`);
+  }
+
+  /**
    * Remove an LXC container
    */
   async removeContainer(containerId: string): Promise<void> {

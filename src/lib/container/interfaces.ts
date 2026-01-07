@@ -75,6 +75,11 @@ export interface IContainerBackend {
   stopContainer(containerId: string, timeout?: number): Promise<void>;
 
   /**
+   * Restart a container (true restart, preserves state)
+   */
+  restartContainer(containerId: string, timeout?: number): Promise<void>;
+
+  /**
    * Remove/destroy a container
    */
   removeContainer(containerId: string): Promise<void>;

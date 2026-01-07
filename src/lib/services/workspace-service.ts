@@ -566,6 +566,26 @@ export class WorkspaceService {
   }
 
   /**
+   * Restart the workspace container (true restart, preserves state)
+   */
+  async restartContainer(workspaceId: string): Promise<Workspace> {
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error(`Workspace ${workspaceId} not found`);
+    }
+
+    if (!workspace.containerId) {
+      throw new Error('No container to restart');
+    }
+
+    await this.containerBackend.restartContainer(workspace.containerId);
+
+    // Sync status after restart
+    const updated = await this.syncContainerStatus(workspaceId);
+    return updated ?? workspace;
+  }
+
+  /**
    * Check for uncommitted changes in the container
    */
   async checkUncommittedChanges(workspaceId: string): Promise<GitStatusResult> {

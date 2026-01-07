@@ -18,6 +18,7 @@ export const sessionStatusEnum = pgEnum('session_status', [
   'stopping',
   'stopped',
   'error',
+  'restarting',
 ]);
 
 export const containerStatusEnum = pgEnum('container_status', [
