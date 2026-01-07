@@ -324,19 +324,26 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
               Click a branch to create a new workspace
             </p>
             <div className="flex flex-wrap gap-2">
-              {liveBranches.slice(0, 20).map((branch) => (
-                <button
-                  key={branch}
-                  onClick={() => onBranchClick?.(branch)}
-                  className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${
-                    branch === repository.defaultBranch
-                      ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
-                      : 'bg-background-tertiary text-foreground hover:bg-background-input'
-                  }`}
-                >
-                  {branch}
-                </button>
-              ))}
+              {liveBranches.slice(0, 20).map((branch) => {
+                const maxLength = 25;
+                const displayName = branch.length > maxLength
+                  ? `${branch.slice(0, maxLength)}...`
+                  : branch;
+                return (
+                  <button
+                    key={branch}
+                    onClick={() => onBranchClick?.(branch)}
+                    title={branch.length > maxLength ? branch : undefined}
+                    className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${
+                      branch === repository.defaultBranch
+                        ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30'
+                        : 'bg-background-tertiary text-foreground hover:bg-background-input'
+                    }`}
+                  >
+                    {displayName}
+                  </button>
+                );
+              })}
               {liveBranches.length > 20 && (
                 <span className="px-2 py-1 text-xs text-foreground-tertiary">
                   +{liveBranches.length - 20} more

@@ -54,6 +54,9 @@ export function useRepositoryBranches(
     onBranchesUpdatedRef.current = onBranchesUpdated;
   }, [onBranchesUpdated]);
 
+  // Track previous repositoryId to detect changes
+  const prevRepositoryIdRef = useRef<string | null>(null);
+
   // Fetch branches from API
   const fetchBranches = useCallback(async () => {
     if (!repositoryId || !token) return;
@@ -144,6 +147,19 @@ export function useRepositoryBranches(
 
   // Fetch on mount and when repositoryId changes
   useEffect(() => {
+    // Clear state when switching to a different repository (not just when becoming null)
+    const repoChanged = prevRepositoryIdRef.current !== null &&
+                        prevRepositoryIdRef.current !== repositoryId;
+
+    if (repoChanged) {
+      setBranches([]);
+      setDefaultBranch(null);
+      setCacheInfo({ cachedAt: null, isStale: true });
+      setError(null);
+    }
+
+    prevRepositoryIdRef.current = repositoryId;
+
     if (repositoryId) {
       setIsLoading(true);
       fetchBranches();
