@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 
 export interface EnvVar {
   key: string;
@@ -15,6 +15,40 @@ interface EnvVarEditorProps {
   inheritedVars?: Record<string, string>; // Show template vars (read-only)
 }
 
+// Patterns for auto-detecting sensitive environment variables
+const SENSITIVE_KEY_PATTERN = /SECRET|PASSWORD|TOKEN|API_KEY|PRIVATE|CREDENTIAL|AUTH/i;
+
+// Parse .env file content into EnvVar array
+function parseEnvContent(content: string): EnvVar[] {
+  const lines = content.split('\n');
+  const vars: EnvVar[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    // Match KEY=value pattern (key must be valid env var name)
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (match) {
+      const [, key, rawValue] = match;
+      // Remove surrounding quotes if present
+      let value = rawValue;
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+
+      // Auto-detect sensitive keys
+      const encrypted = SENSITIVE_KEY_PATTERN.test(key);
+
+      vars.push({ key, value, encrypted });
+    }
+  }
+
+  return vars;
+}
+
 export function EnvVarEditor({
   envVars,
   onChange,
@@ -25,6 +59,17 @@ export function EnvVarEditor({
   const [newValue, setNewValue] = useState('');
   const [newEncrypted, setNewEncrypted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Bulk import state
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkContent, setBulkContent] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Parse bulk content for preview
+  const parsedPreview = useMemo(() => {
+    if (!bulkContent.trim()) return [];
+    return parseEnvContent(bulkContent);
+  }, [bulkContent]);
 
   // Validate key format
   const isValidKey = (key: string): boolean => {
@@ -77,10 +122,148 @@ export function EnvVarEditor({
     return key in inheritedVars;
   };
 
+  // Merge new env vars with existing ones (updates duplicates)
+  const mergeEnvVars = useCallback((newVars: EnvVar[]) => {
+    const merged = [...envVars];
+    for (const newVar of newVars) {
+      const existingIdx = merged.findIndex(v => v.key === newVar.key);
+      if (existingIdx >= 0) {
+        merged[existingIdx] = newVar;
+      } else {
+        merged.push(newVar);
+      }
+    }
+    onChange(merged);
+  }, [envVars, onChange]);
+
+  // Handle file upload
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const parsed = parseEnvContent(content);
+      if (parsed.length > 0) {
+        mergeEnvVars(parsed);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset for re-upload
+  }, [mergeEnvVars]);
+
+  // Apply bulk import
+  const handleApplyBulkImport = useCallback(() => {
+    if (parsedPreview.length > 0) {
+      mergeEnvVars(parsedPreview);
+      setBulkContent('');
+      setShowBulkImport(false);
+    }
+  }, [parsedPreview, mergeEnvVars]);
+
+  // Cancel bulk import
+  const handleCancelBulkImport = useCallback(() => {
+    setBulkContent('');
+    setShowBulkImport(false);
+  }, []);
+
   const inheritedKeys = Object.keys(inheritedVars);
+
+  // Count how many vars will be encrypted in preview
+  const encryptedCount = parsedPreview.filter(v => v.encrypted).length;
 
   return (
     <div className="space-y-4">
+      {/* Import actions bar */}
+      {!disabled && (
+        <div className="flex items-center gap-2">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".env,.env.*,text/plain"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+
+          {/* Import .env button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-foreground-secondary hover:text-foreground bg-background-tertiary hover:bg-background-input border border-border-secondary rounded transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import .env
+          </button>
+
+          {/* Bulk import toggle */}
+          <button
+            type="button"
+            onClick={() => setShowBulkImport(!showBulkImport)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded transition-colors ${
+              showBulkImport
+                ? 'text-primary bg-primary/10 border-primary/30'
+                : 'text-foreground-secondary hover:text-foreground bg-background-tertiary hover:bg-background-input border-border-secondary'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Bulk Import
+            <svg className={`w-3 h-3 transition-transform ${showBulkImport ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Bulk import section */}
+      {showBulkImport && !disabled && (
+        <div className="p-3 bg-background-tertiary/50 rounded border border-border-secondary space-y-3">
+          <div className="text-sm text-foreground-secondary">Paste .env content:</div>
+          <textarea
+            value={bulkContent}
+            onChange={(e) => setBulkContent(e.target.value)}
+            placeholder={`# Paste your .env file content here\nDATABASE_URL=postgres://...\nAPI_KEY=sk-abc123\nDEBUG=true`}
+            className="w-full h-32 px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-sm font-mono text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+
+          {/* Preview */}
+          {parsedPreview.length > 0 && (
+            <div className="text-sm text-foreground-secondary">
+              <span className="text-foreground">{parsedPreview.length}</span> variable{parsedPreview.length !== 1 ? 's' : ''} detected
+              {encryptedCount > 0 && (
+                <span className="text-warning ml-1">
+                  ({encryptedCount} will be encrypted)
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancelBulkImport}
+              className="px-3 py-1.5 text-sm text-foreground-secondary hover:text-foreground bg-background-tertiary border border-border-secondary rounded transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleApplyBulkImport}
+              disabled={parsedPreview.length === 0}
+              className="px-3 py-1.5 text-sm bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-primary-foreground transition-colors"
+            >
+              Apply {parsedPreview.length > 0 && `(${parsedPreview.length})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Inherited variables info */}
       {inheritedKeys.length > 0 && (
         <div className="p-3 bg-background-tertiary/30 rounded border border-border-secondary">

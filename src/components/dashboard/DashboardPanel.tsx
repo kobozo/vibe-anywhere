@@ -108,16 +108,16 @@ export function DashboardPanel({
         if (response.ok) {
           const { data } = await response.json();
           const vars: EnvVar[] = [];
-          // Inherited vars
-          if (data.inherited) {
-            for (const [key, entry] of Object.entries(data.inherited as Record<string, { value: string; encrypted: boolean }>)) {
-              vars.push({ key, value: entry.value, encrypted: entry.encrypted, inherited: true });
+          // Inherited vars (from template) - returns Record<string, string>
+          if (data.inheritedEnvVars) {
+            for (const [key, value] of Object.entries(data.inheritedEnvVars as Record<string, string>)) {
+              vars.push({ key, value: value as string, encrypted: false, inherited: true });
             }
           }
-          // Own vars
-          if (data.envVars) {
-            for (const [key, entry] of Object.entries(data.envVars as Record<string, { value: string; encrypted: boolean }>)) {
-              vars.push({ key, value: entry.value, encrypted: entry.encrypted, inherited: false });
+          // Own vars - returns Array<{ key, value, encrypted }>
+          if (Array.isArray(data.envVars)) {
+            for (const entry of data.envVars as Array<{ key: string; value: string; encrypted: boolean }>) {
+              vars.push({ key: entry.key, value: entry.value, encrypted: entry.encrypted, inherited: false });
             }
           }
           setEnvVars(vars);
@@ -192,14 +192,16 @@ export function DashboardPanel({
         if (envResponse.ok) {
           const { data } = await envResponse.json();
           const vars: EnvVar[] = [];
-          if (data.inherited) {
-            for (const [key, entry] of Object.entries(data.inherited as Record<string, { value: string; encrypted: boolean }>)) {
-              vars.push({ key, value: entry.value, encrypted: entry.encrypted, inherited: true });
+          // Inherited vars (from template) - returns Record<string, string>
+          if (data.inheritedEnvVars) {
+            for (const [key, value] of Object.entries(data.inheritedEnvVars as Record<string, string>)) {
+              vars.push({ key, value: value as string, encrypted: false, inherited: true });
             }
           }
-          if (data.envVars) {
-            for (const [key, entry] of Object.entries(data.envVars as Record<string, { value: string; encrypted: boolean }>)) {
-              vars.push({ key, value: entry.value, encrypted: entry.encrypted, inherited: false });
+          // Own vars - returns Array<{ key, value, encrypted }>
+          if (Array.isArray(data.envVars)) {
+            for (const entry of data.envVars as Array<{ key: string; value: string; encrypted: boolean }>) {
+              vars.push({ key: entry.key, value: entry.value, encrypted: entry.encrypted, inherited: false });
             }
           }
           setEnvVars(vars);
@@ -452,21 +454,23 @@ export function DashboardPanel({
           {envLoading ? (
             <div className="text-sm text-foreground-secondary">Loading...</div>
           ) : envVars.length > 0 ? (
-            <div className="space-y-1">
+            <div className="grid grid-cols-[auto_auto_1fr_auto] gap-x-2 gap-y-1 text-sm font-mono items-baseline">
               {envVars.map((env) => (
-                <div key={env.key} className="flex items-center gap-2 text-sm font-mono">
-                  <span className="text-foreground">{env.key}</span>
-                  <span className="text-foreground-tertiary">=</span>
-                  <span className="text-foreground-secondary">
+                <>
+                  <span key={`${env.key}-key`} className="text-foreground">{env.key}</span>
+                  <span key={`${env.key}-eq`} className="text-foreground-tertiary">=</span>
+                  <span key={`${env.key}-val`} className="text-foreground-secondary break-all">
                     {env.encrypted ? '********' : env.value}
                   </span>
-                  {env.inherited && (
-                    <span className="text-xs text-foreground-tertiary">(inherited)</span>
-                  )}
-                  {env.encrypted && (
-                    <span className="text-xs text-warning">locked</span>
-                  )}
-                </div>
+                  <span key={`${env.key}-badges`} className="flex items-center gap-1">
+                    {env.inherited && (
+                      <span className="text-xs text-foreground-tertiary">(inherited)</span>
+                    )}
+                    {env.encrypted && (
+                      <span className="text-xs text-warning">locked</span>
+                    )}
+                  </span>
+                </>
               ))}
             </div>
           ) : (
