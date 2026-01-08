@@ -39,10 +39,14 @@ export function SplitViewContainer({
   }, [tabs]);
 
   // Get tab info for a member
+  // First try the group member's embedded tab (most up-to-date from server),
+  // then fall back to tabMap (local tabs)
   const getTabForMember = useCallback(
     (paneIndex: number): TabInfo | null => {
       const member = group.members.find(m => m.paneIndex === paneIndex);
       if (!member) return null;
+      // Use member.tab if available (from API response), otherwise look up from tabs prop
+      if (member.tab) return member.tab;
       return tabMap.get(member.tabId) || null;
     },
     [group.members, tabMap]
