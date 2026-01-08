@@ -158,6 +158,33 @@ export function useTabGroups(workspaceId: string | null) {
     [token, activeGroupId]
   );
 
+  // Add a tab to an existing group
+  const addTabToGroup = useCallback(
+    async (groupId: string, tabId: string) => {
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`/api/tab-groups/${groupId}/members`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tabId }),
+      });
+
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error?.message || 'Failed to add tab to group');
+      }
+
+      const { data } = await response.json();
+      setGroups(prev => prev.map(g => (g.id === groupId ? data.group : g)));
+
+      return data.group as TabGroupInfo;
+    },
+    [token]
+  );
+
   // Update pane sizes
   const updatePaneSizes = useCallback(
     async (groupId: string, sizes: UpdatePaneSizeInput[]) => {
@@ -278,6 +305,7 @@ export function useTabGroups(workspaceId: string | null) {
     updateGroup,
     deleteGroup,
     updatePaneSizes,
+    addTabToGroup,
 
     // Utilities
     isTabInGroup,

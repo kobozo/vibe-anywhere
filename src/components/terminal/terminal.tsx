@@ -16,9 +16,10 @@ interface TerminalProps {
   workspaceId?: string;
   onConnectionChange?: (connected: boolean) => void;
   onEnd?: () => void;
+  onContextMenu?: (event: { x: number; y: number; tabId: string }) => void;
 }
 
-export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd }: TerminalProps) {
+export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onContextMenu }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -389,6 +390,30 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd }: Term
       xtermRef.current.writeln(`\r\n\x1b[31m[Error: ${error.message}]\x1b[0m`);
     }
   }, [error]);
+
+  // Handle right-click context menu
+  useEffect(() => {
+    const container = terminalRef.current;
+    if (!container || !onContextMenu) return;
+
+    const handleRightClick = (e: MouseEvent) => {
+      // Skip if text is selected (allow browser copy menu)
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        return;
+      }
+
+      e.preventDefault();
+      onContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        tabId,
+      });
+    };
+
+    container.addEventListener('contextmenu', handleRightClick);
+    return () => container.removeEventListener('contextmenu', handleRightClick);
+  }, [onContextMenu, tabId]);
 
   return (
     <div

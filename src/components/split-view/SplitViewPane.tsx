@@ -17,6 +17,7 @@ interface SplitViewPaneProps {
   containerIp?: string | null;
   onConnectionChange?: (connected: boolean) => void;
   onEnd?: () => void;
+  onContextMenu?: (event: { x: number; y: number; tabId: string }) => void;
 }
 
 export function SplitViewPane({
@@ -25,6 +26,7 @@ export function SplitViewPane({
   containerIp,
   onConnectionChange,
   onEnd,
+  onContextMenu,
 }: SplitViewPaneProps) {
   // No tab assigned to this pane
   if (!tab) {
@@ -62,6 +64,7 @@ export function SplitViewPane({
           workspaceId={workspaceId}
           onConnectionChange={onConnectionChange}
           onEnd={onEnd}
+          onContextMenu={onContextMenu}
         />
       </div>
     );

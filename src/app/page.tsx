@@ -7,6 +7,7 @@ import { useRepositories } from '@/hooks/useRepositories';
 import { useWorkspaceState, WorkspaceStateUpdate } from '@/hooks/useWorkspaceState';
 import { useTemplates, type ProvisionProgress } from '@/hooks/useTemplates';
 import { useTabGroups } from '@/hooks/useTabGroups';
+import { useTabTemplates } from '@/hooks/useTabTemplates';
 import { RepositoryTree } from '@/components/repositories/repository-tree';
 import { AddRepositoryDialog } from '@/components/repositories/add-repository-dialog';
 import { EditRepositoryDialog } from '@/components/repositories/edit-repository-dialog';
@@ -25,6 +26,7 @@ import { RepositoryDashboard } from '@/components/repositories/repository-dashbo
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
 import { StagingTerminalModal } from '@/components/templates/staging-terminal-modal';
 import { SplitViewContainer, CreateGroupDialog } from '@/components/split-view';
+import { TerminalContextMenu, type SplitDirection } from '@/components/terminal/terminal-context-menu';
 import { WorkspaceContent, type ContainerOperation } from '@/components/workspace';
 import type { Repository, Workspace, ProxmoxTemplate } from '@/lib/db/schema';
 import type { TabInfo } from '@/hooks/useTabs';
@@ -157,12 +159,23 @@ function Dashboard() {
     updateGroup,
     deleteGroup,
     updatePaneSizes,
+    addTabToGroup,
+    getGroupForTab,
     groupedTabIds,
     setGroups,
   } = useTabGroups(selectedWorkspace?.id || null);
 
+  // Tab templates hook (for terminal context menu)
+  const { templates: tabTemplates, fetchTemplates: fetchTabTemplates } = useTabTemplates();
+
   // Create group dialog state
   const [isCreateGroupDialogOpen, setIsCreateGroupDialogOpen] = useState(false);
+
+  // Terminal context menu state
+  const [terminalContextMenu, setTerminalContextMenu] = useState<{
+    position: { x: number; y: number };
+    tabId: string;
+  } | null>(null);
 
   // Whisper/Voice state
   const { isConfigured: whisperEnabled, fetchSettings: fetchWhisperSettings } = useOpenAISettings();
@@ -191,6 +204,11 @@ function Dashboard() {
   useEffect(() => {
     fetchWhisperSettings();
   }, [fetchWhisperSettings]);
+
+  // Fetch tab templates on mount
+  useEffect(() => {
+    fetchTabTemplates();
+  }, [fetchTabTemplates]);
 
   // Fetch tab groups when workspace changes
   useEffect(() => {
@@ -377,6 +395,146 @@ function Dashboard() {
       await updatePaneSizes(activeGroupId, sizes);
     }
   }, [activeGroupId, updatePaneSizes]);
+
+  // Terminal context menu handlers
+  const handleTerminalContextMenu = useCallback((event: { x: number; y: number; tabId: string }) => {
+    setTerminalContextMenu({
+      position: { x: event.x, y: event.y },
+      tabId: event.tabId,
+    });
+  }, []);
+
+  // Handle split with existing tab
+  const handleSplitWithExisting = useCallback(async (direction: SplitDirection, existingTabId: string) => {
+    // Capture values at start to avoid closure issues
+    const contextMenu = terminalContextMenu;
+    if (!contextMenu || !selectedWorkspace) return;
+
+    const currentTabId = contextMenu.tabId;
+    const currentTab = workspaceTabsRef.current.find(t => t.id === currentTabId);
+    if (!currentTab) {
+      setTerminalContextMenu(null);
+      return;
+    }
+
+    try {
+      // Check if current tab is in a group
+      const currentGroup = getGroupForTab(currentTabId);
+
+      if (currentGroup) {
+        // Add to existing group
+        await addTabToGroup(currentGroup.id, existingTabId);
+        // Update layout based on new member count
+        const newMemberCount = currentGroup.members.length + 1;
+        let newLayout = currentGroup.layout;
+        if (newMemberCount === 3) {
+          newLayout = direction === 'left' || direction === 'right' ? 'left-stack' : 'right-stack';
+        } else if (newMemberCount === 4) {
+          newLayout = 'grid-2x2';
+        }
+        if (newLayout !== currentGroup.layout) {
+          await updateGroup(currentGroup.id, { layout: newLayout });
+        }
+        await fetchGroups();
+      } else {
+        // Create new group
+        const tabIds = direction === 'left' || direction === 'top'
+          ? [existingTabId, currentTabId]
+          : [currentTabId, existingTabId];
+        const layout = direction === 'left' || direction === 'right' ? 'horizontal' : 'vertical';
+        const groupName = `Split ${currentTab.name}`;
+
+        const newGroup = await createGroup(groupName, tabIds, layout);
+        setActiveGroupId(newGroup.id);
+      }
+    } catch (error) {
+      console.error('Failed to split:', error);
+    } finally {
+      setTerminalContextMenu(null);
+    }
+  }, [terminalContextMenu, selectedWorkspace, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+
+  // Handle split with new template tab
+  const handleSplitWithTemplate = useCallback(async (direction: SplitDirection, templateId: string) => {
+    // Capture values at start to avoid closure issues
+    const contextMenu = terminalContextMenu;
+    const workspace = selectedWorkspace;
+
+    if (!contextMenu || !workspace) return;
+
+    const template = tabTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    try {
+      // Create new tab from template via API
+      const response = await fetch(`/api/workspaces/${workspace.id}/tabs`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: template.name,
+          templateId: template.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error?.message || 'Failed to create tab');
+      }
+
+      const { data } = await response.json();
+      const newTab = data.tab as TabInfo;
+
+      // Add the new tab to the local ref so SplitViewContainer can find it
+      workspaceTabsRef.current = [...workspaceTabsRef.current, newTab];
+
+      // Trigger TabBar refresh to sync with server
+      tabBarRef.current?.refreshTabs();
+
+      // Now split with the new tab - pass the captured contextMenu tabId directly
+      const currentTabId = contextMenu.tabId;
+      const currentTab = workspaceTabsRef.current.find(t => t.id === currentTabId);
+      if (!currentTab) {
+        setTerminalContextMenu(null);
+        return;
+      }
+
+      // Check if current tab is in a group
+      const currentGroup = getGroupForTab(currentTabId);
+
+      if (currentGroup) {
+        // Add to existing group
+        await addTabToGroup(currentGroup.id, newTab.id);
+        const newMemberCount = currentGroup.members.length + 1;
+        let newLayout = currentGroup.layout;
+        if (newMemberCount === 3) {
+          newLayout = direction === 'left' || direction === 'right' ? 'left-stack' : 'right-stack';
+        } else if (newMemberCount === 4) {
+          newLayout = 'grid-2x2';
+        }
+        if (newLayout !== currentGroup.layout) {
+          await updateGroup(currentGroup.id, { layout: newLayout });
+        }
+        await fetchGroups();
+      } else {
+        // Create new group
+        const tabIds = direction === 'left' || direction === 'top'
+          ? [newTab.id, currentTabId]
+          : [currentTabId, newTab.id];
+        const layout = direction === 'left' || direction === 'right' ? 'horizontal' : 'vertical';
+        const groupName = `Split ${currentTab.name}`;
+
+        const newGroup = await createGroup(groupName, tabIds, layout);
+        setActiveGroupId(newGroup.id);
+      }
+    } catch (error) {
+      console.error('Failed to create tab from template:', error);
+    } finally {
+      setTerminalContextMenu(null);
+    }
+  }, [terminalContextMenu, selectedWorkspace, tabTemplates, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle voice transcription - send to active terminal
   const handleVoiceTranscription = useCallback((text: string) => {
@@ -1085,6 +1243,7 @@ function Dashboard() {
                             deleteTabRef.current(tabId).catch(console.error);
                           }
                         }}
+                        onTerminalContextMenu={handleTerminalContextMenu}
                       />
                     </div>
                   </>
@@ -1125,6 +1284,7 @@ function Dashboard() {
                         deleteTabRef.current(selectedTab.id).catch(console.error);
                       }
                     }}
+                    onContextMenu={handleTerminalContextMenu}
                   />
                 ) : selectedTab ? (
                   <div className="h-full flex items-center justify-center text-foreground-tertiary">
@@ -1277,6 +1437,82 @@ function Dashboard() {
         tabs={workspaceTabsRef.current}
         onCreate={handleCreateGroup}
       />
+
+      {/* Terminal context menu */}
+      {terminalContextMenu && selectedWorkspace && (() => {
+        const tab = workspaceTabsRef.current.find(t => t.id === terminalContextMenu.tabId);
+        if (!tab) return null;
+        return (
+          <TerminalContextMenu
+            position={terminalContextMenu.position}
+            tab={tab}
+            currentGroup={getGroupForTab(terminalContextMenu.tabId)}
+            otherTabs={workspaceTabsRef.current.filter(
+              t => t.id !== terminalContextMenu.tabId && !groupedTabIds.has(t.id) && t.tabType !== 'dashboard'
+            )}
+            availableTabs={workspaceTabsRef.current.filter(
+              t => t.id !== terminalContextMenu.tabId && !groupedTabIds.has(t.id) && t.tabType !== 'dashboard'
+            )}
+            groups={groups}
+            templates={tabTemplates.filter(t =>
+              !t.requiredTechStack || workspaceTechStacks.includes(t.requiredTechStack)
+            )}
+            onClose={() => setTerminalContextMenu(null)}
+            onDelete={async () => {
+              if (deleteTabRef.current) {
+                await deleteTabRef.current(terminalContextMenu.tabId);
+              }
+            }}
+            onDuplicate={async () => {
+              // Create duplicate tab via API
+              try {
+                const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/tabs`, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    name: `${tab.name} (copy)`,
+                  }),
+                });
+                if (!response.ok) {
+                  console.error('Failed to duplicate tab');
+                }
+                // Refresh tabs to show the new duplicate
+                tabBarRef.current?.refreshTabs();
+              } catch (error) {
+                console.error('Error duplicating tab:', error);
+              }
+            }}
+            onGroupWith={async (otherTabId) => {
+              // Create new group with these two tabs
+              const otherTab = workspaceTabsRef.current.find(t => t.id === otherTabId);
+              const groupName = `${tab.name} + ${otherTab?.name || 'Tab'}`;
+              try {
+                const newGroup = await createGroup(groupName, [tab.id, otherTabId], 'horizontal');
+                setActiveGroupId(newGroup.id);
+              } catch (error) {
+                console.error('Failed to create group:', error);
+              }
+            }}
+            onAddToGroup={async (groupId) => {
+              try {
+                await addTabToGroup(groupId, tab.id);
+                await fetchGroups();
+              } catch (error) {
+                console.error('Failed to add tab to group:', error);
+              }
+            }}
+            onStartMultiSelect={() => {
+              enterMultiSelectMode();
+              toggleTabSelection(tab.id);
+            }}
+            onSplitWithExisting={handleSplitWithExisting}
+            onSplitWithTemplate={handleSplitWithTemplate}
+          />
+        );
+      })()}
 
       {/* Toast notification */}
       {toastMessage && (

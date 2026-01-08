@@ -47,6 +47,7 @@ interface TabBarProps {
 
 export interface TabBarRef {
   toggleVoice: () => Promise<string | null>;
+  refreshTabs: () => void;
 }
 
 export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
@@ -126,7 +127,10 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
     toggleVoice: async () => {
       return voiceButtonRef.current?.toggle() ?? null;
     },
-  }), []);
+    refreshTabs: () => {
+      fetchTabs();
+    },
+  }), [fetchTabs]);
 
   // Handle workspace state updates (agent updating status)
   const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {

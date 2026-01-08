@@ -16,6 +16,7 @@ interface SplitViewContainerProps {
   onPaneResize?: (sizes: { tabId: string; sizePercent: number }[]) => void;
   onConnectionChange?: (tabId: string, connected: boolean) => void;
   onTabEnd?: (tabId: string) => void;
+  onTerminalContextMenu?: (event: { x: number; y: number; tabId: string }) => void;
 }
 
 export function SplitViewContainer({
@@ -26,6 +27,7 @@ export function SplitViewContainer({
   onPaneResize,
   onConnectionChange,
   onTabEnd,
+  onTerminalContextMenu,
 }: SplitViewContainerProps) {
   const config = LAYOUT_CONFIGS[group.layout];
 
@@ -70,6 +72,7 @@ export function SplitViewContainer({
               const tab = getTabForMember(0);
               if (tab) onTabEnd?.(tab.id);
             }}
+            onContextMenu={onTerminalContextMenu}
           />
         </Panel>
 
@@ -92,6 +95,7 @@ export function SplitViewContainer({
               const tab = getTabForMember(1);
               if (tab) onTabEnd?.(tab.id);
             }}
+            onContextMenu={onTerminalContextMenu}
           />
         </Panel>
       </Group>
@@ -116,6 +120,7 @@ export function SplitViewContainer({
               const tab = getTabForMember(0);
               if (tab) onTabEnd?.(tab.id);
             }}
+            onContextMenu={onTerminalContextMenu}
           />
         </Panel>
 
@@ -135,6 +140,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(1);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
 
@@ -152,6 +158,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(2);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
           </Group>
@@ -178,6 +185,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(0);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
 
@@ -195,6 +203,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(1);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
           </Group>
@@ -215,6 +224,7 @@ export function SplitViewContainer({
               const tab = getTabForMember(2);
               if (tab) onTabEnd?.(tab.id);
             }}
+            onContextMenu={onTerminalContextMenu}
           />
         </Panel>
       </Group>
@@ -240,6 +250,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(0);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
 
@@ -257,6 +268,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(2);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
           </Group>
@@ -279,6 +291,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(1);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
 
@@ -297,6 +310,7 @@ export function SplitViewContainer({
                   const tab = getTabForMember(3);
                   if (tab) onTabEnd?.(tab.id);
                 }}
+                onContextMenu={onTerminalContextMenu}
               />
             </Panel>
           </Group>

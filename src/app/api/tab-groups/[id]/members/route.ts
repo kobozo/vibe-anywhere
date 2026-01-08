@@ -94,3 +94,24 @@ export const PATCH = withErrorHandling(async (request: NextRequest, context: unk
     message: 'Must provide either sizes array, or tabId with action (add/remove)',
   });
 });
+
+/**
+ * POST /api/tab-groups/[id]/members - Add a tab to an existing group
+ */
+export const POST = withErrorHandling(async (request: NextRequest, context: unknown) => {
+  const user = await requireAuth(request);
+  const { id } = await (context as RouteContext).params;
+  const body = await request.json();
+
+  const result = addTabSchema.safeParse(body);
+  if (!result.success) {
+    throw new ValidationError('Invalid request body', result.error.flatten());
+  }
+
+  await verifyGroupAccess(user.id, id);
+
+  const tabGroupService = getTabGroupService();
+  const updatedGroup = await tabGroupService.addTabToGroup(id, result.data.tabId);
+
+  return successResponse({ group: updatedGroup });
+});
