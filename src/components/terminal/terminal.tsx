@@ -17,9 +17,10 @@ interface TerminalProps {
   onConnectionChange?: (connected: boolean) => void;
   onEnd?: () => void;
   onContextMenu?: (event: { x: number; y: number; tabId: string }) => void;
+  hideStatusBar?: boolean;
 }
 
-export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onContextMenu }: TerminalProps) {
+export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onContextMenu, hideStatusBar }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -425,7 +426,7 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
       style={{ backgroundColor: theme.terminal.background }}
     >
       <div ref={terminalRef} className="flex-1 min-h-0" />
-      {workspaceId && (
+      {workspaceId && !hideStatusBar && (
         <StatusBar
           workspaceId={workspaceId}
           tabId={tabId}

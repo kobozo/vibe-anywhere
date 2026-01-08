@@ -9,6 +9,7 @@ interface TabGroupIconProps {
   onClick: () => void;
   onUngroup: () => void;
   onRename: (newName: string) => void;
+  onClose: () => void;
 }
 
 export function TabGroupIcon({
@@ -17,6 +18,7 @@ export function TabGroupIcon({
   onClick,
   onUngroup,
   onRename,
+  onClose,
 }: TabGroupIconProps) {
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -124,6 +126,18 @@ export function TabGroupIcon({
         <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
           {group.members.length}
         </span>
+
+        {/* Close button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error ml-1 transition-opacity"
+          title="Close group"
+        >
+          ×
+        </button>
       </div>
 
       {/* Context menu */}
@@ -160,9 +174,18 @@ export function TabGroupIcon({
                   setShowContextMenu(false);
                   onUngroup();
                 }}
-                className="w-full px-3 py-1.5 text-left text-sm hover:bg-background-secondary text-error"
+                className="w-full px-3 py-1.5 text-left text-sm hover:bg-background-secondary"
               >
                 Ungroup
+              </button>
+              <button
+                onClick={() => {
+                  setShowContextMenu(false);
+                  onClose();
+                }}
+                className="w-full px-3 py-1.5 text-left text-sm hover:bg-background-secondary text-error"
+              >
+                Close Group
               </button>
             </>
           )}

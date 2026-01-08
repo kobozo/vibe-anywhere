@@ -18,6 +18,8 @@ interface SplitViewPaneProps {
   onConnectionChange?: (connected: boolean) => void;
   onEnd?: () => void;
   onContextMenu?: (event: { x: number; y: number; tabId: string }) => void;
+  isFocused?: boolean;
+  onFocus?: () => void;
 }
 
 export function SplitViewPane({
@@ -27,6 +29,8 @@ export function SplitViewPane({
   onConnectionChange,
   onEnd,
   onContextMenu,
+  isFocused,
+  onFocus,
 }: SplitViewPaneProps) {
   // No tab assigned to this pane
   if (!tab) {
@@ -58,13 +62,17 @@ export function SplitViewPane({
   // Terminal tab - check status
   if (tab.status === 'running') {
     return (
-      <div className="h-full w-full overflow-hidden">
+      <div
+        className={`h-full w-full overflow-hidden ${isFocused ? 'ring-1 ring-primary ring-inset' : ''}`}
+        onClick={onFocus}
+      >
         <Terminal
           tabId={tab.id}
           workspaceId={workspaceId}
           onConnectionChange={onConnectionChange}
           onEnd={onEnd}
           onContextMenu={onContextMenu}
+          hideStatusBar
         />
       </div>
     );

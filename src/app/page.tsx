@@ -158,6 +158,7 @@ function Dashboard() {
     createGroup,
     updateGroup,
     deleteGroup,
+    closeGroup,
     updatePaneSizes,
     addTabToGroup,
     getGroupForTab,
@@ -389,6 +390,11 @@ function Dashboard() {
   const handleRenameGroup = useCallback(async (groupId: string, newName: string) => {
     await updateGroup(groupId, { name: newName });
   }, [updateGroup]);
+
+  const handleCloseGroup = useCallback(async (groupId: string) => {
+    if (!deleteTabRef.current) return;
+    await closeGroup(groupId, deleteTabRef.current);
+  }, [closeGroup]);
 
   const handlePaneResize = useCallback(async (sizes: { tabId: string; sizePercent: number }[]) => {
     if (activeGroupId) {
@@ -1261,6 +1267,7 @@ function Dashboard() {
                 onSelectGroup={setActiveGroupId}
                 onUngroupTabs={handleUngroupTabs}
                 onRenameGroup={handleRenameGroup}
+                onCloseGroup={handleCloseGroup}
                 // Multi-select props
                 multiSelectMode={multiSelectMode}
                 selectedTabIdsForGroup={selectedTabIdsForGroup}
@@ -1277,61 +1284,28 @@ function Dashboard() {
               <div className="flex-1 p-4 min-h-0 flex flex-col">
                 {activeGroupId && activeGroup ? (
                   // Split view for tab group
-                  <>
-                    {/* Split view header */}
-                    <div className="flex items-center justify-between mb-2 px-2 py-1 bg-background-secondary rounded-t border border-border border-b-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{activeGroup.name}</span>
-                        <span className="text-xs text-foreground-tertiary">({activeGroup.members.length} tabs)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleUngroupTabs(activeGroupId)}
-                          className="px-2 py-1 text-xs text-foreground-secondary hover:text-error hover:bg-error/10 rounded transition-colors"
-                          title="Ungroup tabs"
-                        >
-                          Ungroup
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActiveGroupId(null);
-                            // Select first tab from group
-                            const firstMember = activeGroup.members[0];
-                            if (firstMember) {
-                              const tab = workspaceTabsRef.current.find(t => t.id === firstMember.tabId);
-                              if (tab) setSelectedTab(tab);
-                            }
-                          }}
-                          className="px-2 py-1 text-xs text-foreground-secondary hover:text-foreground hover:bg-background-tertiary rounded transition-colors"
-                          title="Close split view"
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-h-0 border border-border rounded-b overflow-hidden">
-                      <SplitViewContainer
-                        group={activeGroup}
-                        tabs={workspaceTabsRef.current}
-                        workspaceId={selectedWorkspace.id}
-                        containerIp={selectedWorkspace.containerIp}
-                        onPaneResize={handlePaneResize}
-                        onConnectionChange={(tabId, connected) => {
-                          // Track connection for the first running tab in group
-                          if (activeGroup.members[0]?.tabId === tabId) {
-                            setIsTerminalConnected(connected);
-                          }
-                        }}
-                        onTabEnd={(tabId) => {
-                          // Handle tab end within split view
-                          if (deleteTabRef.current) {
-                            deleteTabRef.current(tabId).catch(console.error);
-                          }
-                        }}
-                        onTerminalContextMenu={handleTerminalContextMenu}
-                      />
-                    </div>
-                  </>
+                  <div className="flex-1 min-h-0 border border-border rounded overflow-hidden">
+                    <SplitViewContainer
+                      group={activeGroup}
+                      tabs={workspaceTabsRef.current}
+                      workspaceId={selectedWorkspace.id}
+                      containerIp={selectedWorkspace.containerIp}
+                      onPaneResize={handlePaneResize}
+                      onConnectionChange={(tabId, connected) => {
+                        // Track connection for the first running tab in group
+                        if (activeGroup.members[0]?.tabId === tabId) {
+                          setIsTerminalConnected(connected);
+                        }
+                      }}
+                      onTabEnd={(tabId) => {
+                        // Handle tab end within split view
+                        if (deleteTabRef.current) {
+                          deleteTabRef.current(tabId).catch(console.error);
+                        }
+                      }}
+                      onTerminalContextMenu={handleTerminalContextMenu}
+                    />
+                  </div>
                 ) : selectedTab && selectedTab.tabType === 'dashboard' ? (
                   // Dashboard panel - workspace overview
                   <DashboardPanel

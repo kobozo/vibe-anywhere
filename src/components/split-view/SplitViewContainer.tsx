@@ -1,9 +1,12 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Panel, Group } from 'react-resizable-panels';
 import { ResizableDivider } from './ResizableDivider';
 import { SplitViewPane } from './SplitViewPane';
+import { StatusBar } from '@/components/terminal/status-bar';
+import { useSocket } from '@/hooks/useSocket';
+import { useAuth } from '@/hooks/useAuth';
 import { LAYOUT_CONFIGS } from './types';
 import type { TabGroupInfo } from '@/hooks/useTabGroups';
 import type { TabInfo } from '@/hooks/useTabs';
@@ -30,6 +33,11 @@ export function SplitViewContainer({
   onTerminalContextMenu,
 }: SplitViewContainerProps) {
   const config = LAYOUT_CONFIGS[group.layout];
+  const { token } = useAuth();
+  const { socket, isConnected } = useSocket({ token });
+
+  // Track which pane is focused (default to first pane)
+  const [focusedPaneIndex, setFocusedPaneIndex] = useState(0);
 
   // Build a map of tabId -> TabInfo for quick lookup
   const tabMap = useMemo(() => {
@@ -52,57 +60,74 @@ export function SplitViewContainer({
     [group.members, tabMap]
   );
 
+  // Get the focused tab for the status bar
+  const focusedTab = getTabForMember(focusedPaneIndex);
+
   // Render a simple 2-pane layout (horizontal or vertical)
   if (!config.nested) {
     return (
-      <Group
-        orientation={config.direction}
-        className="h-full w-full"
-      >
-        <Panel
-          defaultSize={group.members[0]?.sizePercent || 50}
-          minSize={15}
-          className="min-h-0 min-w-0"
+      <div className="h-full w-full flex flex-col">
+        <Group
+          orientation={config.direction}
+          className="flex-1 min-h-0"
         >
-          <SplitViewPane
-            tab={getTabForMember(0)}
-            workspaceId={workspaceId}
-            containerIp={containerIp}
-            onConnectionChange={connected => {
-              const tab = getTabForMember(0);
-              if (tab) onConnectionChange?.(tab.id, connected);
-            }}
-            onEnd={() => {
-              const tab = getTabForMember(0);
-              if (tab) onTabEnd?.(tab.id);
-            }}
-            onContextMenu={onTerminalContextMenu}
-          />
-        </Panel>
+          <Panel
+            defaultSize={group.members[0]?.sizePercent || 50}
+            minSize={15}
+            className="min-h-0 min-w-0"
+          >
+            <SplitViewPane
+              tab={getTabForMember(0)}
+              workspaceId={workspaceId}
+              containerIp={containerIp}
+              onConnectionChange={connected => {
+                const tab = getTabForMember(0);
+                if (tab) onConnectionChange?.(tab.id, connected);
+              }}
+              onEnd={() => {
+                const tab = getTabForMember(0);
+                if (tab) onTabEnd?.(tab.id);
+              }}
+              onContextMenu={onTerminalContextMenu}
+              isFocused={focusedPaneIndex === 0}
+              onFocus={() => setFocusedPaneIndex(0)}
+            />
+          </Panel>
 
-        <ResizableDivider orientation={config.direction} />
+          <ResizableDivider orientation={config.direction} />
 
-        <Panel
-          defaultSize={group.members[1]?.sizePercent || 50}
-          minSize={15}
-          className="min-h-0 min-w-0"
-        >
-          <SplitViewPane
-            tab={getTabForMember(1)}
+          <Panel
+            defaultSize={group.members[1]?.sizePercent || 50}
+            minSize={15}
+            className="min-h-0 min-w-0"
+          >
+            <SplitViewPane
+              tab={getTabForMember(1)}
+              workspaceId={workspaceId}
+              containerIp={containerIp}
+              onConnectionChange={connected => {
+                const tab = getTabForMember(1);
+                if (tab) onConnectionChange?.(tab.id, connected);
+              }}
+              onEnd={() => {
+                const tab = getTabForMember(1);
+                if (tab) onTabEnd?.(tab.id);
+              }}
+              onContextMenu={onTerminalContextMenu}
+              isFocused={focusedPaneIndex === 1}
+              onFocus={() => setFocusedPaneIndex(1)}
+            />
+          </Panel>
+        </Group>
+        {focusedTab && (
+          <StatusBar
             workspaceId={workspaceId}
-            containerIp={containerIp}
-            onConnectionChange={connected => {
-              const tab = getTabForMember(1);
-              if (tab) onConnectionChange?.(tab.id, connected);
-            }}
-            onEnd={() => {
-              const tab = getTabForMember(1);
-              if (tab) onTabEnd?.(tab.id);
-            }}
-            onContextMenu={onTerminalContextMenu}
+            tabId={focusedTab.id}
+            socket={socket}
+            isConnected={isConnected}
           />
-        </Panel>
-      </Group>
+        )}
+      </div>
     );
   }
 
@@ -110,216 +135,266 @@ export function SplitViewContainer({
   if (config.layout === 'left-stack') {
     // Left + (Right-Top / Right-Bottom)
     return (
-      <Group orientation="horizontal" className="h-full w-full">
-        <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
-          <SplitViewPane
-            tab={getTabForMember(0)}
+      <div className="h-full w-full flex flex-col">
+        <Group orientation="horizontal" className="flex-1 min-h-0">
+          <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
+            <SplitViewPane
+              tab={getTabForMember(0)}
+              workspaceId={workspaceId}
+              containerIp={containerIp}
+              onConnectionChange={connected => {
+                const tab = getTabForMember(0);
+                if (tab) onConnectionChange?.(tab.id, connected);
+              }}
+              onEnd={() => {
+                const tab = getTabForMember(0);
+                if (tab) onTabEnd?.(tab.id);
+              }}
+              onContextMenu={onTerminalContextMenu}
+              isFocused={focusedPaneIndex === 0}
+              onFocus={() => setFocusedPaneIndex(0)}
+            />
+          </Panel>
+
+          <ResizableDivider orientation="horizontal" />
+
+          <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
+            <Group orientation="vertical" className="h-full">
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(1)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(1);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(1);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 1}
+                  onFocus={() => setFocusedPaneIndex(1)}
+                />
+              </Panel>
+
+              <ResizableDivider orientation="vertical" />
+
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(2)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(2);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(2);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 2}
+                  onFocus={() => setFocusedPaneIndex(2)}
+                />
+              </Panel>
+            </Group>
+          </Panel>
+        </Group>
+        {focusedTab && (
+          <StatusBar
             workspaceId={workspaceId}
-            containerIp={containerIp}
-            onConnectionChange={connected => {
-              const tab = getTabForMember(0);
-              if (tab) onConnectionChange?.(tab.id, connected);
-            }}
-            onEnd={() => {
-              const tab = getTabForMember(0);
-              if (tab) onTabEnd?.(tab.id);
-            }}
-            onContextMenu={onTerminalContextMenu}
+            tabId={focusedTab.id}
+            socket={socket}
+            isConnected={isConnected}
           />
-        </Panel>
-
-        <ResizableDivider orientation="horizontal" />
-
-        <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
-          <Group orientation="vertical" className="h-full">
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(1)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(1);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(1);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
-
-            <ResizableDivider orientation="vertical" />
-
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(2)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(2);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(2);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
-          </Group>
-        </Panel>
-      </Group>
+        )}
+      </div>
     );
   }
 
   if (config.layout === 'right-stack') {
     // (Left-Top / Left-Bottom) + Right
     return (
-      <Group orientation="horizontal" className="h-full w-full">
-        <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
-          <Group orientation="vertical" className="h-full">
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(0)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(0);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(0);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
+      <div className="h-full w-full flex flex-col">
+        <Group orientation="horizontal" className="flex-1 min-h-0">
+          <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
+            <Group orientation="vertical" className="h-full">
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(0)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(0);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(0);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 0}
+                  onFocus={() => setFocusedPaneIndex(0)}
+                />
+              </Panel>
 
-            <ResizableDivider orientation="vertical" />
+              <ResizableDivider orientation="vertical" />
 
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(1)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(1);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(1);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
-          </Group>
-        </Panel>
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(1)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(1);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(1);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 1}
+                  onFocus={() => setFocusedPaneIndex(1)}
+                />
+              </Panel>
+            </Group>
+          </Panel>
 
-        <ResizableDivider orientation="horizontal" />
+          <ResizableDivider orientation="horizontal" />
 
-        <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
-          <SplitViewPane
-            tab={getTabForMember(2)}
+          <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
+            <SplitViewPane
+              tab={getTabForMember(2)}
+              workspaceId={workspaceId}
+              containerIp={containerIp}
+              onConnectionChange={connected => {
+                const tab = getTabForMember(2);
+                if (tab) onConnectionChange?.(tab.id, connected);
+              }}
+              onEnd={() => {
+                const tab = getTabForMember(2);
+                if (tab) onTabEnd?.(tab.id);
+              }}
+              onContextMenu={onTerminalContextMenu}
+              isFocused={focusedPaneIndex === 2}
+              onFocus={() => setFocusedPaneIndex(2)}
+            />
+          </Panel>
+        </Group>
+        {focusedTab && (
+          <StatusBar
             workspaceId={workspaceId}
-            containerIp={containerIp}
-            onConnectionChange={connected => {
-              const tab = getTabForMember(2);
-              if (tab) onConnectionChange?.(tab.id, connected);
-            }}
-            onEnd={() => {
-              const tab = getTabForMember(2);
-              if (tab) onTabEnd?.(tab.id);
-            }}
-            onContextMenu={onTerminalContextMenu}
+            tabId={focusedTab.id}
+            socket={socket}
+            isConnected={isConnected}
           />
-        </Panel>
-      </Group>
+        )}
+      </div>
     );
   }
 
   // 4-pane grid layout (grid-2x2)
   if (config.layout === 'grid-2x2') {
     return (
-      <Group orientation="horizontal" className="h-full w-full">
-        {/* Left column */}
-        <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
-          <Group orientation="vertical" className="h-full">
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(0)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(0);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(0);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
+      <div className="h-full w-full flex flex-col">
+        <Group orientation="horizontal" className="flex-1 min-h-0">
+          {/* Left column */}
+          <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
+            <Group orientation="vertical" className="h-full">
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(0)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(0);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(0);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 0}
+                  onFocus={() => setFocusedPaneIndex(0)}
+                />
+              </Panel>
 
-            <ResizableDivider orientation="vertical" />
+              <ResizableDivider orientation="vertical" />
 
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(2)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(2);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(2);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
-          </Group>
-        </Panel>
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(2)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(2);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(2);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 2}
+                  onFocus={() => setFocusedPaneIndex(2)}
+                />
+              </Panel>
+            </Group>
+          </Panel>
 
-        <ResizableDivider orientation="horizontal" />
+          <ResizableDivider orientation="horizontal" />
 
-        {/* Right column */}
-        <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
-          <Group orientation="vertical" className="h-full">
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(1)}
-                workspaceId={workspaceId}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(1);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(1);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
+          {/* Right column */}
+          <Panel defaultSize={50} minSize={20} className="min-h-0 min-w-0">
+            <Group orientation="vertical" className="h-full">
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(1)}
+                  workspaceId={workspaceId}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(1);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(1);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 1}
+                  onFocus={() => setFocusedPaneIndex(1)}
+                />
+              </Panel>
 
-            <ResizableDivider orientation="vertical" />
+              <ResizableDivider orientation="vertical" />
 
-            <Panel defaultSize={50} minSize={20} className="min-h-0">
-              <SplitViewPane
-                tab={getTabForMember(3)}
-                workspaceId={workspaceId}
-                containerIp={containerIp}
-                onConnectionChange={connected => {
-                  const tab = getTabForMember(3);
-                  if (tab) onConnectionChange?.(tab.id, connected);
-                }}
-                onEnd={() => {
-                  const tab = getTabForMember(3);
-                  if (tab) onTabEnd?.(tab.id);
-                }}
-                onContextMenu={onTerminalContextMenu}
-              />
-            </Panel>
-          </Group>
-        </Panel>
-      </Group>
+              <Panel defaultSize={50} minSize={20} className="min-h-0">
+                <SplitViewPane
+                  tab={getTabForMember(3)}
+                  workspaceId={workspaceId}
+                  containerIp={containerIp}
+                  onConnectionChange={connected => {
+                    const tab = getTabForMember(3);
+                    if (tab) onConnectionChange?.(tab.id, connected);
+                  }}
+                  onEnd={() => {
+                    const tab = getTabForMember(3);
+                    if (tab) onTabEnd?.(tab.id);
+                  }}
+                  onContextMenu={onTerminalContextMenu}
+                  isFocused={focusedPaneIndex === 3}
+                  onFocus={() => setFocusedPaneIndex(3)}
+                />
+              </Panel>
+            </Group>
+          </Panel>
+        </Group>
+        {focusedTab && (
+          <StatusBar
+            workspaceId={workspaceId}
+            tabId={focusedTab.id}
+            socket={socket}
+            isConnected={isConnected}
+          />
+        )}
+      </div>
     );
   }
 

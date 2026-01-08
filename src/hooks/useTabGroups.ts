@@ -158,6 +158,30 @@ export function useTabGroups(workspaceId: string | null) {
     [token, activeGroupId]
   );
 
+  // Close a group and delete all its tabs
+  const closeGroup = useCallback(
+    async (groupId: string, deleteTab: (tabId: string) => Promise<void>) => {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) throw new Error('Group not found');
+
+      // Get all tab IDs in the group
+      const tabIds = group.members.map(m => m.tabId);
+
+      // Clear active group first to avoid UI issues during deletion
+      if (activeGroupId === groupId) {
+        setActiveGroupId(null);
+      }
+
+      // Delete all tabs in parallel
+      await Promise.all(tabIds.map(tabId => deleteTab(tabId)));
+
+      // Remove the group from state (it should be auto-deleted when all tabs are removed,
+      // but we also remove it locally to ensure UI is updated)
+      setGroups(prev => prev.filter(g => g.id !== groupId));
+    },
+    [groups, activeGroupId]
+  );
+
   // Add a tab to an existing group
   const addTabToGroup = useCallback(
     async (groupId: string, tabId: string) => {
@@ -304,6 +328,7 @@ export function useTabGroups(workspaceId: string | null) {
     createGroup,
     updateGroup,
     deleteGroup,
+    closeGroup,
     updatePaneSizes,
     addTabToGroup,
 

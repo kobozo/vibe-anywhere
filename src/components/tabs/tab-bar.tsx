@@ -33,6 +33,7 @@ interface TabBarProps {
   onSelectGroup?: (groupId: string | null) => void;
   onUngroupTabs?: (groupId: string) => void;
   onRenameGroup?: (groupId: string, newName: string) => void;
+  onCloseGroup?: (groupId: string) => void;
   // Multi-select props
   multiSelectMode?: boolean;
   selectedTabIdsForGroup?: Set<string>;
@@ -66,6 +67,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
   onSelectGroup,
   onUngroupTabs,
   onRenameGroup,
+  onCloseGroup,
   // Multi-select props
   multiSelectMode = false,
   selectedTabIdsForGroup = new Set(),
@@ -117,6 +119,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tabToDelete, setTabToDelete] = useState<TabInfo | null>(null);
+  const [groupToClose, setGroupToClose] = useState<TabGroupInfo | null>(null);
   const [agentUpdating, setAgentUpdating] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ tab: TabInfo; position: { x: number; y: number } } | null>(null);
   const prevAgentUpdating = useRef(false);
@@ -226,6 +229,22 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
     } finally {
       setActionLoading(null);
       setTabToDelete(null);
+    }
+  };
+
+  const handleCloseGroupClick = (group: TabGroupInfo) => {
+    setGroupToClose(group);
+  };
+
+  const confirmCloseGroup = async () => {
+    if (!groupToClose) return;
+
+    try {
+      onCloseGroup?.(groupToClose.id);
+    } catch (error) {
+      console.error('Failed to close group:', error);
+    } finally {
+      setGroupToClose(null);
     }
   };
 
@@ -455,6 +474,7 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
                     onClick={() => handleGroupClick(group)}
                     onUngroup={() => onUngroupTabs?.(group.id)}
                     onRename={(newName) => onRenameGroup?.(group.id, newName)}
+                    onClose={() => handleCloseGroupClick(group)}
                   />
                 </SortableTabItem>
               );
@@ -559,6 +579,17 @@ export const TabBar = forwardRef<TabBarRef, TabBarProps>(function TabBar({
         confirmVariant="danger"
         onConfirm={confirmDeleteTab}
         onCancel={() => setTabToDelete(null)}
+      />
+
+      {/* Close group confirmation */}
+      <ConfirmDialog
+        isOpen={!!groupToClose}
+        title="Close Group"
+        message={`Close all ${groupToClose?.members.length} tabs in "${groupToClose?.name}"?`}
+        confirmLabel="Close All"
+        confirmVariant="danger"
+        onConfirm={confirmCloseGroup}
+        onCancel={() => setGroupToClose(null)}
       />
 
       {/* Tab context menu */}
