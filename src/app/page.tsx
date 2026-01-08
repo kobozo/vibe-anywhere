@@ -397,18 +397,19 @@ function Dashboard() {
   }, [activeGroupId, updatePaneSizes]);
 
   // Terminal context menu handlers
-  const handleTerminalContextMenu = useCallback((event: { x: number; y: number; tabId: string }) => {
+  const handleTerminalContextMenu = useCallback(async (event: { x: number; y: number; tabId: string }) => {
+    // Refresh groups before showing context menu to ensure we have fresh data
+    await fetchGroups();
     setTerminalContextMenu({
       position: { x: event.x, y: event.y },
       tabId: event.tabId,
     });
-  }, []);
+  }, [fetchGroups]);
 
   // Handle split with existing tab
-  const handleSplitWithExisting = useCallback(async (direction: SplitDirection, existingTabId: string) => {
+  const handleSplitWithExisting = useCallback(async (direction: SplitDirection, existingTabId: string, passedGroup: import('@/hooks/useTabGroups').TabGroupInfo | null) => {
     // Capture values at start to avoid closure issues
     const contextMenu = terminalContextMenu;
-    const capturedActiveGroup = activeGroup; // Capture activeGroup for split view context
     if (!contextMenu || !selectedWorkspace) return;
 
     const currentTabId = contextMenu.tabId;
@@ -419,11 +420,8 @@ function Dashboard() {
     }
 
     try {
-      // Check if current tab is in a group - use captured activeGroup first (reliable for split view),
-      // then fall back to getGroupForTab (for single terminal context menus)
-      const currentGroup = capturedActiveGroup?.members.some(m => m.tabId === currentTabId)
-        ? capturedActiveGroup
-        : getGroupForTab(currentTabId);
+      // Use the group passed from the context menu (most reliable)
+      const currentGroup = passedGroup;
 
       if (currentGroup) {
         // Add to existing group
@@ -456,14 +454,13 @@ function Dashboard() {
     } finally {
       setTerminalContextMenu(null);
     }
-  }, [terminalContextMenu, selectedWorkspace, activeGroup, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+  }, [terminalContextMenu, selectedWorkspace, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle split with static tab (Git/Docker)
-  const handleSplitWithStaticTab = useCallback(async (direction: SplitDirection, tabType: import('@/lib/db/schema').TabType) => {
+  const handleSplitWithStaticTab = useCallback(async (direction: SplitDirection, tabType: import('@/lib/db/schema').TabType, passedGroup: import('@/hooks/useTabGroups').TabGroupInfo | null) => {
     // Capture values at start to avoid closure issues
     const contextMenu = terminalContextMenu;
     const workspace = selectedWorkspace;
-    const capturedActiveGroup = activeGroup; // Capture activeGroup for split view context
 
     if (!contextMenu || !workspace) return;
 
@@ -507,11 +504,8 @@ function Dashboard() {
         return;
       }
 
-      // Check if current tab is in a group - use captured activeGroup first (reliable for split view),
-      // then fall back to getGroupForTab (for single terminal context menus)
-      const currentGroup = capturedActiveGroup?.members.some(m => m.tabId === currentTabId)
-        ? capturedActiveGroup
-        : getGroupForTab(currentTabId);
+      // Use the group passed from the context menu (most reliable)
+      const currentGroup = passedGroup;
 
       if (currentGroup) {
         // Add to existing group
@@ -543,14 +537,18 @@ function Dashboard() {
     } finally {
       setTerminalContextMenu(null);
     }
-  }, [terminalContextMenu, selectedWorkspace, activeGroup, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+  }, [terminalContextMenu, selectedWorkspace, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle split with new template tab
-  const handleSplitWithTemplate = useCallback(async (direction: SplitDirection, templateId: string) => {
+  const handleSplitWithTemplate = useCallback(async (direction: SplitDirection, templateId: string, passedGroup: import('@/hooks/useTabGroups').TabGroupInfo | null) => {
     // Capture values at start to avoid closure issues
     const contextMenu = terminalContextMenu;
     const workspace = selectedWorkspace;
-    const capturedActiveGroup = activeGroup; // Capture activeGroup for split view context
+
+    console.log('[handleSplitWithTemplate] Start:', {
+      contextMenu,
+      passedGroup,
+    });
 
     if (!contextMenu || !workspace) return;
 
@@ -593,11 +591,9 @@ function Dashboard() {
         return;
       }
 
-      // Check if current tab is in a group - use captured activeGroup first (reliable for split view),
-      // then fall back to getGroupForTab (for single terminal context menus)
-      const currentGroup = capturedActiveGroup?.members.some(m => m.tabId === currentTabId)
-        ? capturedActiveGroup
-        : getGroupForTab(currentTabId);
+      // Use the group passed from the context menu (most reliable)
+      const currentGroup = passedGroup;
+      console.log('[handleSplitWithTemplate] Using group:', currentGroup);
 
       if (currentGroup) {
         // Add to existing group
@@ -629,7 +625,7 @@ function Dashboard() {
     } finally {
       setTerminalContextMenu(null);
     }
-  }, [terminalContextMenu, selectedWorkspace, activeGroup, tabTemplates, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+  }, [terminalContextMenu, selectedWorkspace, tabTemplates, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle voice transcription - send to active terminal
   const handleVoiceTranscription = useCallback((text: string) => {
@@ -1542,9 +1538,6 @@ function Dashboard() {
             position={terminalContextMenu.position}
             tab={tab}
             currentGroup={getGroupForTab(terminalContextMenu.tabId)}
-            otherTabs={workspaceTabsRef.current.filter(
-              t => t.id !== terminalContextMenu.tabId && !groupedTabIds.has(t.id) && t.tabType !== 'dashboard'
-            )}
             availableTabs={workspaceTabsRef.current.filter(
               t => t.id !== terminalContextMenu.tabId && !groupedTabIds.has(t.id) && t.tabType !== 'dashboard'
             )}
@@ -1578,17 +1571,6 @@ function Dashboard() {
                 tabBarRef.current?.refreshTabs();
               } catch (error) {
                 console.error('Error duplicating tab:', error);
-              }
-            }}
-            onGroupWith={async (otherTabId) => {
-              // Create new group with these two tabs
-              const otherTab = workspaceTabsRef.current.find(t => t.id === otherTabId);
-              const groupName = `${tab.name} + ${otherTab?.name || 'Tab'}`;
-              try {
-                const newGroup = await createGroup(groupName, [tab.id, otherTabId], 'horizontal');
-                setActiveGroupId(newGroup.id);
-              } catch (error) {
-                console.error('Failed to create group:', error);
               }
             }}
             onAddToGroup={async (groupId) => {

@@ -39,7 +39,6 @@ interface TerminalContextMenuProps {
   position: { x: number; y: number };
   tab: TabInfo;
   currentGroup: TabGroupInfo | null;
-  otherTabs: TabInfo[]; // Tabs not in groups (for Group with...)
   availableTabs: TabInfo[]; // Tabs available for split (not in groups, not current)
   groups: TabGroupInfo[]; // All groups (for Add to group...)
   templates: TabTemplate[];
@@ -48,19 +47,17 @@ interface TerminalContextMenuProps {
   onClose: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
-  onGroupWith: (otherTabId: string) => void;
   onAddToGroup?: (groupId: string) => void;
   onStartMultiSelect: () => void;
-  onSplitWithExisting: (direction: SplitDirection, tabId: string) => void;
-  onSplitWithTemplate: (direction: SplitDirection, templateId: string) => void;
-  onSplitWithStaticTab: (direction: SplitDirection, tabType: TabType) => void;
+  onSplitWithExisting: (direction: SplitDirection, tabId: string, currentGroup: TabGroupInfo | null) => void;
+  onSplitWithTemplate: (direction: SplitDirection, templateId: string, currentGroup: TabGroupInfo | null) => void;
+  onSplitWithStaticTab: (direction: SplitDirection, tabType: TabType, currentGroup: TabGroupInfo | null) => void;
 }
 
 export function TerminalContextMenu({
   position,
   tab,
   currentGroup,
-  otherTabs,
   availableTabs,
   groups,
   templates,
@@ -69,7 +66,6 @@ export function TerminalContextMenu({
   onClose,
   onDelete,
   onDuplicate,
-  onGroupWith,
   onAddToGroup,
   onStartMultiSelect,
   onSplitWithExisting,
@@ -77,7 +73,7 @@ export function TerminalContextMenu({
   onSplitWithStaticTab,
 }: TerminalContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [activeSubmenu, setActiveSubmenu] = useState<'groupWith' | 'addToGroup' | 'split' | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'addToGroup' | 'split' | null>(null);
   const [activeSplitDirection, setActiveSplitDirection] = useState<SplitDirection | null>(null);
   const [activeSplitChoice, setActiveSplitChoice] = useState<'existing' | 'template' | null>(null);
 
@@ -108,7 +104,7 @@ export function TerminalContextMenu({
   }, []);
 
   // Delayed submenu close handlers
-  const handleSubmenuEnter = useCallback((submenu: 'groupWith' | 'addToGroup' | 'split') => {
+  const handleSubmenuEnter = useCallback((submenu: 'addToGroup' | 'split') => {
     if (submenuTimeoutRef.current) {
       clearTimeout(submenuTimeoutRef.current);
       submenuTimeoutRef.current = null;
@@ -220,40 +216,7 @@ export function TerminalContextMenu({
       {/* Separator */}
       <div className="h-px bg-border my-1" />
 
-      {/* Grouping Options - same as tab context menu */}
-      {otherTabs.length > 0 && (
-        <div
-          className="relative"
-          onMouseEnter={() => handleSubmenuEnter('groupWith')}
-          onMouseLeave={handleSubmenuLeave}
-        >
-          <button className={menuItemClass}>
-            Group with...
-            <span className="text-foreground-tertiary">›</span>
-          </button>
-          {activeSubmenu === 'groupWith' && (
-            <div
-              className={submenuClass}
-              onMouseEnter={() => handleSubmenuEnter('groupWith')}
-              onMouseLeave={handleSubmenuLeave}
-            >
-              {otherTabs.map((otherTab) => (
-                <button
-                  key={otherTab.id}
-                  onClick={() => {
-                    onClose();
-                    onGroupWith(otherTab.id);
-                  }}
-                  className={menuItemClass}
-                >
-                  <span className="truncate max-w-[120px]">{otherTab.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
+      {/* Grouping Options */}
       {groups.length > 0 && onAddToGroup && (
         <div
           className="relative"
@@ -291,7 +254,7 @@ export function TerminalContextMenu({
         </div>
       )}
 
-      {otherTabs.length > 0 && (
+      {availableTabs.length > 0 && (
         <button
           onClick={() => {
             onClose();
@@ -359,7 +322,7 @@ export function TerminalContextMenu({
                             key={availableTab.id}
                             onClick={() => {
                               // Don't call onClose - handleSplitWithExisting will close the menu
-                              onSplitWithExisting(dir.key, availableTab.id);
+                              onSplitWithExisting(dir.key, availableTab.id, currentGroup);
                             }}
                             className={menuItemClass}
                           >
@@ -413,7 +376,7 @@ export function TerminalContextMenu({
                           <button
                             key={staticTab.id}
                             onClick={() => {
-                              onSplitWithStaticTab(dir.key, staticTab.tabType);
+                              onSplitWithStaticTab(dir.key, staticTab.tabType, currentGroup);
                             }}
                             className={menuItemClass}
                           >
@@ -449,7 +412,7 @@ export function TerminalContextMenu({
                           <button
                             key={template.id}
                             onClick={() => {
-                              onSplitWithTemplate(dir.key, template.id);
+                              onSplitWithTemplate(dir.key, template.id, currentGroup);
                             }}
                             className={menuItemClass}
                           >
