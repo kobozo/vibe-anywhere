@@ -545,11 +545,6 @@ function Dashboard() {
     const contextMenu = terminalContextMenu;
     const workspace = selectedWorkspace;
 
-    console.log('[handleSplitWithTemplate] Start:', {
-      contextMenu,
-      passedGroup,
-    });
-
     if (!contextMenu || !workspace) return;
 
     const template = tabTemplates.find(t => t.id === templateId);
@@ -593,7 +588,6 @@ function Dashboard() {
 
       // Use the group passed from the context menu (most reliable)
       const currentGroup = passedGroup;
-      console.log('[handleSplitWithTemplate] Using group:', currentGroup);
 
       if (currentGroup) {
         // Add to existing group
