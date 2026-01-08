@@ -458,11 +458,20 @@ export class ProxmoxTemplateManager {
         await this.client.setLxcConfig(vmid, { features: 'nesting=1' });
       }
 
-      // Set tags on cloned template (clone API doesn't support tags)
+      // Merge new tech stack tags with inherited parent template tags
       const templateTags = buildTemplateTags(techStacks);
       try {
-        await this.client.setLxcConfig(vmid, { tags: templateTags });
-        console.log(`Set tags for template ${vmid}: ${templateTags}`);
+        // Get existing tags from cloned container (inherited from parent template)
+        const currentConfig = await this.client.getLxcConfig(vmid);
+        const existingTags = currentConfig.tags as string | undefined;
+
+        // Merge: existing parent tags + new tech stack tags (deduplicated)
+        const existingTagSet = new Set(existingTags ? existingTags.split(';').filter(Boolean) : []);
+        const newTagSet = new Set(templateTags.split(';').filter(Boolean));
+        const mergedTags = [...new Set([...existingTagSet, ...newTagSet])].join(';');
+
+        await this.client.setLxcConfig(vmid, { tags: mergedTags });
+        console.log(`Set tags for template ${vmid}: ${mergedTags}`);
       } catch (tagError) {
         console.warn(`Could not set tags for template ${vmid}:`, tagError);
       }

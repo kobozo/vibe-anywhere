@@ -142,11 +142,20 @@ export class ProxmoxBackend implements IContainerBackend {
       // Continue anyway - template defaults should work
     }
 
-    // Set tags (clone API doesn't support tags, must set after)
+    // Merge workspace tags with inherited template tags (clone inherits template tags)
     if (tags) {
       try {
-        await client.setLxcConfig(newVmid, { tags });
-        console.log(`Set tags for container ${newVmid}: ${tags}`);
+        // Get existing tags from cloned container (inherited from template)
+        const currentConfig = await client.getLxcConfig(newVmid);
+        const existingTags = currentConfig.tags as string | undefined;
+
+        // Merge: existing template tags + new workspace tags (deduplicated)
+        const existingTagSet = new Set(existingTags ? existingTags.split(';').filter(Boolean) : []);
+        const newTagSet = new Set(tags.split(';').filter(Boolean));
+        const mergedTags = [...new Set([...existingTagSet, ...newTagSet])].join(';');
+
+        await client.setLxcConfig(newVmid, { tags: mergedTags });
+        console.log(`Set tags for container ${newVmid}: ${mergedTags}`);
       } catch (tagError) {
         console.warn(`Could not set tags for ${newVmid}:`, tagError);
         // Non-fatal - container will work without tags
