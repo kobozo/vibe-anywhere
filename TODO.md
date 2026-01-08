@@ -14,11 +14,11 @@
 
 ## Repository Management
 
-- [ ] **Git user configuration** - When adding a new repository, allow specifying git username and email. Add ability to create and manage git identities in settings, with option to set a default.
+- [x] **Git user configuration** - When adding a new repository, allow specifying git username and email. Add ability to create and manage git identities in settings, with option to set a default.
 
 - [x] **Default project name** - When adding a new repository, default the project name to the repo name if user hasn't specified a custom one.
 
-- [ ] **Multi-step repository wizard** - Convert the "add repository" modal from one large form to a tabbed/wizard approach with Next/Next/Finish flow.
+- [x] **Multi-step repository wizard** - Convert the "add repository" modal from one large form to a tabbed/wizard approach with Next/Next/Finish flow.
 
 ## Workspace Management
 
@@ -41,6 +41,8 @@
 - [x] **Drag and drop tab ordering** - Allow reordering tabs via drag and drop.
 
 - [ ] **Terminal right-click context menu** - Add right-click context menu in terminal with split pane options. Include submenu for split direction (right, left, top, bottom) with choice to add an existing tab/group or start a new template tab.
+
+- [ ] **AI-assisted terminal input** - Add shortcut/button/context menu option that opens an input modal. User types what they want to do, AI proposes a CLI command. Options: Accept (inputs command and presses enter), Correct (sends feedback in same chat session for refinement), Decline (closes modal).
 
 ## Sidebar
 
