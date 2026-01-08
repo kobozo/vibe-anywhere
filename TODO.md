@@ -52,6 +52,8 @@
 
 - [ ] **Rename "Templates" to "Images"** - Rename the "Templates" section in the sidebar to "Images" for clarity.
 
+- [ ] **Sidebar right-click context menu** - Add right-click context menu for repositories and workspaces in the sidebar with relevant actions.
+
 ## Onboarding
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
