@@ -1,13 +1,39 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import type { TabInfo } from '@/hooks/useTabs';
 import type { TabGroupInfo } from '@/hooks/useTabGroups';
 import type { TabTemplate } from '@/hooks/useTabTemplates';
+import type { TabType } from '@/lib/db/schema';
 import { getTemplateIcon } from '@/components/icons/ai-icons';
 
 export type SplitDirection = 'left' | 'right' | 'top' | 'bottom';
+
+// Static tab options for Git and Docker
+interface StaticTabOption {
+  id: string;
+  name: string;
+  icon: string;
+  tabType: TabType;
+  requiredTechStack?: string;
+}
+
+const STATIC_TAB_OPTIONS: StaticTabOption[] = [
+  {
+    id: 'static-git',
+    name: 'Git',
+    icon: 'git',
+    tabType: 'git',
+  },
+  {
+    id: 'static-docker',
+    name: 'Docker',
+    icon: 'docker',
+    tabType: 'docker',
+    requiredTechStack: 'docker',
+  },
+];
 
 interface TerminalContextMenuProps {
   position: { x: number; y: number };
@@ -17,6 +43,8 @@ interface TerminalContextMenuProps {
   availableTabs: TabInfo[]; // Tabs available for split (not in groups, not current)
   groups: TabGroupInfo[]; // All groups (for Add to group...)
   templates: TabTemplate[];
+  existingTabTypes: TabType[]; // Tab types that already exist (to hide git/docker if already open)
+  workspaceTechStacks: string[]; // To check if Docker should be shown
   onClose: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -25,6 +53,7 @@ interface TerminalContextMenuProps {
   onStartMultiSelect: () => void;
   onSplitWithExisting: (direction: SplitDirection, tabId: string) => void;
   onSplitWithTemplate: (direction: SplitDirection, templateId: string) => void;
+  onSplitWithStaticTab: (direction: SplitDirection, tabType: TabType) => void;
 }
 
 export function TerminalContextMenu({
@@ -35,6 +64,8 @@ export function TerminalContextMenu({
   availableTabs,
   groups,
   templates,
+  existingTabTypes,
+  workspaceTechStacks,
   onClose,
   onDelete,
   onDuplicate,
@@ -43,11 +74,23 @@ export function TerminalContextMenu({
   onStartMultiSelect,
   onSplitWithExisting,
   onSplitWithTemplate,
+  onSplitWithStaticTab,
 }: TerminalContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'groupWith' | 'addToGroup' | 'split' | null>(null);
   const [activeSplitDirection, setActiveSplitDirection] = useState<SplitDirection | null>(null);
   const [activeSplitChoice, setActiveSplitChoice] = useState<'existing' | 'template' | null>(null);
+
+  // Filter static tabs: show if not already existing and tech stack requirement is met
+  const availableStaticTabs = useMemo(() => {
+    return STATIC_TAB_OPTIONS.filter((staticTab) => {
+      // Hide if this tab type already exists
+      if (existingTabTypes.includes(staticTab.tabType)) return false;
+      // Check tech stack requirement
+      if (!staticTab.requiredTechStack) return true;
+      return workspaceTechStacks.includes(staticTab.requiredTechStack);
+    });
+  }, [existingTabTypes, workspaceTechStacks]);
 
   // Timeout refs for delayed submenu closing
   const submenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -355,21 +398,57 @@ export function TerminalContextMenu({
                     )}
 
                     {/* Separator between existing and new tabs */}
-                    {availableTabs.length > 0 && templates.length > 0 && (
+                    {availableTabs.length > 0 && (availableStaticTabs.length > 0 || templates.length > 0) && (
                       <div className="h-px bg-border my-1" />
                     )}
 
-                    {/* New tab templates section */}
-                    {templates.length > 0 && (
+                    {/* New tab section - static tabs (Git/Docker) and templates */}
+                    {(availableStaticTabs.length > 0 || templates.length > 0) && (
                       <>
                         <div className="px-3 py-1 text-xs text-foreground-tertiary font-medium">
                           New Tab
                         </div>
+                        {/* Static tabs (Git, Docker) */}
+                        {availableStaticTabs.map((staticTab) => (
+                          <button
+                            key={staticTab.id}
+                            onClick={() => {
+                              onSplitWithStaticTab(dir.key, staticTab.tabType);
+                            }}
+                            className={menuItemClass}
+                          >
+                            <span className="flex items-center gap-2">
+                              {staticTab.tabType === 'git' ? (
+                                <Image
+                                  src="/icons/ai/github.png"
+                                  alt="Git"
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4"
+                                  unoptimized
+                                />
+                              ) : staticTab.tabType === 'docker' ? (
+                                <Image
+                                  src="/icons/ai/docker.png"
+                                  alt="Docker"
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4"
+                                />
+                              ) : (
+                                <span className="w-4 h-4 flex items-center justify-center">
+                                  {getTemplateIcon(staticTab.icon, true, 'w-4 h-4')}
+                                </span>
+                              )}
+                              <span className="truncate max-w-[120px]">{staticTab.name}</span>
+                            </span>
+                          </button>
+                        ))}
+                        {/* Template tabs */}
                         {templates.map((template) => (
                           <button
                             key={template.id}
                             onClick={() => {
-                              // Don't call onClose - handleSplitWithExisting will close the menu
                               onSplitWithTemplate(dir.key, template.id);
                             }}
                             className={menuItemClass}
@@ -386,7 +465,7 @@ export function TerminalContextMenu({
                     )}
 
                     {/* No options message */}
-                    {availableTabs.length === 0 && templates.length === 0 && (
+                    {availableTabs.length === 0 && availableStaticTabs.length === 0 && templates.length === 0 && (
                       <div className="px-3 py-2 text-sm text-foreground-tertiary">
                         No tabs available
                       </div>

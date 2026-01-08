@@ -454,6 +454,89 @@ function Dashboard() {
     }
   }, [terminalContextMenu, selectedWorkspace, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
+  // Handle split with static tab (Git/Docker)
+  const handleSplitWithStaticTab = useCallback(async (direction: SplitDirection, tabType: import('@/lib/db/schema').TabType) => {
+    // Capture values at start to avoid closure issues
+    const contextMenu = terminalContextMenu;
+    const workspace = selectedWorkspace;
+
+    if (!contextMenu || !workspace) return;
+
+    // Only handle git and docker tab types
+    if (tabType !== 'git' && tabType !== 'docker') return;
+
+    try {
+      // Create new static tab via API
+      const tabName = tabType === 'git' ? 'Git' : 'Docker';
+      const response = await fetch(`/api/workspaces/${workspace.id}/tabs`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: tabName,
+          tabType: tabType,
+        }),
+      });
+
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error?.message || 'Failed to create tab');
+      }
+
+      const { data } = await response.json();
+      const newTab = data.tab as TabInfo;
+
+      // Add the new tab to the local ref so SplitViewContainer can find it
+      workspaceTabsRef.current = [...workspaceTabsRef.current, newTab];
+
+      // Trigger TabBar refresh to sync with server
+      tabBarRef.current?.refreshTabs();
+
+      // Now split with the new tab
+      const currentTabId = contextMenu.tabId;
+      const currentTab = workspaceTabsRef.current.find(t => t.id === currentTabId);
+      if (!currentTab) {
+        setTerminalContextMenu(null);
+        return;
+      }
+
+      // Check if current tab is in a group
+      const currentGroup = getGroupForTab(currentTabId);
+
+      if (currentGroup) {
+        // Add to existing group
+        await addTabToGroup(currentGroup.id, newTab.id);
+        const newMemberCount = currentGroup.members.length + 1;
+        let newLayout = currentGroup.layout;
+        if (newMemberCount === 3) {
+          newLayout = direction === 'left' || direction === 'right' ? 'left-stack' : 'right-stack';
+        } else if (newMemberCount === 4) {
+          newLayout = 'grid-2x2';
+        }
+        if (newLayout !== currentGroup.layout) {
+          await updateGroup(currentGroup.id, { layout: newLayout });
+        }
+        await fetchGroups();
+      } else {
+        // Create new group
+        const tabIds = direction === 'left' || direction === 'top'
+          ? [newTab.id, currentTabId]
+          : [currentTabId, newTab.id];
+        const layout = direction === 'left' || direction === 'right' ? 'horizontal' : 'vertical';
+        const groupName = `Split ${currentTab.name}`;
+
+        const newGroup = await createGroup(groupName, tabIds, layout);
+        setActiveGroupId(newGroup.id);
+      }
+    } catch (error) {
+      console.error('Failed to create static tab:', error);
+    } finally {
+      setTerminalContextMenu(null);
+    }
+  }, [terminalContextMenu, selectedWorkspace, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+
   // Handle split with new template tab
   const handleSplitWithTemplate = useCallback(async (direction: SplitDirection, templateId: string) => {
     // Capture values at start to avoid closure issues
@@ -1508,8 +1591,11 @@ function Dashboard() {
               enterMultiSelectMode();
               toggleTabSelection(tab.id);
             }}
+            existingTabTypes={workspaceTabsRef.current.map(t => t.tabType)}
+            workspaceTechStacks={workspaceTechStacks}
             onSplitWithExisting={handleSplitWithExisting}
             onSplitWithTemplate={handleSplitWithTemplate}
+            onSplitWithStaticTab={handleSplitWithStaticTab}
           />
         );
       })()}
