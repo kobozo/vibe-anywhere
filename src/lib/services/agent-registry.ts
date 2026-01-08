@@ -5,11 +5,12 @@
 
 import type { Socket } from 'socket.io';
 import { db } from '@/lib/db';
-import { workspaces, tabs } from '@/lib/db/schema';
+import { workspaces, tabs, repositories } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { startupProgressStore } from './startup-progress-store';
 import { getTabService } from './tab-service';
+import { getGitIdentityService } from './git-identity-service';
 
 interface TabState {
   tabId: string;
@@ -28,7 +29,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.5.3';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.6.2';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -144,6 +145,12 @@ class AgentRegistry {
     } catch (e) {
       console.error('Error recovering tabs after restart:', e);
     }
+
+    // Send git identity to agent after successful registration
+    // Do this asynchronously so it doesn't block registration
+    this.sendGitIdentityForWorkspace(workspaceId).catch((e) => {
+      console.error('Error sending git identity to agent:', e);
+    });
 
     return { success: true, needsUpdate };
   }
@@ -365,6 +372,89 @@ class AgentRegistry {
    */
   gitDiscard(workspaceId: string, requestId: string, files: string[]): boolean {
     return this.emit(workspaceId, 'git:discard', { requestId, files });
+  }
+
+  /**
+   * Send git config (user.name and user.email) to the agent
+   */
+  gitConfig(workspaceId: string, requestId: string, name: string, email: string): boolean {
+    return this.emit(workspaceId, 'git:config', { requestId, name, email });
+  }
+
+  /**
+   * Resolve and send git identity to an agent for a workspace
+   * This is called when an agent connects to ensure the git identity is configured
+   */
+  async sendGitIdentityForWorkspace(workspaceId: string): Promise<boolean> {
+    try {
+      // Get workspace to find repository
+      const [workspace] = await db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .limit(1);
+
+      if (!workspace) {
+        console.log(`Cannot send git identity: workspace ${workspaceId} not found`);
+        return false;
+      }
+
+      // Get repository
+      const [repo] = await db
+        .select()
+        .from(repositories)
+        .where(eq(repositories.id, workspace.repositoryId))
+        .limit(1);
+
+      if (!repo) {
+        console.log(`Cannot send git identity: repository not found for workspace ${workspaceId}`);
+        return false;
+      }
+
+      // Resolve git identity
+      let gitName: string | null = null;
+      let gitEmail: string | null = null;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const repoAny = repo as any;
+
+      if (repoAny.gitIdentityId) {
+        // Use saved identity
+        const gitIdentityService = getGitIdentityService();
+        const identity = await gitIdentityService.getIdentity(repoAny.gitIdentityId);
+        if (identity) {
+          gitName = identity.gitName;
+          gitEmail = identity.gitEmail;
+        }
+      } else if (repoAny.gitCustomName || repoAny.gitCustomEmail) {
+        // Use custom identity
+        gitName = repoAny.gitCustomName;
+        gitEmail = repoAny.gitCustomEmail;
+      }
+
+      // If no identity configured, try to use default
+      if (!gitName || !gitEmail) {
+        const gitIdentityService = getGitIdentityService();
+        const defaultIdentity = await gitIdentityService.getDefaultIdentity(repo.userId);
+        if (defaultIdentity) {
+          gitName = defaultIdentity.gitName;
+          gitEmail = defaultIdentity.gitEmail;
+        }
+      }
+
+      // If we have identity, send it to the agent
+      if (gitName && gitEmail) {
+        const requestId = `git-config-init-${Date.now()}`;
+        console.log(`Sending git identity to workspace ${workspaceId}: ${gitName} <${gitEmail}>`);
+        return this.gitConfig(workspaceId, requestId, gitName, gitEmail);
+      }
+
+      console.log(`No git identity configured for workspace ${workspaceId}`);
+      return false;
+    } catch (error) {
+      console.error(`Error sending git identity for workspace ${workspaceId}:`, error);
+      return false;
+    }
   }
 
   /**

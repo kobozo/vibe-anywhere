@@ -313,6 +313,22 @@ const wsClient = new AgentWebSocket(config, {
     }
   },
 
+  onGitConfig: async (data) => {
+    console.log(`Git config request: ${data.requestId}, name: ${data.name}, email: ${data.email}`);
+    try {
+      const result = await gitHandler.setConfig(data.name, data.email);
+      wsClient.sendGitConfig(data.requestId, true, result);
+    } catch (error) {
+      console.error('Git config failed:', error);
+      wsClient.sendGitConfig(
+        data.requestId,
+        false,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
   // Docker event handlers
   onDockerStatus: async (data) => {
     console.log(`Docker status request: ${data.requestId}`);

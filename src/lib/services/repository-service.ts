@@ -18,6 +18,10 @@ export interface CreateRepoInput {
   resourceMemory?: number | null;     // Memory in MB
   resourceCpuCores?: number | null;   // CPU cores
   resourceDiskSize?: number | null;   // Disk size in GB
+  // Git identity (use saved identity or custom values)
+  gitIdentityId?: string | null;      // FK to gitIdentities
+  gitCustomName?: string | null;      // Custom git user.name
+  gitCustomEmail?: string | null;     // Custom git user.email
 }
 
 /**
@@ -67,6 +71,9 @@ export class RepositoryService {
         resourceMemory: input.resourceMemory ?? null,
         resourceCpuCores: input.resourceCpuCores ?? null,
         resourceDiskSize: input.resourceDiskSize ?? null,
+        gitIdentityId: input.gitIdentityId ?? null,
+        gitCustomName: input.gitCustomName ?? null,
+        gitCustomEmail: input.gitCustomEmail ?? null,
       })
       .returning();
 
@@ -123,6 +130,9 @@ export class RepositoryService {
       resourceMemory?: number | null;
       resourceCpuCores?: number | null;
       resourceDiskSize?: number | null;
+      gitIdentityId?: string | null;
+      gitCustomName?: string | null;
+      gitCustomEmail?: string | null;
     }
   ): Promise<Repository> {
     // Validate resource values if provided

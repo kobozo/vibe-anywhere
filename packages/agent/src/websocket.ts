@@ -26,6 +26,7 @@ export interface AgentEvents {
   onGitUnstage: (data: { requestId: string; files: string[] }) => void;
   onGitCommit: (data: { requestId: string; message: string }) => void;
   onGitDiscard: (data: { requestId: string; files: string[] }) => void;
+  onGitConfig: (data: { requestId: string; name: string; email: string }) => void;
   // Docker events
   onDockerStatus: (data: { requestId: string }) => void;
   onDockerLogs: (data: { requestId: string; containerId: string; tail?: number }) => void;
@@ -181,6 +182,10 @@ export class AgentWebSocket {
 
     this.socket.on('git:discard', (data) => {
       this.events.onGitDiscard(data);
+    });
+
+    this.socket.on('git:config', (data) => {
+      this.events.onGitConfig(data);
     });
 
     // Docker events
@@ -399,6 +404,15 @@ export class AgentWebSocket {
     if (!this.socket?.connected) return;
 
     this.socket.emit('git:discard:response', { requestId, success, error });
+  }
+
+  /**
+   * Send git config response
+   */
+  sendGitConfig(requestId: string, success: boolean, data?: { name: string; email: string }, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('git:config:response', { requestId, success, data, error });
   }
 
   /**

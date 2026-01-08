@@ -30,6 +30,13 @@ interface RepoStats {
   branchCount: number;
 }
 
+interface GitIdentityInfo {
+  name: string;
+  gitName: string;
+  gitEmail: string;
+  isDefault: boolean;
+}
+
 interface RepositoryDetails {
   repository: Repository;
   branches: string[];
@@ -39,6 +46,7 @@ interface RepositoryDetails {
   remotes: Remote[];
   lastCommit: LastCommit | null;
   stats: RepoStats | null;
+  gitIdentity: GitIdentityInfo | null;
 }
 
 interface RepositoryDashboardProps {
@@ -106,7 +114,7 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
     return null;
   }
 
-  const { sshKey, template, hooks, remotes, lastCommit, stats } = details;
+  const { sshKey, template, hooks, remotes, lastCommit, stats, gitIdentity } = details;
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -223,36 +231,7 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
             )}
           </div>
 
-          {/* Template */}
-          <div className="bg-background-secondary rounded-lg p-4">
-            <h2 className="text-sm font-medium text-foreground-secondary mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-              </svg>
-              Container Template
-            </h2>
-            {template ? (
-              <div>
-                <p className="text-foreground">{template.name}</p>
-                {template.description && (
-                  <p className="text-foreground-tertiary text-sm mt-1">{template.description}</p>
-                )}
-                {template.techStacks && template.techStacks.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {template.techStacks.map((tech) => (
-                      <span key={tech} className="px-2 py-0.5 bg-background-tertiary text-foreground text-xs rounded">
-                        {tech}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-foreground-tertiary text-sm">Default Docker template</p>
-            )}
-          </div>
-
-          {/* Tech Stack */}
+          {/* Tech Stack & Template (merged) */}
           <div className="bg-background-secondary rounded-lg p-4">
             <h2 className="text-sm font-medium text-foreground-secondary mb-3 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,19 +239,72 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
               </svg>
               Tech Stack
             </h2>
-            {repository.techStack && repository.techStack.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {(repository.techStack as string[]).map((tech) => (
-                  <span
-                    key={tech}
-                    className="px-3 py-1 bg-purple-500/20 text-purple-400 text-sm rounded-full"
-                  >
-                    {tech}
-                  </span>
-                ))}
+            <div className="space-y-3">
+              {/* Template info */}
+              {template && (
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground-tertiary text-sm">Template:</span>
+                  <span className="text-foreground">{template.name}</span>
+                </div>
+              )}
+
+              {/* Combined tech stacks */}
+              {(() => {
+                const templateStacks = template?.techStacks || [];
+                const repoStacks = (repository.techStack as string[]) || [];
+                const allStacks = [...new Set([...templateStacks, ...repoStacks])];
+
+                if (allStacks.length > 0) {
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {allStacks.map((tech) => {
+                        const isFromRepo = repoStacks.includes(tech);
+                        const isFromTemplate = templateStacks.includes(tech);
+                        return (
+                          <span
+                            key={tech}
+                            className={`px-3 py-1 text-sm rounded-full ${
+                              isFromRepo && !isFromTemplate
+                                ? 'bg-purple-500/20 text-purple-400'
+                                : 'bg-background-tertiary text-foreground'
+                            }`}
+                            title={isFromRepo && !isFromTemplate ? 'Repository override' : 'From template'}
+                          >
+                            {tech}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+                return <p className="text-foreground-tertiary text-sm">No tech stack configured</p>;
+              })()}
+            </div>
+          </div>
+
+          {/* Git Identity */}
+          <div className="bg-background-secondary rounded-lg p-4">
+            <h2 className="text-sm font-medium text-foreground-secondary mb-3 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Git Identity
+            </h2>
+            {gitIdentity ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground">{gitIdentity.gitName}</span>
+                  {gitIdentity.isDefault && (
+                    <span className="text-xs px-1.5 py-0.5 bg-success/20 text-success rounded">default</span>
+                  )}
+                  {gitIdentity.name === 'Custom' && (
+                    <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">custom</span>
+                  )}
+                </div>
+                <p className="text-foreground-tertiary text-sm">&lt;{gitIdentity.gitEmail}&gt;</p>
               </div>
             ) : (
-              <p className="text-foreground-tertiary text-sm">No tech stack configured</p>
+              <p className="text-foreground-tertiary text-sm">Using default identity</p>
             )}
           </div>
         </div>

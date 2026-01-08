@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getRepositoryService } from '@/lib/services';
+import { getAgentRegistry } from '@/lib/services/agent-registry';
+import { db } from '@/lib/db';
+import { workspaces } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import {
   requireAuth,
   successResponse,
@@ -27,6 +31,10 @@ const updateRepositorySchema = z.object({
   resourceMemory: z.number().int().min(512).max(65536).nullable().optional(), // MB
   resourceCpuCores: z.number().int().min(1).max(32).nullable().optional(),
   resourceDiskSize: z.number().int().min(4).max(500).nullable().optional(), // GB
+  // Git identity (use saved identity OR custom values)
+  gitIdentityId: z.string().uuid().nullable().optional(),
+  gitCustomName: z.string().max(100).nullable().optional(),
+  gitCustomEmail: z.string().email().nullable().optional(),
 });
 
 interface RouteContext {
@@ -105,7 +113,38 @@ export const PATCH = withErrorHandling(async (request: NextRequest, context: unk
     throw new NotFoundError('Repository', id);
   }
 
+  // Check if git identity is being updated
+  const gitIdentityChanged =
+    result.data.gitIdentityId !== undefined ||
+    result.data.gitCustomName !== undefined ||
+    result.data.gitCustomEmail !== undefined;
+
   const updated = await repoService.updateRepository(id, result.data);
+
+  // If git identity changed, push to all running workspaces for this repository
+  if (gitIdentityChanged) {
+    try {
+      // Find all workspaces for this repository
+      const repoWorkspaces = await db
+        .select({ id: workspaces.id })
+        .from(workspaces)
+        .where(eq(workspaces.repositoryId, id));
+
+      // Push git identity to each workspace that has a connected agent
+      const agentRegistry = getAgentRegistry();
+      for (const ws of repoWorkspaces) {
+        if (agentRegistry.hasAgent(ws.id)) {
+          console.log(`Pushing git identity update to workspace ${ws.id}`);
+          agentRegistry.sendGitIdentityForWorkspace(ws.id).catch((e) => {
+            console.error(`Failed to push git identity to workspace ${ws.id}:`, e);
+          });
+        }
+      }
+    } catch (e) {
+      // Don't fail the update if pushing fails
+      console.error('Error pushing git identity to workspaces:', e);
+    }
+  }
 
   return successResponse({ repository: updated });
 });

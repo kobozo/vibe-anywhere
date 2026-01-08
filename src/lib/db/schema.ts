@@ -103,6 +103,20 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Git Identities table - named git configurations for commits
+export const gitIdentities = pgTable('git_identities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(), // Display name: "Work", "Personal", etc.
+  gitName: text('git_name').notNull(), // Git config user.name
+  gitEmail: text('git_email').notNull(), // Git config user.email
+  isDefault: boolean('is_default').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Proxmox Templates table - LXC templates with different tech stacks
 export const proxmoxTemplates = pgTable('proxmox_templates', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -150,6 +164,10 @@ export const repositories = pgTable('repositories', {
   resourceMemory: integer('resource_memory'), // Memory in MB
   resourceCpuCores: integer('resource_cpu_cores'), // CPU cores
   resourceDiskSize: integer('resource_disk_size'), // Disk size in GB
+  // Git identity configuration (null = use default identity)
+  gitIdentityId: uuid('git_identity_id'), // FK to gitIdentities (use saved identity)
+  gitCustomName: text('git_custom_name'), // Custom git user.name (if not using saved identity)
+  gitCustomEmail: text('git_custom_email'), // Custom git user.email (if not using saved identity)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -350,6 +368,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   sshKeys: many(sshKeys),
   tabTemplates: many(tabTemplates),
   proxmoxTemplates: many(proxmoxTemplates),
+  gitIdentities: many(gitIdentities),
   sessions: many(sessions), // Legacy
 }));
 
@@ -358,6 +377,14 @@ export const tabTemplatesRelations = relations(tabTemplates, ({ one }) => ({
     fields: [tabTemplates.userId],
     references: [users.id],
   }),
+}));
+
+export const gitIdentitiesRelations = relations(gitIdentities, ({ one, many }) => ({
+  user: one(users, {
+    fields: [gitIdentities.userId],
+    references: [users.id],
+  }),
+  repositories: many(repositories),
 }));
 
 export const repositoriesRelations = relations(repositories, ({ one, many }) => ({
@@ -372,6 +399,10 @@ export const repositoriesRelations = relations(repositories, ({ one, many }) => 
   sshKey: one(sshKeys, {
     fields: [repositories.sshKeyId],
     references: [sshKeys.id],
+  }),
+  gitIdentity: one(gitIdentities, {
+    fields: [repositories.gitIdentityId],
+    references: [gitIdentities.id],
   }),
   workspaces: many(workspaces),
   sshKeys: many(sshKeys),
@@ -498,6 +529,10 @@ export type TabType = (typeof tabTypeEnum.enumValues)[number];
 export type SSHKey = typeof sshKeys.$inferSelect;
 export type NewSSHKey = typeof sshKeys.$inferInsert;
 export type SSHKeyType = (typeof sshKeyTypeEnum.enumValues)[number];
+
+// Git Identities
+export type GitIdentity = typeof gitIdentities.$inferSelect;
+export type NewGitIdentity = typeof gitIdentities.$inferInsert;
 
 // Tab Logs
 export type TabLog = typeof tabLogs.$inferSelect;

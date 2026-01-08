@@ -221,7 +221,16 @@ export class WorkspaceService {
   private async ensureRepoCloned(
     workspaceId: string,
     containerIp: string,
-    repo: { id: string; cloneUrl: string; cloneDepth: number | null; sshKeyId: string | null; techStack: string[] | null },
+    repo: {
+      id: string;
+      cloneUrl: string;
+      cloneDepth: number | null;
+      sshKeyId: string | null;
+      techStack: string[] | null;
+      gitIdentityId?: string | null;
+      gitCustomName?: string | null;
+      gitCustomEmail?: string | null;
+    },
     branchName: string,
     containerId: string,
   ): Promise<void> {
@@ -254,6 +263,9 @@ export class WorkspaceService {
       }
 
       // Clone repository
+      // Note: Git identity is now set by the agent when it connects,
+      // so we don't need to pass it during clone. The agent will send
+      // git:config with the correct identity after registration.
       await gitCloneInContainer(containerIp, {
         url: repo.cloneUrl,
         branch: branchName,

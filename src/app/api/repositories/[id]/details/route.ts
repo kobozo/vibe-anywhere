@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getRepositoryService, getSSHKeyService } from '@/lib/services';
 import { getGitHooksService } from '@/lib/services/git-hooks-service';
+import { getGitIdentityService } from '@/lib/services/git-identity-service';
 import { db } from '@/lib/db';
 import { proxmoxTemplates } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -77,6 +78,45 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
         ? [repository.defaultBranch]
         : ['main'];
 
+  // Get git identity info
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const repo = repository as any;
+  let gitIdentity: { name: string; gitName: string; gitEmail: string; isDefault: boolean } | null = null;
+
+  const gitIdentityService = getGitIdentityService();
+
+  if (repo.gitIdentityId) {
+    // Saved identity explicitly set on repository
+    const identity = await gitIdentityService.getIdentity(repo.gitIdentityId);
+    if (identity) {
+      gitIdentity = {
+        name: identity.name,
+        gitName: identity.gitName,
+        gitEmail: identity.gitEmail,
+        isDefault: identity.isDefault,
+      };
+    }
+  } else if (repo.gitCustomName || repo.gitCustomEmail) {
+    // Custom identity
+    gitIdentity = {
+      name: 'Custom',
+      gitName: repo.gitCustomName || '',
+      gitEmail: repo.gitCustomEmail || '',
+      isDefault: false,
+    };
+  } else {
+    // No explicit identity - fall back to user's default identity
+    const defaultIdentity = await gitIdentityService.getDefaultIdentity(repository.userId);
+    if (defaultIdentity) {
+      gitIdentity = {
+        name: defaultIdentity.name,
+        gitName: defaultIdentity.gitName,
+        gitEmail: defaultIdentity.gitEmail,
+        isDefault: true,
+      };
+    }
+  }
+
   return successResponse({
     repository,
     branches,
@@ -84,6 +124,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     template,
     hooks,
     remotes,
+    gitIdentity,
     lastCommit: null, // Commit info not available - would need to query from container
     stats: null, // Stats not available - would need to query from container
     branchesMeta: {

@@ -593,6 +593,9 @@ export interface GitCloneOptions {
   branch: string;
   depth?: number;      // undefined = full clone, positive int = shallow clone depth
   sshKeyContent?: string;
+  // Note: Git identity (user.name, user.email) is now set by the agent
+  // when it connects, not during clone. The agent sends git:config
+  // with the correct identity based on the repository configuration.
 }
 
 /**
@@ -684,8 +687,8 @@ SSHCONFIG
         git checkout ${branch} 2>/dev/null || git checkout -b ${branch}
 
         git config --global --add safe.directory '${remotePath}'
-        git config user.email 'claude@session-hub.local'
-        git config user.name 'Claude (Session Hub)'
+        # Note: Git identity (user.name, user.email) is set by the agent
+        # when it connects, not during clone
       "
 
       # Ensure proper ownership

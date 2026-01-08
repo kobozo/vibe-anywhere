@@ -30,7 +30,7 @@
 
 - [x] **Add shutdown functionality** - Add ability to shutdown/stop a workspace without destroying it.
 
-- [ ] **Close tabs on redeploy** - When redeploying a workspace, automatically close ALL tabs except dashboard.
+- [x] **Close tabs on redeploy/destroy** - When redeploying or destroying a workspace, automatically close ALL tabs except dashboard.
 
 - [ ] **Advanced workspace creation options** - Extend the "add workspace" modal with a tabbed approach. Include advanced options tab for overwrites: static IP, force VMID, override image template.
 

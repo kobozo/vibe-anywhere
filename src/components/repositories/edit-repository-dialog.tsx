@@ -4,8 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Repository, ProxmoxTemplate } from '@/lib/db/schema';
 import { EnvVarEditor, type EnvVar } from '@/components/env-vars/env-var-editor';
 import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
+import { useGitIdentities } from '@/hooks/useGitIdentities';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  GitIdentitySelector,
+  type GitIdentityValue,
+} from '@/components/git-identity/git-identity-selector';
 
-type RepoDialogTab = 'general' | 'environment' | 'resources';
+type RepoDialogTab = 'general' | 'environment' | 'resources' | 'git-identity';
 
 interface EditRepositoryDialogProps {
   isOpen: boolean;
@@ -20,6 +26,9 @@ interface EditRepositoryDialogProps {
     resourceMemory?: number | null;
     resourceCpuCores?: number | null;
     resourceDiskSize?: number | null;
+    gitIdentityId?: string | null;
+    gitCustomName?: string | null;
+    gitCustomEmail?: string | null;
   }) => Promise<void>;
   isLoading: boolean;
 }
@@ -32,6 +41,7 @@ export function EditRepositoryDialog({
   onSave,
   isLoading,
 }: EditRepositoryDialogProps) {
+  const { token } = useAuth();
   const { settings: proxmoxSettings, fetchSettings: fetchProxmoxSettings } = useProxmoxSettings();
   const [activeTab, setActiveTab] = useState<RepoDialogTab>('general');
   const [name, setName] = useState('');
@@ -51,11 +61,22 @@ export function EditRepositoryDialog({
   const [envVarsLoading, setEnvVarsLoading] = useState(false);
   const [envVarsModified, setEnvVarsModified] = useState(false);
 
+  // Git identity state
+  const { identities, isLoading: identitiesLoading, fetchIdentities } = useGitIdentities();
+  const [gitIdentity, setGitIdentity] = useState<GitIdentityValue>({
+    mode: 'saved',
+  });
+  const [gitIdentityModified, setGitIdentityModified] = useState(false);
+
   // Load environment variables
   const loadEnvVars = useCallback(async (repoId: string) => {
     setEnvVarsLoading(true);
     try {
-      const response = await fetch(`/api/repositories/${repoId}/env-vars`);
+      const response = await fetch(`/api/repositories/${repoId}/env-vars`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setEnvVars(data.envVars || []);
@@ -66,7 +87,7 @@ export function EditRepositoryDialog({
     } finally {
       setEnvVarsLoading(false);
     }
-  }, []);
+  }, [token]);
 
   // Reset form when dialog opens/closes or repository changes
   useEffect(() => {
@@ -86,13 +107,39 @@ export function EditRepositoryDialog({
       setEnvVarsModified(false);
       loadEnvVars(repository.id);
       fetchProxmoxSettings();
+      fetchIdentities();
+
+      // Initialize git identity state from repository
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const repo = repository as any;
+      if (repo.gitIdentityId) {
+        setGitIdentity({
+          mode: 'saved',
+          identityId: repo.gitIdentityId,
+        });
+      } else if (repo.gitCustomName || repo.gitCustomEmail) {
+        setGitIdentity({
+          mode: 'custom',
+          customName: repo.gitCustomName || '',
+          customEmail: repo.gitCustomEmail || '',
+        });
+      } else {
+        setGitIdentity({ mode: 'saved' });
+      }
+      setGitIdentityModified(false);
     }
-  }, [isOpen, repository, loadEnvVars, fetchProxmoxSettings]);
+  }, [isOpen, repository, loadEnvVars, fetchProxmoxSettings, fetchIdentities]);
 
   // Track env vars modifications
   const handleEnvVarsChange = useCallback((newEnvVars: EnvVar[]) => {
     setEnvVars(newEnvVars);
     setEnvVarsModified(true);
+  }, []);
+
+  // Track git identity modifications
+  const handleGitIdentityChange = useCallback((value: GitIdentityValue) => {
+    setGitIdentity(value);
+    setGitIdentityModified(true);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,6 +157,31 @@ export function EditRepositoryDialog({
       const cpuValue = resourceCpuCores ? parseInt(resourceCpuCores, 10) : null;
       const diskValue = resourceDiskSize ? parseInt(resourceDiskSize, 10) : null;
 
+      // Build git identity values if modified
+      let gitIdentityUpdates = {};
+      if (gitIdentityModified) {
+        if (gitIdentity.mode === 'saved' && gitIdentity.identityId) {
+          gitIdentityUpdates = {
+            gitIdentityId: gitIdentity.identityId,
+            gitCustomName: null,
+            gitCustomEmail: null,
+          };
+        } else if (gitIdentity.mode === 'custom') {
+          gitIdentityUpdates = {
+            gitIdentityId: null,
+            gitCustomName: gitIdentity.customName?.trim() || null,
+            gitCustomEmail: gitIdentity.customEmail?.trim() || null,
+          };
+        } else {
+          // 'saved' mode with no explicit selection - use default
+          gitIdentityUpdates = {
+            gitIdentityId: null,
+            gitCustomName: null,
+            gitCustomEmail: null,
+          };
+        }
+      }
+
       await onSave({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -122,6 +194,8 @@ export function EditRepositoryDialog({
           resourceCpuCores: cpuValue,
           resourceDiskSize: diskValue,
         } : {}),
+        // Only include git identity if it was modified
+        ...gitIdentityUpdates,
       });
       onClose();
     } catch (err) {
@@ -182,6 +256,21 @@ export function EditRepositoryDialog({
             {envVars.length > 0 && (
               <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-background-tertiary rounded">
                 {envVars.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('git-identity')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'git-identity'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
+          >
+            Git Identity
+            {(gitIdentity.mode === 'custom' || gitIdentity.identityId) && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded">
+                Custom
               </span>
             )}
           </button>
@@ -397,6 +486,33 @@ export function EditRepositoryDialog({
                     inheritedVars={inheritedEnvVars}
                   />
                 )}
+              </div>
+            )}
+
+            {/* Git Identity Tab */}
+            {activeTab === 'git-identity' && (
+              <div className="space-y-4">
+                <p className="text-sm text-foreground-secondary">
+                  Configure the git identity used for commits in workspaces created from this repository.
+                </p>
+
+                {identitiesLoading ? (
+                  <div className="text-foreground-tertiary text-sm py-4 text-center">
+                    Loading git identities...
+                  </div>
+                ) : (
+                  <GitIdentitySelector
+                    value={gitIdentity}
+                    onChange={handleGitIdentityChange}
+                    identities={identities}
+                    disabled={isLoading}
+                    onIdentityCreated={() => fetchIdentities()}
+                  />
+                )}
+
+                <p className="text-xs text-foreground-tertiary mt-4">
+                  Git identity changes apply to newly created workspaces. Existing workspaces retain their original configuration.
+                </p>
               </div>
             )}
 

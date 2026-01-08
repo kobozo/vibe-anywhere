@@ -271,4 +271,43 @@ export class GitHandler {
       return false;
     }
   }
+
+  /**
+   * Set git config for user.name and user.email
+   * This is used to configure the git identity for commits in this workspace
+   */
+  async setConfig(name: string, email: string): Promise<{ name: string; email: string }> {
+    // First, unset any global config to avoid confusion in git config --list
+    // The template may have set global defaults that we want to override
+    try {
+      await this.git.raw(['config', '--global', '--unset', 'user.name']);
+    } catch { /* ignore if not set */ }
+    try {
+      await this.git.raw(['config', '--global', '--unset', 'user.email']);
+    } catch { /* ignore if not set */ }
+
+    // Set local config (repository-specific)
+    await this.git.raw(['config', 'user.name', name]);
+    await this.git.raw(['config', 'user.email', email]);
+
+    console.log(`Git config set: ${name} <${email}>`);
+
+    return { name, email };
+  }
+
+  /**
+   * Get current git config for user.name and user.email
+   */
+  async getConfig(): Promise<{ name: string | null; email: string | null }> {
+    try {
+      const name = await this.git.getConfig('user.name', 'local');
+      const email = await this.git.getConfig('user.email', 'local');
+      return {
+        name: name.value || null,
+        email: email.value || null,
+      };
+    } catch {
+      return { name: null, email: null };
+    }
+  }
 }

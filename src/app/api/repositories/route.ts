@@ -26,6 +26,10 @@ const createRepoSchema = z.object({
   resourceMemory: z.number().int().min(512).max(65536).nullable().optional(), // MB
   resourceCpuCores: z.number().int().min(1).max(32).nullable().optional(),
   resourceDiskSize: z.number().int().min(4).max(500).nullable().optional(), // GB
+  // Git identity (either use a saved identity or custom values)
+  gitIdentityId: z.string().uuid().nullable().optional(), // FK to gitIdentities
+  gitCustomName: z.string().max(200).nullable().optional(), // Custom git user.name
+  gitCustomEmail: z.string().max(200).email().nullable().optional(), // Custom git user.email
 });
 
 /**
@@ -66,6 +70,9 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     resourceMemory: result.data.resourceMemory,
     resourceCpuCores: result.data.resourceCpuCores,
     resourceDiskSize: result.data.resourceDiskSize,
+    gitIdentityId: result.data.gitIdentityId,
+    gitCustomName: result.data.gitCustomName,
+    gitCustomEmail: result.data.gitCustomEmail,
   });
 
   return successResponse({ repository }, 201);

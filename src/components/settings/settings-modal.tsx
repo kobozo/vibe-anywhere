@@ -6,6 +6,7 @@ import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
 import { ProxmoxSettings } from './proxmox-settings';
 import { VoiceSettings } from './voice-settings';
 import { ThemeSettings } from './theme-settings';
+import { GitIdentityList } from '@/components/git-identity/git-identity-list';
 import { getTemplateIcon } from '@/components/icons/ai-icons';
 import { MATERIAL_ICONS, getMaterialIcon } from '@/components/icons/material-icons';
 import { getStacksByCategory, type TechStack } from '@/lib/container/proxmox/tech-stacks';
@@ -16,7 +17,7 @@ interface SettingsModalProps {
   onVoiceSettingsChange?: () => void;
 }
 
-type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'proxmox' | 'voice';
+type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'git-identities' | 'proxmox' | 'voice';
 
 // Get AI assistant tech stacks for the dropdown
 const AI_TECH_STACKS: TechStack[] = getStacksByCategory('ai-assistant');
@@ -164,6 +165,15 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                 : 'text-foreground-secondary hover:text-foreground'}`}
           >
             SSH Keys
+          </button>
+          <button
+            onClick={() => setActiveTab('git-identities')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'git-identities'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
+          >
+            Git Identities
           </button>
           <button
             onClick={() => setActiveTab('proxmox')}
@@ -472,6 +482,11 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                 </div>
               )}
             </div>
+          )}
+
+          {/* Git Identities */}
+          {activeTab === 'git-identities' && (
+            <GitIdentityList />
           )}
 
           {/* Proxmox */}
