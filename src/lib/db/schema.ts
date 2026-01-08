@@ -124,6 +124,7 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
   parentTemplateId: uuid('parent_template_id'), // Self-reference for template inheritance
+  baseCtTemplate: text('base_ct_template'), // CT template used as base (e.g., 'debian-12-standard', 'ubuntu-22.04-standard')
   name: text('name').notNull(),
   description: text('description'),
   vmid: integer('vmid').unique(), // Actual Proxmox VMID (null until created)
@@ -196,6 +197,11 @@ export const workspaces = pgTable('workspaces', {
   agentConnectedAt: timestamp('agent_connected_at', { withTimezone: true }), // When agent connected
   agentLastHeartbeat: timestamp('agent_last_heartbeat', { withTimezone: true }), // Last heartbeat
   agentVersion: text('agent_version'), // Agent version string
+  // Advanced creation options (nullable = use defaults)
+  staticIpAddress: text('static_ip_address'), // CIDR format: 192.168.3.50/24
+  staticIpGateway: text('static_ip_gateway'), // Gateway IP: 192.168.3.1
+  forcedVmid: integer('forced_vmid'), // Force specific VMID instead of auto-allocation
+  overrideTemplateId: uuid('override_template_id').references(() => proxmoxTemplates.id), // Override repository template
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).defaultNow().notNull(),
@@ -428,6 +434,16 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   repository: one(repositories, {
     fields: [workspaces.repositoryId],
     references: [repositories.id],
+  }),
+  template: one(proxmoxTemplates, {
+    fields: [workspaces.templateId],
+    references: [proxmoxTemplates.id],
+    relationName: 'workspaceTemplate',
+  }),
+  overrideTemplate: one(proxmoxTemplates, {
+    fields: [workspaces.overrideTemplateId],
+    references: [proxmoxTemplates.id],
+    relationName: 'workspaceOverrideTemplate',
   }),
   tabs: many(tabs),
   portForwards: many(portForwards),

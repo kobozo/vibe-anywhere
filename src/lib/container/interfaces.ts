@@ -17,6 +17,9 @@ export interface ContainerConfig {
   cpuLimit?: number;           // CPU cores
   diskSize?: number;           // Disk size in GB (Proxmox only)
   reuseVmid?: number;          // Reuse this VMID when recreating (Proxmox only)
+  // Static IP configuration (Proxmox only)
+  staticIp?: string;           // CIDR notation: 192.168.3.50/24
+  gateway?: string;            // Gateway IP: 192.168.3.1
 }
 
 /**

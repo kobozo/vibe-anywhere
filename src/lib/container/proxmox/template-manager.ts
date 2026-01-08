@@ -324,9 +324,33 @@ export class ProxmoxTemplateManager {
    * Ensure OS appliance template exists in storage
    * Note: OS templates (vztmpl) must be stored on 'local' or similar storage
    * that supports the 'vztmpl' content type. LVM storage doesn't support templates.
+   * @param baseCtTemplate - Can be either:
+   *   - Full volid: 'local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst'
+   *   - Simple name: 'debian-12-standard' (will look up/download)
    */
-  async ensureOsTemplate(): Promise<string> {
-    const templateName = DEFAULT_OS_TEMPLATE;
+  async ensureOsTemplate(baseCtTemplate?: string): Promise<string> {
+    const templateInput = baseCtTemplate || DEFAULT_OS_TEMPLATE;
+
+    // If it's a full volid (contains ':'), verify it exists and return it directly
+    if (templateInput.includes(':')) {
+      // Extract storage and verify the template exists
+      const [storageId] = templateInput.split(':');
+
+      // List templates from this storage to verify it exists
+      const storedTemplates = await this.client.listStoredCtTemplates();
+      const found = storedTemplates.find(t => t.volid === templateInput);
+
+      if (found) {
+        console.log(`Using CT template: ${templateInput}`);
+        return templateInput;
+      }
+
+      // Template specified but not found - this is an error
+      throw new Error(`CT template '${templateInput}' not found in storage '${storageId}'`);
+    }
+
+    // Simple name provided - use legacy lookup logic
+    const templateName = templateInput;
     // OS templates (vztmpl) are always stored on 'local' storage
     // This is separate from the container rootfs storage
     const templateStorageId = 'local';
@@ -340,16 +364,16 @@ export class ProxmoxTemplateManager {
 
     // Find the exact template name from available appliances
     const appliances = await this.client.listAppliances();
-    const debianTemplate = appliances.find(a =>
+    const osTemplate = appliances.find(a =>
       a.template.includes(templateName) || a.package.includes(templateName)
     );
 
-    if (!debianTemplate) {
-      throw new Error(`No Debian template found. Available: ${appliances.map(a => a.template).join(', ')}`);
+    if (!osTemplate) {
+      throw new Error(`CT template '${templateName}' not found. Available: ${appliances.map(a => a.template).join(', ')}`);
     }
 
-    console.log(`Downloading OS template: ${debianTemplate.template}`);
-    const upid = await this.client.downloadAppliance(debianTemplate.template, templateStorageId);
+    console.log(`Downloading OS template: ${osTemplate.template}`);
+    const upid = await this.client.downloadAppliance(osTemplate.template, templateStorageId);
     await pollTaskUntilComplete(this.client, upid, {
       timeoutMs: 300000, // 5 minutes for download
       onProgress: (status) => console.log(`Download: ${status}`),
@@ -368,6 +392,7 @@ export class ProxmoxTemplateManager {
    * Create a new template with SSH keys pre-configured
    * @param stopAtStaging - If true, keeps container running for manual customization
    * @param parentVmid - If provided, clone from this parent template instead of base OS
+   * @param baseCtTemplate - CT template to use as base (e.g., 'debian-12-standard')
    * @returns Container IP if staging mode, otherwise void
    */
   async createTemplate(
@@ -379,11 +404,12 @@ export class ProxmoxTemplateManager {
       techStacks?: string[];
       stopAtStaging?: boolean;
       parentVmid?: number; // Clone from parent template instead of base OS
+      baseCtTemplate?: string; // CT template to use as base (e.g., 'debian-12-standard', 'ubuntu-22.04-standard')
       onProgress?: ProgressCallback;
       onLog?: LogCallback;
     } = {}
   ): Promise<{ containerIp?: string }> {
-    const { name, storage, onProgress, techStacks = [], parentVmid } = options;
+    const { name, storage, onProgress, techStacks = [], parentVmid, baseCtTemplate } = options;
     const settingsService = getSettingsService();
 
     // Get settings from database
@@ -440,8 +466,8 @@ export class ProxmoxTemplateManager {
       }
 
       // Step 2: Ensure OS template exists (always on 'local' storage)
-      progress('os-template', 10, 'Checking OS template...');
-      const osTemplate = await this.ensureOsTemplate();
+      progress('os-template', 10, `Checking CT template: ${baseCtTemplate || DEFAULT_OS_TEMPLATE}...`);
+      const osTemplate = await this.ensureOsTemplate(baseCtTemplate);
       progress('os-template', 15, `Using OS template: ${osTemplate}`);
 
       // Step 3: Create container with SSH keys

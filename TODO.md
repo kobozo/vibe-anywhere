@@ -32,7 +32,9 @@
 
 - [x] **Close tabs on redeploy/destroy** - When redeploying or destroying a workspace, automatically close ALL tabs except dashboard.
 
-- [ ] **Advanced workspace creation options** - Extend the "add workspace" modal with a tabbed approach. Include advanced options tab for overwrites: static IP, force VMID, override image template.
+- [x] **Advanced workspace creation options** - Extend the "add workspace" modal with a tabbed approach. Include advanced options tab for overwrites: static IP, force VMID, override image template.
+
+- [ ] **Proxmox container tags** - Add tags to templates and workspace containers in Proxmox for grouping. Include: repository name, tech stack items as individual tags. Branch name not needed.
 
 ## Tab System
 
@@ -43,6 +45,8 @@
 - [ ] **Terminal right-click context menu** - Add right-click context menu in terminal with split pane options. Include submenu for split direction (right, left, top, bottom) with choice to add an existing tab/group or start a new template tab.
 
 - [ ] **AI-assisted terminal input** - Add shortcut/button/context menu option that opens an input modal. User types what they want to do, AI proposes a CLI command. Options: Accept (inputs command and presses enter), Correct (sends feedback in same chat session for refinement), Decline (closes modal).
+
+- [ ] **Terminal color customization** - Current theme overwrites terminal colors set by apps. Extend the theme with dedicated terminal color settings, or allow terminals to use their own color schemes independently.
 
 ## Sidebar
 

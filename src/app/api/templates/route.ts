@@ -17,7 +17,8 @@ const createTemplateSchema = z.object({
   description: z.string().max(500).optional(),
   techStacks: z.array(z.enum(validTechStackIds)).optional().default([]),
   isDefault: z.boolean().optional().default(false),
-  parentTemplateId: z.string().uuid().optional(), // Clone from this parent template
+  parentTemplateId: z.string().uuid().optional(), // Clone from this parent template (Session Hub template)
+  baseCtTemplate: z.string().max(100).optional(), // CT template to use as base (e.g., 'debian-12-standard')
 });
 
 /**
@@ -51,6 +52,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     techStacks: result.data.techStacks,
     isDefault: result.data.isDefault,
     parentTemplateId: result.data.parentTemplateId,
+    baseCtTemplate: result.data.baseCtTemplate,
   });
 
   return successResponse({ template }, 201);

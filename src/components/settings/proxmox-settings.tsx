@@ -294,6 +294,13 @@ export function ProxmoxSettings() {
   const [vmidError, setVmidError] = useState<string | null>(null);
   const [vmidSaving, setVmidSaving] = useState(false);
 
+  // CT Templates state (for default template selection)
+  const [ctTemplates, setCtTemplates] = useState<Array<{ id: string; volid: string; name: string; os: string }>>([]);
+  const [ctTemplatesLoading, setCtTemplatesLoading] = useState(false);
+  const [ctTemplatesError, setCtTemplatesError] = useState<string | null>(null);
+  const [defaultCtTemplate, setDefaultCtTemplate] = useState<string>('');
+  const [ctTemplateSaving, setCtTemplateSaving] = useState(false);
+
   const fetchVmidConfig = async () => {
     if (!token) return;
     try {
@@ -308,6 +315,49 @@ export function ProxmoxSettings() {
     } catch {
       // Silently fail - VMID config is optional
     }
+  };
+
+  const fetchCtTemplates = async () => {
+    if (!token) return;
+    setCtTemplatesLoading(true);
+    setCtTemplatesError(null);
+    try {
+      const res = await fetch('/api/proxmox/ct-templates', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCtTemplates(data.data || []);
+      } else {
+        setCtTemplatesError(data.error || `Failed to fetch (${res.status})`);
+      }
+    } catch (err) {
+      setCtTemplatesError(err instanceof Error ? err.message : 'Failed to fetch CT templates');
+    }
+    setCtTemplatesLoading(false);
+  };
+
+  const saveDefaultCtTemplate = async (templateId: string) => {
+    if (!token) return;
+    setCtTemplateSaving(true);
+    try {
+      await fetch('/api/proxmox/settings', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          templates: { defaultCtTemplate: templateId || null },
+        }),
+      });
+      setDefaultCtTemplate(templateId);
+      // Refresh settings to confirm
+      await fetchSettings();
+    } catch {
+      // Silently fail
+    }
+    setCtTemplateSaving(false);
   };
 
   const handleVmidSave = async () => {
@@ -344,7 +394,15 @@ export function ProxmoxSettings() {
   useEffect(() => {
     fetchSettings();
     fetchVmidConfig();
+    fetchCtTemplates();
   }, [fetchSettings, token]);
+
+  // Sync default CT template from settings
+  useEffect(() => {
+    if (settings?.templates?.defaultCtTemplate) {
+      setDefaultCtTemplate(settings.templates.defaultCtTemplate);
+    }
+  }, [settings]);
 
   if (error) {
     return (
@@ -415,6 +473,52 @@ export function ProxmoxSettings() {
           onSave={saveResourceSettings}
           isLoading={isLoading}
         />
+      </Section>
+
+      {/* Templates Section */}
+      <Section title="Templates">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-foreground-secondary mb-1">
+              Default CT Template
+            </label>
+            {ctTemplatesLoading ? (
+              <div className="text-sm text-foreground-tertiary">Loading CT templates...</div>
+            ) : ctTemplatesError ? (
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-error">{ctTemplatesError}</div>
+                <button
+                  onClick={fetchCtTemplates}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : ctTemplates.length === 0 ? (
+              <div className="text-sm text-foreground-tertiary">
+                No CT templates available. Configure Proxmox connection first.
+              </div>
+            ) : (
+              <select
+                value={defaultCtTemplate}
+                onChange={(e) => saveDefaultCtTemplate(e.target.value)}
+                disabled={ctTemplateSaving || isLoading}
+                className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground disabled:opacity-50"
+              >
+                <option value="">Select default (uses first available)</option>
+                {ctTemplates.map((ct) => (
+                  <option key={ct.volid} value={ct.volid}>
+                    {ct.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="text-xs text-foreground-tertiary mt-1">
+              The default OS template used when creating new templates.
+              Only apt-based templates (Debian, Ubuntu) are supported.
+            </p>
+          </div>
+        </div>
       </Section>
 
       {/* VMID Configuration Section */}

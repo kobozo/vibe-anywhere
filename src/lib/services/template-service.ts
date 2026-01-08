@@ -21,7 +21,8 @@ export interface CreateTemplateInput {
   description?: string;
   techStacks?: string[];
   isDefault?: boolean;
-  parentTemplateId?: string; // Clone from this template
+  parentTemplateId?: string; // Clone from this template (Session Hub template)
+  baseCtTemplate?: string;   // CT template to use as base (e.g., 'debian-12-standard')
 }
 
 export interface UpdateTemplateInput {
@@ -161,11 +162,21 @@ export class TemplateService {
     const existingTemplates = await this.listTemplates(userId);
     const isFirstTemplate = existingTemplates.length === 0;
 
+    // Determine base CT template:
+    // - If cloning from parent template, inherit parent's baseCtTemplate
+    // - If creating from scratch, use provided baseCtTemplate or default to 'debian-12-standard'
+    let baseCtTemplate = input.baseCtTemplate || null;
+    if (input.parentTemplateId && !baseCtTemplate) {
+      const parent = await this.getTemplate(input.parentTemplateId);
+      baseCtTemplate = parent?.baseCtTemplate || null;
+    }
+
     const [template] = await db
       .insert(proxmoxTemplates)
       .values({
         userId,
         parentTemplateId: input.parentTemplateId || null,
+        baseCtTemplate,
         name: input.name,
         description: input.description || null,
         techStacks: newTechStacks,

@@ -13,6 +13,7 @@ import { EditRepositoryDialog } from '@/components/repositories/edit-repository-
 import { CreateWorkspaceDialog } from '@/components/workspaces/create-workspace-dialog';
 import { TabBar, TabBarRef } from '@/components/tabs/tab-bar';
 import { useOpenAISettings } from '@/hooks/useOpenAISettings';
+import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
 import { useSocket } from '@/hooks/useSocket';
 import { useUIState } from '@/hooks/useUIState';
 import { LoginForm } from '@/components/auth/login-form';
@@ -66,6 +67,23 @@ function Dashboard() {
     isTemplateProvisioning,
     provisionLogs,
   } = useTemplates();
+
+  // Proxmox settings (for default CT template)
+  const { settings: proxmoxSettings, fetchSettings: fetchProxmoxSettings } = useProxmoxSettings();
+
+  // Fetch Proxmox settings on mount and when template dialog opens
+  useEffect(() => {
+    if (user) {
+      fetchProxmoxSettings();
+    }
+  }, [user, fetchProxmoxSettings]);
+
+  // Re-fetch Proxmox settings when template dialog opens (to get latest default CT template)
+  useEffect(() => {
+    if (isTemplateDialogOpen && user) {
+      fetchProxmoxSettings();
+    }
+  }, [isTemplateDialogOpen, user, fetchProxmoxSettings]);
 
   // Fetch repositories on mount
   useEffect(() => {
@@ -547,7 +565,15 @@ function Dashboard() {
     setIsAddWorkspaceOpen(true);
   }, []);
 
-  const handleCreateWorkspace = useCallback(async (name: string, branchName: string, baseBranch?: string) => {
+  const handleCreateWorkspace = useCallback(async (options: {
+    name: string;
+    branchName: string;
+    baseBranch?: string;
+    staticIpAddress?: string;
+    staticIpGateway?: string;
+    forcedVmid?: number;
+    overrideTemplateId?: string;
+  }) => {
     if (!workspaceRepoId) return;
 
     setActionLoading(true);
@@ -558,7 +584,7 @@ function Dashboard() {
           Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, branchName, baseBranch }),
+        body: JSON.stringify(options),
       });
 
       if (!response.ok) {
@@ -677,6 +703,7 @@ function Dashboard() {
     isDefault?: boolean;
     staging?: boolean;
     parentTemplateId?: string;
+    baseCtTemplate?: string;
   }) => {
     setIsTemplateDialogLoading(true);
     try {
@@ -1156,6 +1183,7 @@ function Dashboard() {
         isOpen={isAddWorkspaceOpen}
         repositoryId={workspaceRepoId}
         initialBranch={preselectedBranch}
+        templates={templates}
         onClose={() => {
           setIsAddWorkspaceOpen(false);
           setWorkspaceRepoId(null);
@@ -1196,6 +1224,7 @@ function Dashboard() {
         template={editingTemplate}
         parentTemplate={cloningTemplate}
         templates={templates}
+        defaultCtTemplate={proxmoxSettings?.templates?.defaultCtTemplate}
         onSave={async (input) => {
           if (editingTemplate) {
             await handleUpdateTemplate(editingTemplate.id, input);

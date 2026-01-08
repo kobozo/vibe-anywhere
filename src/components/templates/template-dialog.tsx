@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ProxmoxTemplate } from '@/lib/db/schema';
+import { useAuth } from '@/hooks/useAuth';
 import {
   TECH_STACKS,
   getStacksByCategory,
@@ -10,12 +11,30 @@ import {
   type TechStackCategory,
 } from '@/lib/container/proxmox/tech-stacks';
 
+// CT Template type from API
+interface CtTemplate {
+  id: string;
+  volid: string;   // Full volume ID for container creation
+  name: string;
+  os: string;
+  version: string;
+  storage: string;
+  node: string;
+}
+
+// Selection can be a CT template or Session Hub template
+type BaseSelection =
+  | { type: 'ct'; id: string; volid: string; name: string }
+  | { type: 'template'; id: string; template: ProxmoxTemplate }
+  | null;
+
 interface TemplateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   template?: ProxmoxTemplate | null; // If provided, edit mode
   parentTemplate?: ProxmoxTemplate | null; // If provided, clone mode (create based on this template)
   templates?: ProxmoxTemplate[]; // All templates (for "Based on" dropdown)
+  defaultCtTemplate?: string; // Default CT template from settings
   onSave: (data: {
     name: string;
     description?: string;
@@ -23,6 +42,7 @@ interface TemplateDialogProps {
     isDefault?: boolean;
     staging?: boolean;
     parentTemplateId?: string;
+    baseCtTemplate?: string;
   }) => Promise<void>;
   isLoading: boolean;
 }
@@ -33,9 +53,11 @@ export function TemplateDialog({
   template,
   parentTemplate,
   templates = [],
+  defaultCtTemplate,
   onSave,
   isLoading,
 }: TemplateDialogProps) {
+  const { token } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [techStacks, setTechStacks] = useState<string[]>([]);
@@ -44,13 +66,45 @@ export function TemplateDialog({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TechStackCategory>('runtime');
   const [hoveredLock, setHoveredLock] = useState<string | null>(null);
-  const [selectedParentId, setSelectedParentId] = useState<string>(''); // User-selected parent from dropdown
+
+  // CT Templates state
+  const [ctTemplates, setCtTemplates] = useState<CtTemplate[]>([]);
+  const [ctTemplatesLoading, setCtTemplatesLoading] = useState(false);
+  const [ctTemplatesError, setCtTemplatesError] = useState<string | null>(null);
+
+  // Selected base (either CT template or Session Hub template)
+  const [selectedBaseValue, setSelectedBaseValue] = useState<string>('');
 
   const isEditMode = !!template;
   const isCloneMode = !!parentTemplate && !template; // Clone mode = parent provided (from Clone button)
   const isProvisioned = template?.status === 'ready' || template?.status === 'provisioning' || template?.status === 'staging';
 
-  // Get available templates for "Based on" dropdown (only ready templates, excluding current if editing)
+  // Fetch CT templates when dialog opens
+  useEffect(() => {
+    if (isOpen && !isEditMode && !isCloneMode && token) {
+      setCtTemplatesLoading(true);
+      setCtTemplatesError(null);
+      fetch('/api/proxmox/ct-templates', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            setCtTemplatesError(data.error);
+          } else {
+            setCtTemplates(data.data || []);
+          }
+        })
+        .catch(err => {
+          setCtTemplatesError(err.message || 'Failed to fetch CT templates');
+        })
+        .finally(() => {
+          setCtTemplatesLoading(false);
+        });
+    }
+  }, [isOpen, isEditMode, isCloneMode, token]);
+
+  // Get available Session Hub templates for dropdown (only ready templates, excluding current if editing)
   const availableParentTemplates = useMemo(() => {
     return templates.filter(t =>
       t.status === 'ready' &&
@@ -58,14 +112,33 @@ export function TemplateDialog({
     );
   }, [templates, template?.id]);
 
-  // Effective parent: either forced (from Clone button) or user-selected from dropdown
+  // Parse selected base value into structured selection
+  const selectedBase = useMemo((): BaseSelection => {
+    if (!selectedBaseValue) return null;
+
+    if (selectedBaseValue.startsWith('ct:')) {
+      const ctVolid = selectedBaseValue.slice(3);
+      const ct = ctTemplates.find(t => t.volid === ctVolid);
+      return ct ? { type: 'ct', id: ct.id, volid: ct.volid, name: ct.name } : null;
+    }
+
+    if (selectedBaseValue.startsWith('tpl:')) {
+      const tplId = selectedBaseValue.slice(4);
+      const tpl = templates.find(t => t.id === tplId);
+      return tpl ? { type: 'template', id: tplId, template: tpl } : null;
+    }
+
+    return null;
+  }, [selectedBaseValue, ctTemplates, templates]);
+
+  // Effective parent: either forced (from Clone button) or user-selected Session Hub template
   const effectiveParent = useMemo(() => {
     if (parentTemplate) return parentTemplate; // Forced clone mode
-    if (selectedParentId) {
-      return templates.find(t => t.id === selectedParentId) || null;
+    if (selectedBase?.type === 'template') {
+      return selectedBase.template;
     }
     return null;
-  }, [parentTemplate, selectedParentId, templates]);
+  }, [parentTemplate, selectedBase]);
 
   // Get inherited stacks from effective parent
   const inheritedStacks = useMemo(() => {
@@ -81,63 +154,92 @@ export function TemplateDialog({
   const aiStacks = useMemo(() => getStacksByCategory('ai-assistant'), []);
 
   // Check if a stack is locked (has dependents that are selected)
-  const getLockedDependents = (stackId: string): string[] => {
+  const getLockedDependents = useCallback((stackId: string): string[] => {
     return getSelectedDependentNames(stackId, techStacks);
-  };
+  }, [techStacks]);
 
-  const isStackLocked = (stackId: string): boolean => {
+  const isStackLocked = useCallback((stackId: string): boolean => {
     return getLockedDependents(stackId).length > 0;
-  };
+  }, [getLockedDependents]);
 
-  // Reset form when dialog opens/closes or template changes
+  // Track if dialog was just opened (to avoid resetting form on every defaultCtTemplate change)
+  const [dialogJustOpened, setDialogJustOpened] = useState(false);
+
+  // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
+      setDialogJustOpened(true);
       if (template) {
         // Edit mode
         setName(template.name);
         setDescription(template.description || '');
         setTechStacks(template.techStacks || []);
         setIsDefault(template.isDefault);
-        setEnableStaging(false); // Don't enable staging for existing templates
-        setSelectedParentId(''); // Clear parent selection
+        setEnableStaging(false);
+        setSelectedBaseValue('');
       } else if (parentTemplate) {
         // Clone mode (from Clone button) - pre-fill based on parent
         setName(`${parentTemplate.name} (Clone)`);
         setDescription(parentTemplate.description || '');
-        setTechStacks([]); // Start with no additional stacks (inherited shown separately)
+        setTechStacks([]);
         setIsDefault(false);
         setEnableStaging(false);
-        setSelectedParentId(''); // Parent is forced, not selected
+        setSelectedBaseValue('');
       } else {
         // Create new mode
         setName('');
         setDescription('');
-        setTechStacks(['nodejs']); // Default to Node.js
+        setTechStacks(['nodejs']);
         setIsDefault(false);
         setEnableStaging(false);
-        setSelectedParentId(''); // No parent selected by default
+        setSelectedBaseValue(''); // Will be set by the next effect when CT templates/default loads
       }
       setError(null);
       setActiveTab('runtime');
+    } else {
+      setDialogJustOpened(false);
     }
   }, [isOpen, template, parentTemplate]);
 
+  // Set default CT template selection when available (separate from form reset)
+  useEffect(() => {
+    // Only run in create mode when we need to set a default
+    if (!isOpen || isEditMode || isCloneMode) return;
+    // Only set if no selection yet (avoid overwriting user's choice)
+    if (selectedBaseValue && !dialogJustOpened) return;
+
+    // Try to use the default CT template from settings
+    if (defaultCtTemplate) {
+      // Find matching CT template by volid or id
+      const defaultCt = ctTemplates.find(t => t.volid === defaultCtTemplate || t.id === defaultCtTemplate);
+      if (defaultCt) {
+        setSelectedBaseValue(`ct:${defaultCt.volid}`);
+        setDialogJustOpened(false);
+        return;
+      }
+    }
+
+    // Fallback: use first available CT template if we have them loaded
+    if (ctTemplates.length > 0) {
+      const fallbackCt = ctTemplates.find(t => t.id === 'debian-12-standard') || ctTemplates[0];
+      if (fallbackCt) {
+        setSelectedBaseValue(`ct:${fallbackCt.volid}`);
+        setDialogJustOpened(false);
+      }
+    }
+  }, [isOpen, isEditMode, isCloneMode, ctTemplates, defaultCtTemplate, selectedBaseValue, dialogJustOpened]);
+
   const handleTechStackToggle = (stackId: string) => {
-    if (isProvisioned) return; // Can't change tech stacks after provisioning
-    if (inheritedStacks.includes(stackId)) return; // Can't toggle inherited stacks
+    if (isProvisioned) return;
+    if (inheritedStacks.includes(stackId)) return;
 
     const stack = getTechStack(stackId);
     if (!stack) return;
 
     if (techStacks.includes(stackId)) {
-      // REMOVING - check if anything depends on it
-      if (isStackLocked(stackId)) {
-        // Can't remove - it has dependents
-        return;
-      }
+      if (isStackLocked(stackId)) return;
       setTechStacks((prev) => prev.filter((id) => id !== stackId));
     } else {
-      // ADDING - auto-add dependencies (but exclude inherited ones)
       const deps = (stack.dependencies || []).filter(
         (dep) => !inheritedStacks.includes(dep)
       );
@@ -145,18 +247,19 @@ export function TemplateDialog({
     }
   };
 
-  // When parent selection changes, filter out tech stacks that are now inherited
-  const handleParentChange = (newParentId: string) => {
-    setSelectedParentId(newParentId);
+  // When base selection changes, filter out tech stacks that are now inherited
+  const handleBaseChange = (newValue: string) => {
+    setSelectedBaseValue(newValue);
 
-    if (newParentId) {
-      const parent = templates.find(t => t.id === newParentId);
+    // If selecting a Session Hub template, filter out inherited stacks
+    if (newValue.startsWith('tpl:')) {
+      const tplId = newValue.slice(4);
+      const parent = templates.find(t => t.id === tplId);
       if (parent) {
         const parentStacks = [
           ...(parent.inheritedTechStacks || []),
           ...(parent.techStacks || []),
         ];
-        // Remove any selected stacks that are now inherited
         setTechStacks(prev => prev.filter(s => !parentStacks.includes(s)));
       }
     }
@@ -171,15 +274,32 @@ export function TemplateDialog({
       return;
     }
 
+    // Require base selection for new templates (not in clone mode)
+    if (!isEditMode && !isCloneMode && !selectedBase) {
+      setError('Please select a base (CT template or Session Hub template)');
+      return;
+    }
+
     try {
-      await onSave({
+      const saveData: Parameters<typeof onSave>[0] = {
         name: name.trim(),
         description: description.trim() || undefined,
-        techStacks: isProvisioned ? undefined : techStacks, // Don't send tech stacks if editing provisioned template
+        techStacks: isProvisioned ? undefined : techStacks,
         isDefault,
-        staging: !isEditMode ? enableStaging : undefined, // Only send staging for new templates
-        parentTemplateId: effectiveParent?.id, // Include parent if selected or forced
-      });
+        staging: !isEditMode ? enableStaging : undefined,
+      };
+
+      // Set either parentTemplateId or baseCtTemplate based on selection
+      if (isCloneMode && parentTemplate) {
+        saveData.parentTemplateId = parentTemplate.id;
+      } else if (selectedBase?.type === 'template') {
+        saveData.parentTemplateId = selectedBase.id;
+      } else if (selectedBase?.type === 'ct') {
+        // Use volid for container creation (e.g., "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst")
+        saveData.baseCtTemplate = selectedBase.volid;
+      }
+
+      await onSave(saveData);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save template');
@@ -224,34 +344,80 @@ export function TemplateDialog({
               />
             </div>
 
-            {/* Based on (Parent Template) - only for new templates, not in forced clone mode */}
-            {!isEditMode && !isCloneMode && availableParentTemplates.length > 0 && (
+            {/* Based on - Required for new templates, not shown in clone mode or edit mode */}
+            {!isEditMode && !isCloneMode && (
               <div>
-                <label className="block text-sm text-foreground mb-1">Based on (optional)</label>
-                <select
-                  value={selectedParentId}
-                  onChange={(e) => handleParentChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
-                  disabled={isLoading}
-                >
-                  <option value="">None - start from scratch</option>
-                  {availableParentTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} {t.techStacks && t.techStacks.length > 0 ? `(${t.techStacks.join(', ')})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm text-foreground mb-1">Based on *</label>
+                {ctTemplatesLoading ? (
+                  <div className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground-secondary">
+                    Loading CT templates...
+                  </div>
+                ) : ctTemplatesError ? (
+                  <div className="w-full px-3 py-2 bg-background-tertiary border border-error rounded text-error text-sm">
+                    {ctTemplatesError}
+                  </div>
+                ) : (
+                  <select
+                    value={selectedBaseValue}
+                    onChange={(e) => handleBaseChange(e.target.value)}
+                    className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
+                    disabled={isLoading}
+                  >
+                    <option value="">Select a base...</option>
+
+                    {/* CT Templates Group */}
+                    {ctTemplates.length > 0 && (
+                      <optgroup label="CT Templates (OS Images)">
+                        {ctTemplates.map((ct) => (
+                          <option key={ct.volid} value={`ct:${ct.volid}`}>
+                            {ct.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {/* Session Hub Templates Group */}
+                    {availableParentTemplates.length > 0 && (
+                      <optgroup label="Session Hub Templates">
+                        {availableParentTemplates.map((t) => (
+                          <option key={`tpl:${t.id}`} value={`tpl:${t.id}`}>
+                            {t.name} {t.techStacks && t.techStacks.length > 0 ? `(${t.techStacks.join(', ')})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                )}
                 <p className="text-xs text-foreground-tertiary mt-1">
-                  Clone from an existing template to inherit its configuration and tech stacks.
+                  {selectedBase?.type === 'ct'
+                    ? 'Create from a fresh OS image with full provisioning.'
+                    : selectedBase?.type === 'template'
+                    ? 'Clone from an existing template to inherit its configuration and tech stacks.'
+                    : 'Select a CT template (OS image) or an existing Session Hub template.'}
                 </p>
               </div>
             )}
 
-            {/* Parent template info (when selected or in clone mode) */}
-            {effectiveParent && (
+            {/* Clone mode info (when forced from Clone button) */}
+            {isCloneMode && parentTemplate && (
               <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
                 <div className="text-sm text-purple-300">
-                  {isCloneMode ? 'Based on:' : 'Inheriting from:'}{' '}
+                  Cloning from:{' '}
+                  <span className="text-foreground font-medium">{parentTemplate.name}</span>
+                </div>
+                {inheritedStacks.length > 0 && (
+                  <div className="text-xs text-purple-400 mt-1">
+                    Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Selected base info (when Session Hub template selected via dropdown) */}
+            {!isCloneMode && selectedBase?.type === 'template' && effectiveParent && (
+              <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
+                <div className="text-sm text-purple-300">
+                  Inheriting from:{' '}
                   <span className="text-foreground font-medium">{effectiveParent.name}</span>
                 </div>
                 {inheritedStacks.length > 0 && (
@@ -259,6 +425,19 @@ export function TemplateDialog({
                     Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Selected CT template info */}
+            {!isCloneMode && selectedBase?.type === 'ct' && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded">
+                <div className="text-sm text-blue-300">
+                  Base OS:{' '}
+                  <span className="text-foreground font-medium">{selectedBase.name}</span>
+                </div>
+                <div className="text-xs text-blue-400 mt-1">
+                  Full provisioning will be performed (Node.js, Git, Session Hub Agent, etc.)
+                </div>
               </div>
             )}
 
@@ -329,11 +508,9 @@ export function TemplateDialog({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1">
                           <span className="text-sm text-foreground truncate">{stack.name}</span>
-                          {/* Inherited badge */}
                           {isInherited && (
                             <span className="text-xs text-purple-400 ml-1">(inherited)</span>
                           )}
-                          {/* Lock icon for dependencies */}
                           {isSelected && locked && !isInherited && (
                             <span
                               className="relative cursor-help"
@@ -351,7 +528,6 @@ export function TemplateDialog({
                                   clipRule="evenodd"
                                 />
                               </svg>
-                              {/* Tooltip */}
                               {hoveredLock === stack.id && (
                                 <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-background text-xs text-foreground rounded shadow-lg whitespace-nowrap z-10">
                                   Required by: {lockedByNames.join(', ')}
@@ -378,7 +554,7 @@ export function TemplateDialog({
                   )}
                   {techStacks.length > 0 && (
                     <div>
-                      <span className="text-primary">{isCloneMode ? 'Additional:' : 'Selected:'}</span>{' '}
+                      <span className="text-primary">{effectiveParent ? 'Additional:' : 'Selected:'}</span>{' '}
                       {techStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
                     </div>
                   )}
@@ -432,6 +608,9 @@ export function TemplateDialog({
                 )}
                 {template.node && (
                   <div className="text-foreground-secondary">Node: <span className="text-foreground">{template.node}</span></div>
+                )}
+                {template.baseCtTemplate && (
+                  <div className="text-foreground-secondary">Base CT: <span className="text-foreground">{template.baseCtTemplate}</span></div>
                 )}
                 {template.errorMessage && (
                   <div className="text-error mt-2">Error: {template.errorMessage}</div>

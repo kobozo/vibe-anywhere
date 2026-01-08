@@ -50,7 +50,7 @@ export class ProxmoxBackend implements IContainerBackend {
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
     const client = await this.getClient();
     const cfg = await this.getRuntimeConfig();
-    const { workspacePath, env = {}, memoryLimit, cpuLimit, diskSize: configDiskSize, reuseVmid, templateId } = containerConfig;
+    const { workspacePath, env = {}, memoryLimit, cpuLimit, diskSize: configDiskSize, reuseVmid, templateId, staticIp, gateway } = containerConfig;
     const settingsService = getSettingsService();
 
     // Use provided templateId from containerConfig, or fall back to settings (backwards compatibility)
@@ -113,12 +113,26 @@ export class ProxmoxBackend implements IContainerBackend {
       containerConfig2.cores = cpuLimit;
     }
 
-    // Configure network with VLAN tag if specified
+    // Configure network: static IP takes precedence, otherwise DHCP
+    // Build net0 configuration based on whether static IP is provided
+    let net0 = `name=eth0,bridge=${cfg.bridge}`;
+
+    if (staticIp && gateway) {
+      // Static IP configuration: ip=CIDR,gw=gateway
+      net0 += `,ip=${staticIp},gw=${gateway}`;
+      console.log(`Setting static IP: ${staticIp}, gateway: ${gateway}`);
+    } else {
+      // DHCP configuration
+      net0 += `,ip=dhcp`;
+    }
+
+    // Add VLAN tag if specified
     if (cfg.vlanTag) {
-      // Format: name=eth0,bridge=vmbr0,tag=2,ip=dhcp
-      containerConfig2.net0 = `name=eth0,bridge=${cfg.bridge},tag=${cfg.vlanTag},ip=dhcp`;
+      net0 += `,tag=${cfg.vlanTag}`;
       console.log(`Setting network with VLAN tag ${cfg.vlanTag}`);
     }
+
+    containerConfig2.net0 = net0;
 
     // Apply configuration
     try {

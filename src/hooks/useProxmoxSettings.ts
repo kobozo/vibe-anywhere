@@ -24,6 +24,9 @@ export interface ProxmoxSettingsData {
     defaultCpuCores?: number;
     defaultDiskSize?: number;
   };
+  templates: {
+    defaultCtTemplate?: string;
+  };
 }
 
 /**

@@ -92,6 +92,9 @@ export interface ProxmoxSettings {
   // VMID range
   vmidMin?: number;           // Minimum VMID for containers
   vmidMax?: number;           // Maximum VMID for containers
+
+  // Default CT template for new templates (e.g., 'debian-12-standard')
+  defaultCtTemplate?: string;
 }
 
 class SettingsService {

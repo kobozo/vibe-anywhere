@@ -17,6 +17,11 @@ export interface CreateWorkspaceInput {
   name: string;
   branchName: string;
   baseBranch?: string; // Branch to create from (defaults to repo's default branch)
+  // Advanced options (all optional)
+  staticIpAddress?: string; // CIDR format: 192.168.3.50/24
+  staticIpGateway?: string; // Gateway IP: 192.168.3.1
+  forcedVmid?: number; // Force specific VMID
+  overrideTemplateId?: string; // Override repository's default template
 }
 
 export class WorkspaceService {
@@ -76,19 +81,38 @@ export class WorkspaceService {
     }
 
     // Get template from repository (snapshot at creation time)
+    // Advanced override takes precedence over repository template
     const templateService = getTemplateService();
-    const template = await templateService.getTemplateForRepository(repositoryId);
+    let templateId: string | null = null;
 
-    // Create database record
+    if (input.overrideTemplateId) {
+      // Verify override template exists and is ready
+      const overrideTemplate = await templateService.getTemplate(input.overrideTemplateId);
+      if (overrideTemplate && overrideTemplate.status === 'ready') {
+        templateId = overrideTemplate.id;
+      } else {
+        throw new Error('Override template not found or not ready');
+      }
+    } else {
+      const template = await templateService.getTemplateForRepository(repositoryId);
+      templateId = template?.id || null;
+    }
+
+    // Create database record with advanced options
     const [workspace] = await db
       .insert(workspaces)
       .values({
         repositoryId,
-        templateId: template?.id || null,
+        templateId,
         name: input.name,
         branchName: input.branchName,
         status: 'active',
         containerBackend: 'proxmox', // Default to Proxmox for new workspaces
+        // Advanced options (stored for container creation)
+        staticIpAddress: input.staticIpAddress || null,
+        staticIpGateway: input.staticIpGateway || null,
+        forcedVmid: input.forcedVmid || null,
+        overrideTemplateId: input.overrideTemplateId || null,
       })
       .returning();
 
@@ -394,7 +418,18 @@ export class WorkspaceService {
 
     // Create container with backend-appropriate config
     const backendType = this.containerBackend.backendType;
-    const reuseVmid = backendType === 'proxmox' && oldContainerId ? parseInt(oldContainerId, 10) : undefined;
+
+    // Determine VMID: forcedVmid > reuseVmid (for redeploy) > auto-allocate
+    let reuseVmid: number | undefined;
+    if (backendType === 'proxmox') {
+      if (workspace.forcedVmid) {
+        // User specified a forced VMID
+        reuseVmid = workspace.forcedVmid;
+      } else if (oldContainerId) {
+        // Redeploy: reuse the old VMID
+        reuseVmid = parseInt(oldContainerId, 10);
+      }
+    }
 
     // Get template VMID for Proxmox
     let proxmoxTemplateVmid: number | undefined;
@@ -419,6 +454,9 @@ export class WorkspaceService {
       memoryLimit: repo.resourceMemory ? `${repo.resourceMemory}m` : undefined,
       cpuLimit: repo.resourceCpuCores ?? undefined,
       diskSize: repo.resourceDiskSize ?? undefined,
+      // Pass static IP configuration from workspace advanced options
+      staticIp: workspace.staticIpAddress ?? undefined,
+      gateway: workspace.staticIpGateway ?? undefined,
     });
 
     // Save containerId immediately to prevent race conditions

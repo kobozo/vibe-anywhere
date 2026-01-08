@@ -9,7 +9,8 @@ export interface CreateTemplateInput {
   description?: string;
   techStacks?: string[];
   isDefault?: boolean;
-  parentTemplateId?: string; // Clone from this parent template
+  parentTemplateId?: string; // Clone from this parent template (Session Hub template)
+  baseCtTemplate?: string;   // CT template to use as base (e.g., 'debian-12-standard')
 }
 
 export interface UpdateTemplateInput {

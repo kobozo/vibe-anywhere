@@ -141,6 +141,7 @@ export async function POST(
           techStacks: template.techStacks || [], // Only NEW stacks (service already filtered inherited ones)
           stopAtStaging: staging,
           parentVmid, // Clone from parent if specified
+          baseCtTemplate: template.baseCtTemplate || undefined, // CT template to use as base
           onProgress: (progress) => {
             sendEvent('progress', progress);
           },

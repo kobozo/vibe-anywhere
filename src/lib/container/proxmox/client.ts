@@ -343,7 +343,7 @@ export class ProxmoxClient {
   }
 
   /**
-   * List available appliance templates
+   * List available appliance templates (downloadable from Proxmox repository)
    */
   async listAppliances(): Promise<Array<{
     template: string;
@@ -370,6 +370,93 @@ export class ProxmoxClient {
       console.warn('Failed to list appliances:', error);
       return [];
     }
+  }
+
+  /**
+   * List all CT templates stored on Proxmox storage
+   * Scans all storages on all nodes that support vztmpl content type
+   */
+  async listStoredCtTemplates(): Promise<Array<{
+    volid: string;       // Full volume ID (e.g., "local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst")
+    name: string;        // Template filename
+    storage: string;     // Storage ID
+    node: string;        // Node name
+    size: number;        // Size in bytes
+    os?: string;         // Detected OS (debian, ubuntu, etc.)
+    version?: string;    // Detected version
+  }>> {
+    const templates: Array<{
+      volid: string;
+      name: string;
+      storage: string;
+      node: string;
+      size: number;
+      os?: string;
+      version?: string;
+    }> = [];
+
+    try {
+      // Get all nodes in the cluster
+      const nodes = await this.getNodes();
+
+      for (const nodeInfo of nodes) {
+        const nodeName = nodeInfo.node;
+
+        try {
+          // List all storages on this node
+          const storages = await this.proxmox.nodes.$(nodeName).storage.$get();
+
+          for (const storage of storages) {
+            // Check if this storage supports vztmpl content type
+            const contentTypes = String(storage.content || '').split(',');
+            if (!contentTypes.includes('vztmpl')) {
+              continue;
+            }
+
+            const storageId = String(storage.storage || '');
+            if (!storageId) continue;
+
+            try {
+              // List vztmpl content in this storage
+              const content = await this.proxmox.nodes.$(nodeName).storage.$(storageId).content.$get({
+                content: 'vztmpl',
+              });
+
+              for (const item of content || []) {
+                const volid = String(item.volid || '');
+                const filename = volid.split('/').pop() || volid;
+
+                // Parse OS and version from filename
+                // Common formats: debian-12-standard_12.2-1_amd64.tar.zst
+                //                 ubuntu-22.04-standard_22.04-1_amd64.tar.zst
+                const osMatch = filename.match(/^(debian|ubuntu|centos|alpine|fedora|rocky|alma)/i);
+                const versionMatch = filename.match(/-([\d.]+)[-_]/);
+
+                templates.push({
+                  volid,
+                  name: filename,
+                  storage: storageId,
+                  node: nodeName,
+                  size: Number(item.size || 0),
+                  os: osMatch ? osMatch[1].toLowerCase() : undefined,
+                  version: versionMatch ? versionMatch[1] : undefined,
+                });
+              }
+            } catch (storageError) {
+              // Skip storages we can't read (permission issues, etc.)
+              console.warn(`Failed to list content in storage ${storageId} on ${nodeName}:`, storageError);
+            }
+          }
+        } catch (nodeError) {
+          // Skip nodes we can't access
+          console.warn(`Failed to list storages on node ${nodeName}:`, nodeError);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to list stored CT templates:', error);
+    }
+
+    return templates;
   }
 
   /**

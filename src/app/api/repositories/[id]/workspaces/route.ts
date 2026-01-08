@@ -13,11 +13,34 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+import { CIDR_REGEX, IP_REGEX } from '@/lib/types/network-config';
+
 const createWorkspaceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   branchName: z.string().regex(/^[a-zA-Z0-9/_-]+$/, 'Invalid branch name'),
   baseBranch: z.string().optional(),
-});
+  // Advanced options
+  staticIpAddress: z.string().regex(CIDR_REGEX, 'Invalid CIDR notation (e.g., 192.168.3.50/24)').optional(),
+  staticIpGateway: z.string().regex(IP_REGEX, 'Invalid gateway IP address').optional(),
+  forcedVmid: z.number().int().min(100, 'VMID must be >= 100').max(999999999).optional(),
+  overrideTemplateId: z.string().uuid('Invalid template ID').optional(),
+}).refine(
+  (data) => {
+    // If staticIpAddress is provided, gateway is required
+    if (data.staticIpAddress && !data.staticIpGateway) {
+      return false;
+    }
+    // If gateway is provided without IP, that's also invalid
+    if (data.staticIpGateway && !data.staticIpAddress) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Both static IP address and gateway are required when using static IP',
+    path: ['staticIpGateway'],
+  }
+);
 
 /**
  * GET /api/repositories/[id]/workspaces - List workspaces for a repository

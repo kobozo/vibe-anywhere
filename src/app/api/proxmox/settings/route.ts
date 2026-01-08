@@ -29,6 +29,9 @@ interface ProxmoxSettingsResponse {
     defaultCpuCores?: number;
     defaultDiskSize?: number;
   };
+  templates: {
+    defaultCtTemplate?: string;
+  };
 }
 
 /**
@@ -75,6 +78,9 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
       defaultMemory: dbSettings.defaultMemory,
       defaultCpuCores: dbSettings.defaultCpuCores,
       defaultDiskSize: dbSettings.defaultDiskSize,
+    },
+    templates: {
+      defaultCtTemplate: dbSettings.defaultCtTemplate,
     },
   };
 
@@ -171,6 +177,16 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
         return errorResponse('INVALID_DISK_SIZE', 'Default disk size must be a number >= 1 GB', 400);
       }
       settings.defaultDiskSize = body.resources.defaultDiskSize ?? undefined;
+    }
+  }
+
+  // Template settings
+  if (body.templates) {
+    if (body.templates.defaultCtTemplate !== undefined) {
+      if (body.templates.defaultCtTemplate !== null && typeof body.templates.defaultCtTemplate !== 'string') {
+        return errorResponse('INVALID_DEFAULT_CT_TEMPLATE', 'Default CT template must be a string', 400);
+      }
+      settings.defaultCtTemplate = body.templates.defaultCtTemplate ?? undefined;
     }
   }
 
