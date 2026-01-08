@@ -1352,6 +1352,7 @@ function Dashboard() {
                   <DockerPanel workspaceId={selectedWorkspace.id} containerIp={selectedWorkspace.containerIp ?? null} />
                 ) : selectedTab && selectedTab.status === 'running' ? (
                   <Terminal
+                    key={selectedTab.id}
                     tabId={selectedTab.id}
                     workspaceId={selectedWorkspace.id}
                     onConnectionChange={setIsTerminalConnected}

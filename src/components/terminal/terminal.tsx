@@ -131,7 +131,11 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
     };
 
     // Handle buffered output on reconnect
-    const handleBuffer = (data: { lines: string[] }) => {
+    const handleBuffer = (data: { tabId?: string; lines: string[] }) => {
+      // Only process buffer for this specific tab
+      if (data.tabId && data.tabId !== tabId) {
+        return;
+      }
       if (xtermRef.current) {
         // Clear terminal before writing buffer
         xtermRef.current.clear();

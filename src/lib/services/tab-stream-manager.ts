@@ -63,7 +63,7 @@ class TabStreamManager {
         // Send buffered output from database
         const buffer = await tabService.getOutputBuffer(tabId);
         if (buffer.length > 0) {
-          socket.emit('terminal:buffer', { lines: buffer });
+          socket.emit('terminal:buffer', { tabId, lines: buffer });
         }
       }
 
@@ -427,7 +427,7 @@ class TabStreamManager {
     if (!tabStream) return;
 
     for (const socket of tabStream.connectedSockets) {
-      socket.emit('terminal:buffer', { lines });
+      socket.emit('terminal:buffer', { tabId, lines });
     }
   }
 
