@@ -408,6 +408,7 @@ function Dashboard() {
   const handleSplitWithExisting = useCallback(async (direction: SplitDirection, existingTabId: string) => {
     // Capture values at start to avoid closure issues
     const contextMenu = terminalContextMenu;
+    const capturedActiveGroup = activeGroup; // Capture activeGroup for split view context
     if (!contextMenu || !selectedWorkspace) return;
 
     const currentTabId = contextMenu.tabId;
@@ -418,8 +419,11 @@ function Dashboard() {
     }
 
     try {
-      // Check if current tab is in a group
-      const currentGroup = getGroupForTab(currentTabId);
+      // Check if current tab is in a group - use captured activeGroup first (reliable for split view),
+      // then fall back to getGroupForTab (for single terminal context menus)
+      const currentGroup = capturedActiveGroup?.members.some(m => m.tabId === currentTabId)
+        ? capturedActiveGroup
+        : getGroupForTab(currentTabId);
 
       if (currentGroup) {
         // Add to existing group
@@ -452,13 +456,14 @@ function Dashboard() {
     } finally {
       setTerminalContextMenu(null);
     }
-  }, [terminalContextMenu, selectedWorkspace, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+  }, [terminalContextMenu, selectedWorkspace, activeGroup, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle split with static tab (Git/Docker)
   const handleSplitWithStaticTab = useCallback(async (direction: SplitDirection, tabType: import('@/lib/db/schema').TabType) => {
     // Capture values at start to avoid closure issues
     const contextMenu = terminalContextMenu;
     const workspace = selectedWorkspace;
+    const capturedActiveGroup = activeGroup; // Capture activeGroup for split view context
 
     if (!contextMenu || !workspace) return;
 
@@ -502,8 +507,11 @@ function Dashboard() {
         return;
       }
 
-      // Check if current tab is in a group
-      const currentGroup = getGroupForTab(currentTabId);
+      // Check if current tab is in a group - use captured activeGroup first (reliable for split view),
+      // then fall back to getGroupForTab (for single terminal context menus)
+      const currentGroup = capturedActiveGroup?.members.some(m => m.tabId === currentTabId)
+        ? capturedActiveGroup
+        : getGroupForTab(currentTabId);
 
       if (currentGroup) {
         // Add to existing group
@@ -535,13 +543,14 @@ function Dashboard() {
     } finally {
       setTerminalContextMenu(null);
     }
-  }, [terminalContextMenu, selectedWorkspace, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+  }, [terminalContextMenu, selectedWorkspace, activeGroup, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle split with new template tab
   const handleSplitWithTemplate = useCallback(async (direction: SplitDirection, templateId: string) => {
     // Capture values at start to avoid closure issues
     const contextMenu = terminalContextMenu;
     const workspace = selectedWorkspace;
+    const capturedActiveGroup = activeGroup; // Capture activeGroup for split view context
 
     if (!contextMenu || !workspace) return;
 
@@ -584,8 +593,11 @@ function Dashboard() {
         return;
       }
 
-      // Check if current tab is in a group
-      const currentGroup = getGroupForTab(currentTabId);
+      // Check if current tab is in a group - use captured activeGroup first (reliable for split view),
+      // then fall back to getGroupForTab (for single terminal context menus)
+      const currentGroup = capturedActiveGroup?.members.some(m => m.tabId === currentTabId)
+        ? capturedActiveGroup
+        : getGroupForTab(currentTabId);
 
       if (currentGroup) {
         // Add to existing group
@@ -617,7 +629,7 @@ function Dashboard() {
     } finally {
       setTerminalContextMenu(null);
     }
-  }, [terminalContextMenu, selectedWorkspace, tabTemplates, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
+  }, [terminalContextMenu, selectedWorkspace, activeGroup, tabTemplates, getGroupForTab, addTabToGroup, updateGroup, fetchGroups, createGroup, setActiveGroupId]);
 
   // Handle voice transcription - send to active terminal
   const handleVoiceTranscription = useCallback((text: string) => {
