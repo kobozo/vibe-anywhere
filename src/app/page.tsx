@@ -71,19 +71,12 @@ function Dashboard() {
   // Proxmox settings (for default CT template)
   const { settings: proxmoxSettings, fetchSettings: fetchProxmoxSettings } = useProxmoxSettings();
 
-  // Fetch Proxmox settings on mount and when template dialog opens
+  // Fetch Proxmox settings on mount
   useEffect(() => {
     if (user) {
       fetchProxmoxSettings();
     }
   }, [user, fetchProxmoxSettings]);
-
-  // Re-fetch Proxmox settings when template dialog opens (to get latest default CT template)
-  useEffect(() => {
-    if (isTemplateDialogOpen && user) {
-      fetchProxmoxSettings();
-    }
-  }, [isTemplateDialogOpen, user, fetchProxmoxSettings]);
 
   // Fetch repositories on mount
   useEffect(() => {
@@ -121,6 +114,13 @@ function Dashboard() {
   const [editingTemplate, setEditingTemplate] = useState<ProxmoxTemplate | null>(null);
   const [cloningTemplate, setCloningTemplate] = useState<ProxmoxTemplate | null>(null); // Parent template for clone mode
   const [isTemplateDialogLoading, setIsTemplateDialogLoading] = useState(false);
+
+  // Re-fetch Proxmox settings when template dialog opens (to get latest default CT template)
+  useEffect(() => {
+    if (isTemplateDialogOpen && user) {
+      fetchProxmoxSettings();
+    }
+  }, [isTemplateDialogOpen, user, fetchProxmoxSettings]);
 
   // Template details modal state (for viewing status, errors, actions)
   const [selectedTemplate, setSelectedTemplate] = useState<ProxmoxTemplate | null>(null);
