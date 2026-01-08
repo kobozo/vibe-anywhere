@@ -34,7 +34,7 @@
 
 - [x] **Advanced workspace creation options** - Extend the "add workspace" modal with a tabbed approach. Include advanced options tab for overwrites: static IP, force VMID, override image template.
 
-- [ ] **Proxmox container tags** - Add tags to templates and workspace containers in Proxmox for grouping. Include: repository name, tech stack items as individual tags. Branch name not needed.
+- [x] **Proxmox container tags** - Add tags to templates and workspace containers in Proxmox for grouping. Include: repository name, tech stack items as individual tags. Branch name not needed.
 
 ## Tab System
 

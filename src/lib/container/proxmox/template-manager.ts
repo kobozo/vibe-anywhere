@@ -9,6 +9,7 @@ import { pollTaskUntilComplete, waitForContainerIp, waitForContainerRunning } fr
 import { execSSHCommand } from './ssh-stream';
 import { getSettingsService, type ProxmoxTemplateSettings } from '@/lib/services/settings-service';
 import { generateInstallScript, requiresNesting } from './tech-stacks';
+import { buildTemplateTags } from './tags';
 import * as fs from 'fs';
 
 // Default Debian template to use
@@ -456,6 +457,15 @@ export class ProxmoxTemplateManager {
         progress('config', 25, 'Enabling LXC nesting for Docker support...');
         await this.client.setLxcConfig(vmid, { features: 'nesting=1' });
       }
+
+      // Set tags on cloned template (clone API doesn't support tags)
+      const templateTags = buildTemplateTags(techStacks);
+      try {
+        await this.client.setLxcConfig(vmid, { tags: templateTags });
+        console.log(`Set tags for template ${vmid}: ${templateTags}`);
+      } catch (tagError) {
+        console.warn(`Could not set tags for template ${vmid}:`, tagError);
+      }
     } else {
       // Create from base OS template (original flow)
       // Step 1: Get SSH public key
@@ -472,6 +482,7 @@ export class ProxmoxTemplateManager {
 
       // Step 3: Create container with SSH keys
       progress('create', 20, 'Creating container...');
+      const templateTags = buildTemplateTags(techStacks);
       const upid = await this.client.createLxcWithSSHKeys(vmid, osTemplate, {
         hostname,
         description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
@@ -482,6 +493,7 @@ export class ProxmoxTemplateManager {
         rootPassword: 'SessionHub2024!',
         vlanTag,
         features: needsNesting ? 'nesting=1' : undefined,
+        tags: templateTags,
       });
 
       await pollTaskUntilComplete(this.client, upid, {

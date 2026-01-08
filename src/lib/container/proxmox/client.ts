@@ -135,6 +135,7 @@ export class ProxmoxClient {
       cores?: number;
       net0?: string;
       mp0?: string;  // Mount point for workspace
+      tags?: string; // Proxmox tags (semicolon-separated)
     } = {}
   ): Promise<string> {
     const cfg = this.runtimeConfig;
@@ -158,6 +159,7 @@ export class ProxmoxClient {
       features: 'nesting=1',
       unprivileged: true,
       start: false,
+      tags: options.tags,
     });
 
     return response;
@@ -303,6 +305,7 @@ export class ProxmoxClient {
       rootPassword?: string;
       vlanTag?: number;     // Optional VLAN tag override
       features?: string;    // Optional features (e.g., 'nesting=1')
+      tags?: string;        // Proxmox tags (semicolon-separated)
     }
   ): Promise<string> {
     const cfg = this.runtimeConfig;
@@ -329,6 +332,7 @@ export class ProxmoxClient {
       start: false,
       'ssh-public-keys': options.sshPublicKeys,
       password: options.rootPassword,
+      tags: options.tags,
     });
 
     return response;

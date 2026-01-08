@@ -20,6 +20,7 @@ export interface ContainerConfig {
   // Static IP configuration (Proxmox only)
   staticIp?: string;           // CIDR notation: 192.168.3.50/24
   gateway?: string;            // Gateway IP: 192.168.3.1
+  tags?: string;               // Proxmox tags (semicolon-separated, Proxmox only)
 }
 
 /**

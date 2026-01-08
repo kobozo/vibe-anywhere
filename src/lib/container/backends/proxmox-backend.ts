@@ -50,7 +50,7 @@ export class ProxmoxBackend implements IContainerBackend {
   async createContainer(workspaceId: string, containerConfig: ContainerConfig): Promise<string> {
     const client = await this.getClient();
     const cfg = await this.getRuntimeConfig();
-    const { workspacePath, env = {}, memoryLimit, cpuLimit, diskSize: configDiskSize, reuseVmid, templateId, staticIp, gateway } = containerConfig;
+    const { workspacePath, env = {}, memoryLimit, cpuLimit, diskSize: configDiskSize, reuseVmid, templateId, staticIp, gateway, tags } = containerConfig;
     const settingsService = getSettingsService();
 
     // Use provided templateId from containerConfig, or fall back to settings (backwards compatibility)
@@ -140,6 +140,17 @@ export class ProxmoxBackend implements IContainerBackend {
     } catch (error) {
       console.warn(`Could not apply container config for ${newVmid}:`, error);
       // Continue anyway - template defaults should work
+    }
+
+    // Set tags (clone API doesn't support tags, must set after)
+    if (tags) {
+      try {
+        await client.setLxcConfig(newVmid, { tags });
+        console.log(`Set tags for container ${newVmid}: ${tags}`);
+      } catch (tagError) {
+        console.warn(`Could not set tags for ${newVmid}:`, tagError);
+        // Non-fatal - container will work without tags
+      }
     }
 
     // Store workspace path for later syncing

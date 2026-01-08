@@ -9,6 +9,7 @@ import { getGitHooksService } from './git-hooks-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { gitCloneInContainer, getGitStatusInContainer, isRepoClonedInContainer, type GitStatusResult } from '@/lib/container/proxmox/ssh-stream';
+import { buildWorkspaceTags } from '@/lib/container/proxmox/tags';
 import { config } from '@/lib/config';
 import { startupProgressStore } from './startup-progress-store';
 import type { StartupStep } from '@/lib/types/startup-progress';
@@ -446,6 +447,11 @@ export class WorkspaceService {
       }
     }
 
+    // Build tags for Proxmox container (repository name + tech stacks)
+    const tags = backendType === 'proxmox'
+      ? buildWorkspaceTags(repo.name, repo.techStack || [])
+      : undefined;
+
     const containerId = await this.containerBackend.createContainer(workspaceId, {
       image: backendType === 'docker' ? config.docker.claudeImage : undefined,
       templateId: proxmoxTemplateVmid,
@@ -457,6 +463,8 @@ export class WorkspaceService {
       // Pass static IP configuration from workspace advanced options
       staticIp: workspace.staticIpAddress ?? undefined,
       gateway: workspace.staticIpGateway ?? undefined,
+      // Proxmox tags for filtering (repo name + tech stacks)
+      tags,
     });
 
     // Save containerId immediately to prevent race conditions
