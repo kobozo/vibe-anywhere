@@ -64,6 +64,10 @@
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
 
+## Debugging & Logs
+
+- [ ] **Template creation logs** - Store logs (temporarily) when creating new templates. Currently errors like "Tech stack installation failed with exit code 100" are a black box with no way to diagnose what went wrong.
+
 ## New Features
 
 - [ ] **Makefile tab** - If a Makefile is detected by the agent, allow adding a "Make" tab that can execute tasks from the Makefile. Show available make targets and allow one-click execution.
