@@ -289,6 +289,10 @@ export function AddRepositoryDialog({
     const keyToCopy = publicKey || generatedKey?.publicKey;
     if (!keyToCopy) return;
     try {
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard API not available. Please use HTTPS or localhost.');
+      }
       await navigator.clipboard.writeText(keyToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

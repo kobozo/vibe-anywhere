@@ -215,10 +215,17 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
                 <span className="text-foreground">{sshKey.name}</span>
                 <span className="text-foreground-tertiary text-xs px-2 py-0.5 bg-background-tertiary rounded">{sshKey.keyType.toUpperCase()}</span>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(sshKey.publicKey);
-                    setCopiedKey(true);
-                    setTimeout(() => setCopiedKey(false), 2000);
+                  onClick={async () => {
+                    try {
+                      if (!navigator.clipboard) {
+                        throw new Error('Clipboard API not available. Please use HTTPS or localhost.');
+                      }
+                      await navigator.clipboard.writeText(sshKey.publicKey);
+                      setCopiedKey(true);
+                      setTimeout(() => setCopiedKey(false), 2000);
+                    } catch (err) {
+                      console.error('Failed to copy:', err);
+                    }
                   }}
                   className="text-xs px-2 py-1 bg-primary hover:bg-primary-hover text-foreground rounded transition-colors"
                 >

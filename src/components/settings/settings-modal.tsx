@@ -131,6 +131,9 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
   const handleCopyPublicKey = async (key: SSHKeyInfo) => {
     try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard API not available. Please use HTTPS or localhost.');
+      }
       await navigator.clipboard.writeText(key.publicKey);
       setCopiedId(key.id);
       setTimeout(() => setCopiedId(null), 2000);
