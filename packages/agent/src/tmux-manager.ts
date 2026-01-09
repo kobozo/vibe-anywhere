@@ -108,7 +108,11 @@ export class TmuxManager {
   /**
    * Create a new tmux window for a tab
    */
-  async createWindow(tabId: string, command: string[]): Promise<number> {
+  async createWindow(
+    tabId: string,
+    command: string[],
+    envVars?: Record<string, string>
+  ): Promise<number> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -185,6 +189,23 @@ export class TmuxManager {
 
     // Start output capture
     this.startOutputCapture(tabId, windowIndex);
+
+    // Inject per-window environment variables BEFORE sending command
+    if (envVars && Object.keys(envVars).length > 0) {
+      console.log(`Injecting ${Object.keys(envVars).length} env vars into window ${windowIndex}`);
+      for (const [key, value] of Object.entries(envVars)) {
+        // Escape single quotes in value: replace ' with '\''
+        const escapedValue = value.replace(/'/g, "'\\''");
+        try {
+          await exec(
+            `tmux setenv -t ${this.sessionName}:${windowIndex} ${key} '${escapedValue}'`
+          );
+        } catch (err) {
+          console.error(`Failed to set env var ${key}:`, err);
+          // Continue with other vars - don't fail entire operation
+        }
+      }
+    }
 
     // Send the command to execute (skip if it's just a shell - tmux already starts one)
     // Prepend 'clear && ' to hide the shell prompt and command from being visible

@@ -106,8 +106,11 @@ const wsClient = new AgentWebSocket(config, {
 
   onTabCreate: async (data) => {
     console.log(`Creating tab ${data.tabId} with command:`, data.command);
+    if (data.envVars && Object.keys(data.envVars).length > 0) {
+      console.log(`  with ${Object.keys(data.envVars).length} environment variables`);
+    }
     try {
-      const windowIndex = await tmuxManager.createWindow(data.tabId, data.command);
+      const windowIndex = await tmuxManager.createWindow(data.tabId, data.command, data.envVars);
       wsClient.sendTabCreated(data.tabId, windowIndex);
     } catch (error) {
       console.error('Failed to create tab:', error);

@@ -11,7 +11,7 @@ export interface AgentEvents {
   onDisconnected: (reason: string) => void;
   onRegistered: (data: { success: boolean; recoveryMode?: boolean }) => void;
   onUpdateRequested: (data: { version: string; bundleUrl: string }) => void;
-  onTabCreate: (data: { tabId: string; command: string[]; name?: string }) => void;
+  onTabCreate: (data: { tabId: string; command: string[]; name?: string; envVars?: Record<string, string> }) => void;
   onTabInput: (data: { tabId: string; data: string }) => void;
   onTabResize: (data: { tabId: string; cols: number; rows: number }) => void;
   onTabClose: (data: { tabId: string }) => void;

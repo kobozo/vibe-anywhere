@@ -2,6 +2,7 @@ import { getContainerBackendAsync, getBackendType, type ContainerStream } from '
 import { getTabService } from './tab-service';
 import { getWorkspaceService } from './workspace-service';
 import { getAgentRegistry } from './agent-registry';
+import { getSecretsService } from './secrets-service';
 import type { Socket } from 'socket.io';
 
 interface TabStream {
@@ -115,10 +116,30 @@ class TabStreamManager {
     command: string[]
   ): Promise<void> {
     const agentRegistry = getAgentRegistry();
+    const tabService = getTabService();
+    const secretsService = getSecretsService();
 
     // Check if agent is connected
     if (!agentRegistry.hasAgent(workspaceId)) {
       throw new Error('Workspace agent not connected. Please wait for the container to initialize.');
+    }
+
+    // Get tab template and filter secrets
+    const tab = await tabService.getTab(tabId);
+    const templateName = tab?.icon || 'terminal';
+
+    let envVars: Record<string, string> = {};
+    try {
+      // Get secrets filtered by template whitelist
+      // This returns ONLY secrets where templateWhitelist includes this tab's template
+      envVars = await secretsService.getSecretsForTab(workspaceId, templateName);
+
+      if (Object.keys(envVars).length > 0) {
+        console.log(`Injecting ${Object.keys(envVars).length} secrets for tab ${tabId} (template: ${templateName})`);
+      }
+    } catch (error) {
+      console.error('Failed to filter secrets for tab:', error);
+      // Continue without secrets - don't fail tab creation
     }
 
     // Create tab stream entry (without containerStream)
@@ -135,9 +156,9 @@ class TabStreamManager {
 
     this.streams.set(tabId, tabStream);
 
-    // Request agent to create the tab
+    // Request agent to create the tab WITH filtered env vars
     console.log('Requesting agent to create tab:', tabId, 'with command:', command);
-    const sent = agentRegistry.createTab(workspaceId, tabId, command);
+    const sent = agentRegistry.createTab(workspaceId, tabId, command, envVars);
 
     if (!sent) {
       this.streams.delete(tabId);

@@ -7,6 +7,8 @@ import {
   jsonb,
   integer,
   pgEnum,
+  index,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -330,6 +332,42 @@ export const appSettings = pgTable('app_settings', {
 });
 
 // ============================================
+// Secrets Vault - User-level encrypted environment variables
+// ============================================
+export const secrets = pgTable('secrets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  envKey: text('env_key').notNull(),
+  valueEncrypted: text('value_encrypted').notNull(),
+  description: text('description'),
+  templateWhitelist: jsonb('template_whitelist').$type<string[]>().default([]).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('secrets_user_id_idx').on(table.userId),
+}));
+
+// Repository-Secret association table (normalized join table)
+export const repositorySecrets = pgTable('repository_secrets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repositoryId: uuid('repository_id')
+    .references(() => repositories.id, { onDelete: 'cascade' })
+    .notNull(),
+  secretId: uuid('secret_id')
+    .references(() => secrets.id, { onDelete: 'cascade' })
+    .notNull(),
+  includeInEnvFile: boolean('include_in_env_file').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueRepoSecret: unique('unique_repo_secret').on(table.repositoryId, table.secretId),
+  repoIdIdx: index('repository_secrets_repo_id_idx').on(table.repositoryId),
+  secretIdIdx: index('repository_secrets_secret_id_idx').on(table.secretId),
+}));
+
+// ============================================
 // LEGACY: Sessions table (kept for migration)
 // ============================================
 export const sessions = pgTable('sessions', {
@@ -375,6 +413,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   tabTemplates: many(tabTemplates),
   proxmoxTemplates: many(proxmoxTemplates),
   gitIdentities: many(gitIdentities),
+  secrets: many(secrets),
   sessions: many(sessions), // Legacy
 }));
 
@@ -412,6 +451,7 @@ export const repositoriesRelations = relations(repositories, ({ one, many }) => 
   }),
   workspaces: many(workspaces),
   sshKeys: many(sshKeys),
+  repositorySecrets: many(repositorySecrets),
 }));
 
 export const proxmoxTemplatesRelations = relations(proxmoxTemplates, ({ one, many }) => ({
@@ -503,6 +543,25 @@ export const tabLogsRelations = relations(tabLogs, ({ one }) => ({
   }),
 }));
 
+export const secretsRelations = relations(secrets, ({ one, many }) => ({
+  user: one(users, {
+    fields: [secrets.userId],
+    references: [users.id],
+  }),
+  repositorySecrets: many(repositorySecrets),
+}));
+
+export const repositorySecretsRelations = relations(repositorySecrets, ({ one }) => ({
+  repository: one(repositories, {
+    fields: [repositorySecrets.repositoryId],
+    references: [repositories.id],
+  }),
+  secret: one(secrets, {
+    fields: [repositorySecrets.secretId],
+    references: [secrets.id],
+  }),
+}));
+
 // Legacy relations
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   user: one(users, {
@@ -584,6 +643,12 @@ export type TabGroupLayout = (typeof tabGroupLayoutEnum.enumValues)[number];
 // App Settings
 export type AppSetting = typeof appSettings.$inferSelect;
 export type NewAppSetting = typeof appSettings.$inferInsert;
+
+// Secrets Vault
+export type Secret = typeof secrets.$inferSelect;
+export type NewSecret = typeof secrets.$inferInsert;
+export type RepositorySecret = typeof repositorySecrets.$inferSelect;
+export type NewRepositorySecret = typeof repositorySecrets.$inferInsert;
 
 // Shared enums
 export type SessionStatus = (typeof sessionStatusEnum.enumValues)[number];

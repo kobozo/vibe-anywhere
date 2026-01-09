@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTabTemplates, TabTemplate } from '@/hooks/useTabTemplates';
 import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
+import { useSecrets, type Secret } from '@/hooks/useSecrets';
 import { ProxmoxSettings } from './proxmox-settings';
 import { VoiceSettings } from './voice-settings';
 import { ThemeSettings } from './theme-settings';
@@ -17,7 +18,7 @@ interface SettingsModalProps {
   onVoiceSettingsChange?: () => void;
 }
 
-type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'git-identities' | 'proxmox' | 'voice';
+type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'git-identities' | 'secrets' | 'proxmox' | 'voice';
 
 // Get AI assistant tech stacks for the dropdown
 const AI_TECH_STACKS: TechStack[] = getStacksByCategory('ai-assistant');
@@ -46,12 +47,25 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Secrets
+  const { secrets, fetchSecrets, createSecret, updateSecret, deleteSecret, isLoading: secretsLoading } = useSecrets();
+  const [showAddSecret, setShowAddSecret] = useState(false);
+  const [newSecret, setNewSecret] = useState({
+    name: '',
+    envKey: '',
+    value: '',
+    description: '',
+    templateWhitelist: [] as string[],
+  });
+  const [isSavingSecret, setIsSavingSecret] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
       fetchKeys();
+      fetchSecrets();
     }
-  }, [isOpen, fetchTemplates, fetchKeys]);
+  }, [isOpen, fetchTemplates, fetchKeys, fetchSecrets]);
 
   if (!isOpen) return null;
 
@@ -125,6 +139,47 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
     }
   };
 
+  const handleAddSecret = async () => {
+    if (!newSecret.name || !newSecret.envKey || !newSecret.value) return;
+
+    setIsSavingSecret(true);
+    try {
+      await createSecret({
+        name: newSecret.name,
+        envKey: newSecret.envKey,
+        value: newSecret.value,
+        description: newSecret.description || undefined,
+        templateWhitelist: newSecret.templateWhitelist,
+      });
+      setNewSecret({ name: '', envKey: '', value: '', description: '', templateWhitelist: [] });
+      setShowAddSecret(false);
+    } catch (error) {
+      console.error('Failed to create secret:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create secret');
+    } finally {
+      setIsSavingSecret(false);
+    }
+  };
+
+  const handleDeleteSecret = async (secret: Secret) => {
+    if (!confirm(`Delete secret "${secret.name}"?\n\nThis will remove it from all repositories that reference it.`)) return;
+
+    try {
+      await deleteSecret(secret.id);
+    } catch (error) {
+      console.error('Failed to delete secret:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete secret');
+    }
+  };
+
+  const handleToggleTemplate = (template: string) => {
+    setNewSecret(prev => ({
+      ...prev,
+      templateWhitelist: prev.templateWhitelist.includes(template)
+        ? prev.templateWhitelist.filter(t => t !== template)
+        : [...prev.templateWhitelist, template]
+    }));
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -174,6 +229,15 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                 : 'text-foreground-secondary hover:text-foreground'}`}
           >
             Git Identities
+          </button>
+          <button
+            onClick={() => setActiveTab('secrets')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'secrets'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
+          >
+            Secrets
           </button>
           <button
             onClick={() => setActiveTab('proxmox')}
@@ -487,6 +551,157 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
           {/* Git Identities */}
           {activeTab === 'git-identities' && (
             <GitIdentityList />
+          )}
+
+          {/* Secrets */}
+          {activeTab === 'secrets' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-foreground-secondary">
+                  Manage secret environment variables that can be injected into specific tab types.
+                </p>
+                <button
+                  onClick={() => setShowAddSecret(!showAddSecret)}
+                  className="text-sm text-primary hover:text-primary-hover"
+                >
+                  {showAddSecret ? 'Cancel' : '+ Add Secret'}
+                </button>
+              </div>
+
+              {/* Add Secret Form */}
+              {showAddSecret && (
+                <div className="p-4 bg-background-tertiary/50 rounded space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-foreground-secondary mb-1">Name *</label>
+                      <input
+                        type="text"
+                        value={newSecret.name}
+                        onChange={(e) => setNewSecret({ ...newSecret, name: e.target.value })}
+                        placeholder="Anthropic API Key"
+                        className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-foreground-secondary mb-1">Environment Key *</label>
+                      <input
+                        type="text"
+                        value={newSecret.envKey}
+                        onChange={(e) => setNewSecret({ ...newSecret, envKey: e.target.value.toUpperCase() })}
+                        placeholder="ANTHROPIC_API_KEY"
+                        className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-foreground-secondary mb-1">Value *</label>
+                    <input
+                      type="password"
+                      value={newSecret.value}
+                      onChange={(e) => setNewSecret({ ...newSecret, value: e.target.value })}
+                      placeholder="sk-ant-..."
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-foreground-secondary mb-1">Description (optional)</label>
+                    <input
+                      type="text"
+                      value={newSecret.description}
+                      onChange={(e) => setNewSecret({ ...newSecret, description: e.target.value })}
+                      placeholder="Production API key"
+                      className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-foreground-secondary mb-2">
+                      Tab Templates * <span className="text-foreground-tertiary">(select at least one)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {templates.map((template) => (
+                        <label key={template.id} className="flex items-center gap-2 p-2 bg-background-tertiary/50 rounded cursor-pointer hover:bg-background-tertiary">
+                          <input
+                            type="checkbox"
+                            checked={newSecret.templateWhitelist.includes(template.icon)}
+                            onChange={() => handleToggleTemplate(template.icon)}
+                            className="w-4 h-4 rounded border-border-secondary bg-background-tertiary text-primary"
+                          />
+                          <div className="w-5 h-5 flex-shrink-0">
+                            {getTemplateIcon(template.icon, template.isBuiltIn, 'w-5 h-5 text-foreground')}
+                          </div>
+                          <span className="text-sm text-foreground">{template.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-foreground-tertiary mt-1">
+                      Secret will only be injected in tabs matching these templates
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleAddSecret}
+                    disabled={isSavingSecret || !newSecret.name || !newSecret.envKey || !newSecret.value || newSecret.templateWhitelist.length === 0}
+                    className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-sm text-primary-foreground"
+                  >
+                    {isSavingSecret ? 'Adding...' : 'Add Secret'}
+                  </button>
+                </div>
+              )}
+
+              {/* Secrets List */}
+              {secretsLoading && secrets.length === 0 ? (
+                <div className="text-foreground-tertiary text-sm py-4">Loading secrets...</div>
+              ) : secrets.length === 0 ? (
+                <div className="text-foreground-tertiary text-sm py-4">
+                  No secrets yet. Add one to inject environment variables into specific tab types.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {secrets.map((secret) => (
+                    <div
+                      key={secret.id}
+                      className="flex items-start gap-3 p-3 bg-background-tertiary/30 rounded group"
+                    >
+                      <span className="text-warning text-xl mt-0.5">{'\u{1F511}'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm text-foreground font-medium">{secret.name}</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-background-input text-foreground-secondary rounded font-mono">
+                            {secret.envKey}
+                          </span>
+                        </div>
+                        {secret.description && (
+                          <div className="text-xs text-foreground-secondary mt-0.5">{secret.description}</div>
+                        )}
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          <span className="text-xs text-foreground-tertiary">Templates:</span>
+                          {secret.templateWhitelist.map((templateIcon) => {
+                            const template = templates.find(t => t.icon === templateIcon);
+                            return template ? (
+                              <span key={templateIcon} className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 bg-primary/20 text-primary rounded">
+                                <div className="w-3 h-3">
+                                  {getTemplateIcon(template.icon, template.isBuiltIn, 'w-3 h-3')}
+                                </div>
+                                {template.name}
+                              </span>
+                            ) : (
+                              <span key={templateIcon} className="text-xs px-1.5 py-0.5 bg-warning/20 text-warning rounded">
+                                {templateIcon}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteSecret(secret)}
+                        className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-2"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Proxmox */}

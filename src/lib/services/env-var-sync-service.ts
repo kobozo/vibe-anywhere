@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { workspaces, repositories } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getEnvVarService } from './env-var-service';
+import { getSecretsService } from './secrets-service';
 import { execSSHCommand } from '@/lib/container/proxmox/ssh-stream';
 import type { EnvVarDiff, EnvVarDiffDetails } from '@/types/env-sync';
 
@@ -152,8 +153,21 @@ export class EnvVarSyncService {
       workspace.templateId ?? undefined
     );
 
-    // Compare
-    const diff = this.compareEnvVars(workspaceVars, repoVars);
+    // Get vault secret keys to exclude from diff
+    // (secrets are managed separately and should not trigger sync warnings)
+    const secretsService = getSecretsService();
+    const secretKeys = await secretsService.getWorkspaceSecretKeys(workspaceId);
+
+    // Remove vault secrets from both sets before comparison
+    const workspaceVarsFiltered = { ...workspaceVars };
+    const repoVarsFiltered = { ...repoVars };
+    for (const secretKey of secretKeys) {
+      delete workspaceVarsFiltered[secretKey];
+      delete repoVarsFiltered[secretKey];
+    }
+
+    // Compare (excluding vault secrets)
+    const diff = this.compareEnvVars(workspaceVarsFiltered, repoVarsFiltered);
     const hasDifferences = diff.added.length > 0 || diff.removed.length > 0 || diff.changed.length > 0;
 
     return {

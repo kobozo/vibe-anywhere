@@ -29,7 +29,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.6.2';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '1.7.0';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -247,8 +247,13 @@ class AgentRegistry {
   /**
    * Request agent to create a tab
    */
-  createTab(workspaceId: string, tabId: string, command: string[]): boolean {
-    return this.emit(workspaceId, 'tab:create', { tabId, command });
+  createTab(
+    workspaceId: string,
+    tabId: string,
+    command: string[],
+    envVars?: Record<string, string>
+  ): boolean {
+    return this.emit(workspaceId, 'tab:create', { tabId, command, envVars });
   }
 
   /**

@@ -6,12 +6,13 @@ import { EnvVarEditor, type EnvVar } from '@/components/env-vars/env-var-editor'
 import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
 import { useGitIdentities } from '@/hooks/useGitIdentities';
 import { useAuth } from '@/hooks/useAuth';
+import { useSecrets } from '@/hooks/useSecrets';
 import {
   GitIdentitySelector,
   type GitIdentityValue,
 } from '@/components/git-identity/git-identity-selector';
 
-type RepoDialogTab = 'general' | 'environment' | 'resources' | 'git-identity';
+type RepoDialogTab = 'general' | 'environment' | 'resources' | 'secrets' | 'git-identity';
 
 interface EditRepositoryDialogProps {
   isOpen: boolean;
@@ -68,6 +69,12 @@ export function EditRepositoryDialog({
   });
   const [gitIdentityModified, setGitIdentityModified] = useState(false);
 
+  // Secrets state
+  const { secrets, fetchSecrets } = useSecrets();
+  const [selectedSecrets, setSelectedSecrets] = useState<Array<{ secretId: string; includeInEnvFile: boolean }>>([]);
+  const [secretsLoading, setSecretsLoading] = useState(false);
+  const [secretsModified, setSecretsModified] = useState(false);
+
   // Load environment variables
   const loadEnvVars = useCallback(async (repoId: string) => {
     setEnvVarsLoading(true);
@@ -89,6 +96,31 @@ export function EditRepositoryDialog({
     }
   }, [token]);
 
+  // Load repository secrets
+  const loadRepositorySecrets = useCallback(async (repoId: string) => {
+    setSecretsLoading(true);
+    try {
+      const response = await fetch(`/api/repositories/${repoId}/secrets`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (response.ok) {
+        const { data } = await response.json();
+        // Transform nested structure to flat structure for component state
+        const assignments = (data.secrets || []).map((item: any) => ({
+          secretId: item.secret.id,
+          includeInEnvFile: item.includeInEnvFile
+        }));
+        setSelectedSecrets(assignments);
+      }
+    } catch (err) {
+      console.error('Failed to load repository secrets:', err);
+    } finally {
+      setSecretsLoading(false);
+    }
+  }, [token]);
+
   // Reset form when dialog opens/closes or repository changes
   useEffect(() => {
     if (isOpen && repository) {
@@ -105,9 +137,13 @@ export function EditRepositoryDialog({
       setEnvVars([]);
       setInheritedEnvVars({});
       setEnvVarsModified(false);
+      setSelectedSecrets([]);
+      setSecretsModified(false);
       loadEnvVars(repository.id);
+      loadRepositorySecrets(repository.id);
       fetchProxmoxSettings();
       fetchIdentities();
+      fetchSecrets();
 
       // Initialize git identity state from repository
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,7 +164,7 @@ export function EditRepositoryDialog({
       }
       setGitIdentityModified(false);
     }
-  }, [isOpen, repository, loadEnvVars, fetchProxmoxSettings, fetchIdentities]);
+  }, [isOpen, repository, loadEnvVars, loadRepositorySecrets, fetchProxmoxSettings, fetchIdentities, fetchSecrets]);
 
   // Track env vars modifications
   const handleEnvVarsChange = useCallback((newEnvVars: EnvVar[]) => {
@@ -142,6 +178,28 @@ export function EditRepositoryDialog({
     setGitIdentityModified(true);
   }, []);
 
+  // Secret selection handlers
+  const handleToggleSecret = useCallback((secretId: string) => {
+    setSelectedSecrets(prev => {
+      const exists = prev.find(s => s.secretId === secretId);
+      if (exists) {
+        return prev.filter(s => s.secretId !== secretId);
+      } else {
+        return [...prev, { secretId, includeInEnvFile: false }];
+      }
+    });
+    setSecretsModified(true);
+  }, []);
+
+  const handleToggleIncludeInEnv = useCallback((secretId: string) => {
+    setSelectedSecrets(prev =>
+      prev.map(s =>
+        s.secretId === secretId ? { ...s, includeInEnvFile: !s.includeInEnvFile } : s
+      )
+    );
+    setSecretsModified(true);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -152,6 +210,28 @@ export function EditRepositoryDialog({
     }
 
     try {
+      // Save secrets if modified (DO THIS FIRST)
+      if (secretsModified && repository) {
+        try {
+          const secretsResponse = await fetch(`/api/repositories/${repository.id}/secrets`, {
+            method: 'PUT',
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ secrets: selectedSecrets }),
+          });
+
+          if (!secretsResponse.ok) {
+            const errorData = await secretsResponse.json();
+            throw new Error(errorData.error?.message || 'Failed to save secrets');
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to save secrets');
+          return; // Stop submission if secrets fail
+        }
+      }
+
       // Parse resource values (empty string = null = use default)
       const memoryValue = resourceMemory ? parseInt(resourceMemory, 10) : null;
       const cpuValue = resourceCpuCores ? parseInt(resourceCpuCores, 10) : null;
@@ -256,6 +336,21 @@ export function EditRepositoryDialog({
             {envVars.length > 0 && (
               <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-background-tertiary rounded">
                 {envVars.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('secrets')}
+            className={`px-4 py-2 text-sm font-medium transition-colors
+              ${activeTab === 'secrets'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-foreground-secondary hover:text-foreground'}`}
+          >
+            Secrets
+            {selectedSecrets.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded">
+                {selectedSecrets.length}
               </span>
             )}
           </button>
@@ -486,6 +581,90 @@ export function EditRepositoryDialog({
                     inheritedVars={inheritedEnvVars}
                   />
                 )}
+              </div>
+            )}
+
+            {/* Secrets Tab */}
+            {activeTab === 'secrets' && (
+              <div className="space-y-4">
+                <p className="text-sm text-foreground-secondary">
+                  Select secrets from your vault to inject into tabs based on template filters.
+                </p>
+
+                {secretsLoading ? (
+                  <div className="text-foreground-tertiary text-sm py-4 text-center">
+                    Loading secrets...
+                  </div>
+                ) : secrets.length === 0 ? (
+                  <div className="text-foreground-tertiary text-sm py-4 bg-background-tertiary/30 rounded p-3">
+                    No secrets available. Create secrets in Settings to inject them into specific tab types.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {secrets.map((secret) => {
+                      const isSelected = selectedSecrets.some(s => s.secretId === secret.id);
+                      const assignment = selectedSecrets.find(s => s.secretId === secret.id);
+
+                      return (
+                        <div
+                          key={secret.id}
+                          className={`p-3 rounded border transition-colors ${
+                            isSelected
+                              ? 'bg-primary/10 border-primary/30'
+                              : 'bg-background-tertiary/30 border-border/50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSecret(secret.id)}
+                              className="mt-0.5 w-4 h-4 rounded border-border-secondary bg-background-tertiary text-primary"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">{secret.name}</span>
+                                <span className="text-xs px-1.5 py-0.5 bg-background-input text-foreground-secondary rounded font-mono">
+                                  {secret.envKey}
+                                </span>
+                              </div>
+                              {secret.description && (
+                                <div className="text-xs text-foreground-secondary mt-0.5">{secret.description}</div>
+                              )}
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                <span className="text-xs text-foreground-tertiary">Templates:</span>
+                                {secret.templateWhitelist.map((templateIcon) => (
+                                  <span key={templateIcon} className="text-xs px-1.5 py-0.5 bg-primary/20 text-primary rounded">
+                                    {templateIcon}
+                                  </span>
+                                ))}
+                              </div>
+                              {isSelected && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`include-env-${secret.id}`}
+                                    checked={assignment?.includeInEnvFile || false}
+                                    onChange={() => handleToggleIncludeInEnv(secret.id)}
+                                    className="w-4 h-4 rounded border-border-secondary bg-background-tertiary text-primary"
+                                  />
+                                  <label htmlFor={`include-env-${secret.id}`} className="text-xs text-foreground">
+                                    Include in .env file
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-xs text-foreground-tertiary">
+                  Secrets are filtered by tab template and injected only in matching tabs.
+                  Changes will be saved when you click "Save Changes" below.
+                </p>
               </div>
             )}
 
