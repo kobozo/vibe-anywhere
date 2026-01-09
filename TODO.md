@@ -1,5 +1,9 @@
 # Session Hub - TODO
 
+## Project Rename
+
+- [ ] **Rename project to vibe-anywhere** - Complete project rename from "session-hub" to "vibe-anywhere". This includes: directory names, package.json, Docker images/containers, documentation (README, CLAUDE.md, TODO.md), code references, environment variables, database references, UI text, git references, and any other mentions throughout the codebase.
+
 ## Environment Variables
 
 - [x] **Sync detection on container operations** - When redeploying, destroying a container, or deleting a workspace, detect if there are differences between workspace `.env` and repository-level synced values. Show a modal asking to sync changes before proceeding.
