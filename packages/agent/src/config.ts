@@ -65,7 +65,7 @@ export function loadConfig(): AgentConfig {
     heartbeatInterval: parseInt(optionalEnv('HEARTBEAT_INTERVAL', '30000'), 10),
     maxReconnectAttempts: parseInt(optionalEnv('MAX_RECONNECT_ATTEMPTS', '0'), 10),
     reconnectBaseDelay: parseInt(optionalEnv('RECONNECT_BASE_DELAY', '1000'), 10),
-    reconnectMaxDelay: parseInt(optionalEnv('RECONNECT_MAX_DELAY', '60000'), 10),
+    reconnectMaxDelay: parseInt(optionalEnv('RECONNECT_MAX_DELAY', '300000'), 10),
     bufferSize: parseInt(optionalEnv('BUFFER_SIZE', '10000'), 10),
     tmuxPrefix: optionalEnv('TMUX_PREFIX', 'sh_'),
   };
