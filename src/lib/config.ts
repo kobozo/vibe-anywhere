@@ -103,7 +103,9 @@ export const config = {
     const homeDir = getConfig().APP_HOME_DIR;
     return {
       root: homeDir,
-      sshKeys: `${homeDir}/.ssh/keys`,
+      // SSH keys are stored encrypted in database; this path is only for temp files
+      // during key generation (ssh-keygen) and git operations (requires file paths)
+      sshKeys: `/tmp/vibe-anywhere-ssh-keys`,
       // DEPRECATED: Repositories are now cloned directly in containers
       // These paths are kept for legacy session API backward compatibility
       repositories: `${homeDir}/repositories`,

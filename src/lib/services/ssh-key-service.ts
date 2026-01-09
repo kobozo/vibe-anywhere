@@ -31,18 +31,32 @@ const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
+/**
+ * SSH Key Service
+ *
+ * Manages SSH keys for Git authentication. Keys are stored encrypted in the database
+ * using AES-256-GCM with a key derived from AUTH_SECRET. The keysDir is used only
+ * for temporary files during:
+ * - Key generation (ssh-keygen requires filesystem access)
+ * - Fingerprint calculation (ssh-keygen -lf requires file path)
+ * - Git operations (git CLI requires key file paths)
+ *
+ * Temporary files are always cleaned up after use.
+ */
 export class SSHKeyService {
   private keysDir: string;
   private encryptionKey: Buffer;
 
   constructor() {
+    // Directory for temporary files only - keys are stored encrypted in database
     this.keysDir = config.appHome.sshKeys;
     // Derive encryption key from AUTH_SECRET (32 bytes for AES-256)
     this.encryptionKey = crypto.scryptSync(config.auth.secret, 'ssh-key-salt', 32);
   }
 
   /**
-   * Ensure the SSH keys directory exists
+   * Ensure the temporary SSH keys directory exists.
+   * This directory is used for temporary files during key operations, not for permanent storage.
    */
   async ensureKeysDir(): Promise<void> {
     await fs.mkdir(this.keysDir, { recursive: true, mode: 0o700 });

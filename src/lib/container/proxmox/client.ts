@@ -445,7 +445,7 @@ export class ProxmoxClient {
 
         try {
           // Try to list storages - first at node level, then at cluster level
-          let storages;
+          let storages: any[] = [];
           try {
             storages = await this.proxmox.nodes.$(nodeName).storage.$get();
             console.log(`[CT Templates] Raw storage response:`, JSON.stringify(storages).substring(0, 500));
