@@ -56,15 +56,35 @@
 
 ## Sidebar
 
-- [ ] **Alphabetical ordering by default** - Sort repositories alphabetically in the sidebar by default.
+- [x] **Alphabetical ordering by default** - Sort repositories alphabetically in the sidebar by default.
 
-- [ ] **Filters and custom sort orders** - Add filtering options and custom sort orders for repositories in the sidebar.
+- [x] **Filters and custom sort orders** - Add filtering options and custom sort orders for repositories in the sidebar.
 
-- [ ] **User menu in sidebar footer** - Move the logged-in user display to the sidebar footer. Clicking on the user opens a submenu with logout and other user options.
+- [x] **User menu in sidebar footer** - Move the logged-in user display to the sidebar footer. Clicking on the user opens a submenu with logout and other user options.
 
-- [ ] **Rename "Templates" to "Images"** - Rename the "Templates" section in the sidebar to "Images" for clarity.
+- [x] **Rename "Templates" to "Images"** - Rename the "Templates" section in the sidebar to "Images" for clarity.
 
-- [ ] **Sidebar right-click context menu** - Add right-click context menu for repositories and workspaces in the sidebar with relevant actions.
+- [x] **Sidebar right-click context menu** - Add right-click context menu for repositories and workspaces in the sidebar with relevant actions.
+
+- [ ] **Collapsible repository groups/folders** - Group repositories by project, client, or custom tags. Allow creating folders to organize repositories.
+
+- [ ] **Favorites/pinned repositories** - Star repos to pin them at the top of the sidebar for quick access.
+
+- [ ] **Workspace status badges** - Show count of running/stopped containers per repository (e.g., "2/3 running").
+
+- [ ] **Repository icons/colors** - Custom icons or color dots per repository for quick visual identification.
+
+- [ ] **Bulk operations** - Select multiple workspaces to start/stop/redeploy at once.
+
+- [ ] **Workspace branch indicators** - Show git branch with ahead/behind status on workspace items.
+
+- [ ] **Last activity timestamp** - Show "2h ago" or similar on workspaces to indicate last activity.
+
+- [ ] **Resizable sidebar** - Drag to resize sidebar width, persist preference.
+
+- [ ] **Collapsible sidebar** - Minimize sidebar to icon-only rail view.
+
+- [ ] **Persist filter/sort preferences** - Remember user's filter and sort settings across sessions.
 
 ## Onboarding
 
