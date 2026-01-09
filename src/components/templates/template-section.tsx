@@ -61,7 +61,7 @@ export function TemplateSection({
             <span className="text-foreground-secondary text-xs w-4">
               {isExpanded ? '▾' : '▸'}
             </span>
-            <h2 className="text-lg font-semibold">Templates</h2>
+            <h2 className="text-lg font-semibold">Images</h2>
             <span className="text-xs text-foreground-tertiary ml-1">
               ({templates.length})
             </span>
@@ -79,13 +79,13 @@ export function TemplateSection({
       {isExpanded && (
         <div className="p-2 max-h-64 overflow-y-auto">
           {isLoading && templates.length === 0 && (
-            <div className="text-center text-foreground-secondary py-4">Loading templates...</div>
+            <div className="text-center text-foreground-secondary py-4">Loading images...</div>
           )}
 
           {!isLoading && templates.length === 0 && (
             <div className="text-center text-foreground-secondary py-4">
-              <p>No templates yet.</p>
-              <p className="text-sm mt-1">Add a template to get started.</p>
+              <p>No images yet.</p>
+              <p className="text-sm mt-1">Add an image to get started.</p>
             </div>
           )}
 
