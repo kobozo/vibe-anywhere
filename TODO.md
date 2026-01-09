@@ -86,6 +86,10 @@
 
 - [ ] **Persist filter/sort preferences** - Remember user's filter and sort settings across sessions.
 
+## Themes
+
+- [ ] **Light blue theme border contrast** - Borders in the light blue theme are too light and hard to see. Increase border color contrast for better visibility.
+
 ## Onboarding
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
