@@ -193,12 +193,16 @@ function Dashboard() {
     activeGroupId: persistedActiveGroupId,
     selectedRepositoryId: persistedRepositoryId,
     selectedWorkspaceId: persistedWorkspaceId,
+    repoSearchQuery: persistedRepoSearchQuery,
+    repoSortOption: persistedRepoSortOption,
     isLoaded: uiStateLoaded,
     setExpandedRepos: persistExpandedRepos,
     setSelectedTabId: persistSelectedTabId,
     setActiveGroupId: persistActiveGroupId,
     setSelectedRepositoryId: persistSelectedRepositoryId,
     setSelectedWorkspaceId: persistSelectedWorkspaceId,
+    setRepoSearchQuery: persistRepoSearchQuery,
+    setRepoSortOption: persistRepoSortOption,
   } = useUIState();
 
   // Toast notification state
@@ -1236,6 +1240,10 @@ function Dashboard() {
               initialExpandedRepos={uiStateLoaded ? persistedExpandedRepos : undefined}
               onExpandedReposChange={persistExpandedRepos}
               onWorkspacesLoaded={handleWorkspacesLoaded}
+              initialSearchQuery={uiStateLoaded ? persistedRepoSearchQuery : ''}
+              initialSortOption={uiStateLoaded ? persistedRepoSortOption : 'name-asc'}
+              onSearchQueryChange={persistRepoSearchQuery}
+              onSortOptionChange={persistRepoSortOption}
             />
           </div>
           <TemplateSection

@@ -29,6 +29,11 @@ interface RepositoryTreeProps {
   onExpandedReposChange?: (repoIds: string[]) => void;
   // Callback when workspaces are loaded for a repository
   onWorkspacesLoaded?: (repoId: string, workspaces: Workspace[]) => void;
+  // Filter/sort persistence
+  initialSearchQuery?: string;
+  initialSortOption?: string;
+  onSearchQueryChange?: (query: string) => void;
+  onSortOptionChange?: (option: string) => void;
 }
 
 export function RepositoryTree({
@@ -48,6 +53,10 @@ export function RepositoryTree({
   initialExpandedRepos,
   onExpandedReposChange,
   onWorkspacesLoaded,
+  initialSearchQuery,
+  initialSortOption,
+  onSearchQueryChange,
+  onSortOptionChange,
 }: RepositoryTreeProps) {
 
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set(initialExpandedRepos || []));
@@ -64,9 +73,20 @@ export function RepositoryTree({
     repository?: Repository;
     workspace?: Workspace;
   } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortOption, setSortOption] = useState<SortOption>('name-asc');
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQueryState] = useState(initialSearchQuery || '');
+  const [sortOption, setSortOptionState] = useState<SortOption>((initialSortOption as SortOption) || 'name-asc');
+  const [showFilters, setShowFilters] = useState(Boolean(initialSearchQuery));
+
+  // Handlers that persist changes
+  const setSearchQuery = useCallback((query: string) => {
+    setSearchQueryState(query);
+    onSearchQueryChange?.(query);
+  }, [onSearchQueryChange]);
+
+  const setSortOption = useCallback((option: SortOption) => {
+    setSortOptionState(option);
+    onSortOptionChange?.(option);
+  }, [onSortOptionChange]);
 
   // Filter and sort repositories
   const filteredAndSortedRepos = useMemo(() => {

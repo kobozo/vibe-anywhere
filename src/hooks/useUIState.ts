@@ -10,6 +10,8 @@ interface UIState {
   activeGroupId: string | null;
   selectedRepositoryId: string | null;
   selectedWorkspaceId: string | null;
+  repoSearchQuery: string;
+  repoSortOption: string;
 }
 
 const defaultState: UIState = {
@@ -18,6 +20,8 @@ const defaultState: UIState = {
   activeGroupId: null,
   selectedRepositoryId: null,
   selectedWorkspaceId: null,
+  repoSearchQuery: '',
+  repoSortOption: 'name-asc',
 };
 
 function loadState(): UIState {
@@ -93,17 +97,37 @@ export function useUIState() {
     });
   }, []);
 
+  const setRepoSearchQuery = useCallback((query: string) => {
+    setState(prev => {
+      const next = { ...prev, repoSearchQuery: query };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
+  const setRepoSortOption = useCallback((option: string) => {
+    setState(prev => {
+      const next = { ...prev, repoSortOption: option };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
   return {
     expandedRepos: state.expandedRepos,
     selectedTabId: state.selectedTabId,
     activeGroupId: state.activeGroupId,
     selectedRepositoryId: state.selectedRepositoryId,
     selectedWorkspaceId: state.selectedWorkspaceId,
+    repoSearchQuery: state.repoSearchQuery,
+    repoSortOption: state.repoSortOption,
     isLoaded,
     setExpandedRepos,
     setSelectedTabId,
     setActiveGroupId,
     setSelectedRepositoryId,
     setSelectedWorkspaceId,
+    setRepoSearchQuery,
+    setRepoSortOption,
   };
 }
