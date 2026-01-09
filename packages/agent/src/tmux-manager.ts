@@ -363,10 +363,12 @@ export class TmuxManager {
     }
 
     try {
-      // capture-pane with -p prints to stdout, -S specifies start line (negative = from end)
-      // -E specifies end line (empty = current position)
+      // capture-pane flags:
+      // -p: print to stdout
+      // -e: preserve escape sequences (ANSI colors!)
+      // -S -N: start N lines from the end of history
       const { stdout } = await exec(
-        `tmux capture-pane -t ${this.sessionName}:${window.windowIndex} -p -S -${lines}`
+        `tmux capture-pane -t ${this.sessionName}:${window.windowIndex} -p -e -S -${lines}`
       );
 
       // Split by newlines and filter empty trailing lines
