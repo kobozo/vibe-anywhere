@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ProxmoxTemplate } from '@/lib/db/schema';
 import { useAuth } from '@/hooks/useAuth';
+import { WizardStepper, WizardNavigation } from '@/components/ui/wizard-stepper';
 import {
   TECH_STACKS,
   getStacksByCategory,
@@ -27,6 +28,16 @@ type BaseSelection =
   | { type: 'ct'; id: string; volid: string; name: string }
   | { type: 'template'; id: string; template: ProxmoxTemplate }
   | null;
+
+// Wizard step IDs
+type WizardStepId = 'basic-info' | 'base-selection' | 'tech-stacks' | 'options';
+
+const WIZARD_STEPS = [
+  { id: 'basic-info' as const, label: 'Basic Info' },
+  { id: 'base-selection' as const, label: 'Base Selection' },
+  { id: 'tech-stacks' as const, label: 'Tech Stacks' },
+  { id: 'options' as const, label: 'Options' },
+];
 
 interface TemplateDialogProps {
   isOpen: boolean;
@@ -58,6 +69,12 @@ export function TemplateDialog({
   isLoading,
 }: TemplateDialogProps) {
   const { token } = useAuth();
+
+  // Wizard state
+  const [activeStep, setActiveStep] = useState<WizardStepId>('basic-info');
+  const [completedSteps, setCompletedSteps] = useState<Set<WizardStepId>>(new Set());
+
+  // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [techStacks, setTechStacks] = useState<string[]>([]);
@@ -169,6 +186,9 @@ export function TemplateDialog({
   useEffect(() => {
     if (isOpen) {
       setDialogJustOpened(true);
+      setActiveStep('basic-info');
+      setCompletedSteps(new Set());
+
       if (template) {
         // Edit mode
         setName(template.name);
@@ -265,18 +285,70 @@ export function TemplateDialog({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Wizard step validation
+  const isStep1Valid = (): boolean => !!name.trim();
+  const isStep2Valid = (): boolean => {
+    if (isEditMode || isCloneMode) return true;
+    return !!selectedBase;
+  };
+  const isStep3Valid = (): boolean => true;
+  const isStep4Valid = (): boolean => true;
+
+  const canProceed = (): boolean => {
+    switch (activeStep) {
+      case 'basic-info': return isStep1Valid();
+      case 'base-selection': return isStep2Valid();
+      case 'tech-stacks': return isStep3Valid();
+      case 'options': return isStep4Valid();
+      default: return false;
+    }
+  };
+
+  // Wizard navigation handlers
+  const handleNext = () => {
+    setError(null);
+    if (activeStep === 'basic-info' && isStep1Valid()) {
+      setCompletedSteps((prev) => new Set(prev).add('basic-info'));
+      setActiveStep('base-selection');
+    } else if (activeStep === 'base-selection' && isStep2Valid()) {
+      setCompletedSteps((prev) => new Set(prev).add('base-selection'));
+      setActiveStep('tech-stacks');
+    } else if (activeStep === 'tech-stacks' && isStep3Valid()) {
+      setCompletedSteps((prev) => new Set(prev).add('tech-stacks'));
+      setActiveStep('options');
+    }
+  };
+
+  const handleBack = () => {
+    setError(null);
+    if (activeStep === 'base-selection') setActiveStep('basic-info');
+    else if (activeStep === 'tech-stacks') setActiveStep('base-selection');
+    else if (activeStep === 'options') setActiveStep('tech-stacks');
+  };
+
+  const handleStepClick = (stepId: string) => {
+    const step = stepId as WizardStepId;
+    const stepIndex = WIZARD_STEPS.findIndex((s) => s.id === step);
+    const currentIndex = WIZARD_STEPS.findIndex((s) => s.id === activeStep);
+    if (completedSteps.has(step) || stepIndex < currentIndex) {
+      setError(null);
+      setActiveStep(step);
+    }
+  };
+
+  const handleSubmit = async () => {
     setError(null);
 
+    // Safety checks with step navigation
     if (!name.trim()) {
       setError('Name is required');
+      setActiveStep('basic-info');
       return;
     }
 
-    // Require base selection for new templates (not in clone mode)
     if (!isEditMode && !isCloneMode && !selectedBase) {
-      setError('Please select a base (CT template or Vibe Anywhere template)');
+      setError('Please select a base');
+      setActiveStep('base-selection');
       return;
     }
 
@@ -312,136 +384,237 @@ export function TemplateDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-secondary rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-foreground mb-4">
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">
             {isEditMode ? 'Edit Template' : isCloneMode ? 'Clone Template' : 'Create Template'}
           </h2>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name */}
-            <div>
-              <label className="block text-sm text-foreground mb-1">Name *</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
-                placeholder="e.g., Node.js Development"
-                disabled={isLoading}
-              />
+        {/* Wizard Steps (Create/Clone) or Tabs (Edit) */}
+        {isEditMode ? (
+          // Edit mode: Use tabs for flexible navigation
+          <div className="flex border-b border-border">
+            <button
+              type="button"
+              onClick={() => setActiveStep('basic-info')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeStep === 'basic-info'
+                  ? 'text-primary border-b-2 border-primary -mb-[1px]'
+                  : 'text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              Basic Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep('base-selection')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeStep === 'base-selection'
+                  ? 'text-primary border-b-2 border-primary -mb-[1px]'
+                  : 'text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              Base Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep('tech-stacks')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeStep === 'tech-stacks'
+                  ? 'text-primary border-b-2 border-primary -mb-[1px]'
+                  : 'text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              Tech Stacks
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep('options')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeStep === 'options'
+                  ? 'text-primary border-b-2 border-primary -mb-[1px]'
+                  : 'text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              Options
+            </button>
+          </div>
+        ) : (
+          // Create/Clone mode: Use wizard for sequential navigation
+          <WizardStepper
+            steps={WIZARD_STEPS}
+            activeStepId={activeStep}
+            completedSteps={completedSteps}
+            onStepClick={handleStepClick}
+          />
+        )}
+
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Error */}
+          {error && (
+            <div className="p-3 bg-error/20 border border-error/50 rounded text-error text-sm">
+              {error}
             </div>
+          )}
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm text-foreground mb-1">Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary h-20 resize-none"
-                placeholder="Optional description"
-                disabled={isLoading}
-              />
-            </div>
-
-            {/* Based on - Required for new templates, not shown in clone mode or edit mode */}
-            {!isEditMode && !isCloneMode && (
+          {/* Step 1: Basic Info */}
+          {activeStep === 'basic-info' && (
+            <>
               <div>
-                <label className="block text-sm text-foreground mb-1">Based on *</label>
-                {ctTemplatesLoading ? (
-                  <div className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground-secondary">
-                    Loading CT templates...
-                  </div>
-                ) : ctTemplatesError ? (
-                  <div className="w-full px-3 py-2 bg-background-tertiary border border-error rounded text-error text-sm">
-                    {ctTemplatesError}
-                  </div>
-                ) : (
-                  <select
-                    value={selectedBaseValue}
-                    onChange={(e) => handleBaseChange(e.target.value)}
-                    className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
-                    disabled={isLoading}
-                  >
-                    <option value="">Select a base...</option>
+                <label className="block text-sm text-foreground mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
+                  placeholder="e.g., Node.js Development"
+                  disabled={isLoading}
+                />
+              </div>
 
-                    {/* CT Templates Group */}
-                    {ctTemplates.length > 0 && (
-                      <optgroup label="CT Templates (OS Images)">
-                        {ctTemplates.map((ct) => (
-                          <option key={ct.volid} value={`ct:${ct.volid}`}>
-                            {ct.name}
-                          </option>
-                        ))}
-                      </optgroup>
+              <div>
+                <label className="block text-sm text-foreground mb-1">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary h-20 resize-none"
+                  placeholder="Optional description"
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Step 2: Base Selection */}
+          {activeStep === 'base-selection' && (
+            <>
+              {isEditMode ? (
+                // Edit mode: Show read-only base info
+                <div className="p-3 bg-background-tertiary/50 rounded">
+                  <div className="text-sm text-foreground-secondary mb-2">
+                    Base cannot be changed after creation
+                  </div>
+                  {template.baseCtTemplate && (
+                    <div className="text-sm">
+                      Base CT: <span className="text-foreground font-medium">{template.baseCtTemplate}</span>
+                    </div>
+                  )}
+                  {template.parentTemplateId && effectiveParent && (
+                    <>
+                      <div className="text-sm">
+                        Based on: <span className="text-foreground font-medium">{effectiveParent.name}</span>
+                      </div>
+                      {inheritedStacks.length > 0 && (
+                        <div className="text-xs text-purple-400 mt-1">
+                          Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : isCloneMode ? (
+                // Clone mode: Show parent info (read-only)
+                <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
+                  <div className="text-sm text-purple-300">
+                    Cloning from:{' '}
+                    <span className="text-foreground font-medium">{parentTemplate.name}</span>
+                  </div>
+                  {inheritedStacks.length > 0 && (
+                    <div className="text-xs text-purple-400 mt-1">
+                      Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Create mode: Show dropdown and info cards
+                <>
+                  <div>
+                    <label className="block text-sm text-foreground mb-1">Based on *</label>
+                    {ctTemplatesLoading ? (
+                      <div className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground-secondary">
+                        Loading CT templates...
+                      </div>
+                    ) : ctTemplatesError ? (
+                      <div className="w-full px-3 py-2 bg-background-tertiary border border-error rounded text-error text-sm">
+                        {ctTemplatesError}
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedBaseValue}
+                        onChange={(e) => handleBaseChange(e.target.value)}
+                        className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground focus:outline-none focus:border-primary"
+                        disabled={isLoading}
+                      >
+                        <option value="">Select a base...</option>
+
+                        {/* CT Templates Group */}
+                        {ctTemplates.length > 0 && (
+                          <optgroup label="CT Templates (OS Images)">
+                            {ctTemplates.map((ct) => (
+                              <option key={ct.volid} value={`ct:${ct.volid}`}>
+                                {ct.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+
+                        {/* Vibe Anywhere Templates Group */}
+                        {availableParentTemplates.length > 0 && (
+                          <optgroup label="Vibe Anywhere Templates">
+                            {availableParentTemplates.map((t) => (
+                              <option key={`tpl:${t.id}`} value={`tpl:${t.id}`}>
+                                {t.name} {t.techStacks && t.techStacks.length > 0 ? `(${t.techStacks.join(', ')})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
                     )}
-
-                    {/* Vibe Anywhere Templates Group */}
-                    {availableParentTemplates.length > 0 && (
-                      <optgroup label="Vibe Anywhere Templates">
-                        {availableParentTemplates.map((t) => (
-                          <option key={`tpl:${t.id}`} value={`tpl:${t.id}`}>
-                            {t.name} {t.techStacks && t.techStacks.length > 0 ? `(${t.techStacks.join(', ')})` : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                )}
-                <p className="text-xs text-foreground-tertiary mt-1">
-                  {selectedBase?.type === 'ct'
-                    ? 'Create from a fresh OS image with full provisioning.'
-                    : selectedBase?.type === 'template'
-                    ? 'Clone from an existing template to inherit its configuration and tech stacks.'
-                    : 'Select a CT template (OS image) or an existing Vibe Anywhere template.'}
-                </p>
-              </div>
-            )}
-
-            {/* Clone mode info (when forced from Clone button) */}
-            {isCloneMode && parentTemplate && (
-              <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
-                <div className="text-sm text-purple-300">
-                  Cloning from:{' '}
-                  <span className="text-foreground font-medium">{parentTemplate.name}</span>
-                </div>
-                {inheritedStacks.length > 0 && (
-                  <div className="text-xs text-purple-400 mt-1">
-                    Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
+                    <p className="text-xs text-foreground-tertiary mt-1">
+                      {selectedBase?.type === 'ct'
+                        ? 'Create from a fresh OS image with full provisioning.'
+                        : selectedBase?.type === 'template'
+                        ? 'Clone from an existing template to inherit its configuration and tech stacks.'
+                        : 'Select a CT template (OS image) or an existing Vibe Anywhere template.'}
+                    </p>
                   </div>
-                )}
-              </div>
-            )}
 
-            {/* Selected base info (when Vibe Anywhere template selected via dropdown) */}
-            {!isCloneMode && selectedBase?.type === 'template' && effectiveParent && (
-              <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
-                <div className="text-sm text-purple-300">
-                  Inheriting from:{' '}
-                  <span className="text-foreground font-medium">{effectiveParent.name}</span>
-                </div>
-                {inheritedStacks.length > 0 && (
-                  <div className="text-xs text-purple-400 mt-1">
-                    Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
-                  </div>
-                )}
-              </div>
-            )}
+                  {/* Selected base info cards */}
+                  {selectedBase?.type === 'template' && effectiveParent && (
+                    <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
+                      <div className="text-sm text-purple-300">
+                        Inheriting from:{' '}
+                        <span className="text-foreground font-medium">{effectiveParent.name}</span>
+                      </div>
+                      {inheritedStacks.length > 0 && (
+                        <div className="text-xs text-purple-400 mt-1">
+                          Inherits: {inheritedStacks.map(id => getTechStack(id)?.name).filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-            {/* Selected CT template info */}
-            {!isCloneMode && selectedBase?.type === 'ct' && (
-              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded">
-                <div className="text-sm text-blue-300">
-                  Base OS:{' '}
-                  <span className="text-foreground font-medium">{selectedBase.name}</span>
-                </div>
-                <div className="text-xs text-blue-400 mt-1">
-                  Full provisioning will be performed (Node.js, Git, Vibe Anywhere Agent, etc.)
-                </div>
-              </div>
-            )}
+                  {selectedBase?.type === 'ct' && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded">
+                      <div className="text-sm text-blue-300">
+                        Base OS:{' '}
+                        <span className="text-foreground font-medium">{selectedBase.name}</span>
+                      </div>
+                      <div className="text-xs text-blue-400 mt-1">
+                        Full provisioning will be performed (Node.js, Git, Vibe Anywhere Agent, etc.)
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
 
-            {/* Tech Stacks with Tabs */}
+          {/* Step 3: Tech Stacks */}
+          {activeStep === 'tech-stacks' && (
             <div>
               <label className="block text-sm text-foreground mb-2">
                 Tech Stacks
@@ -561,88 +734,105 @@ export function TemplateDialog({
                 </div>
               )}
             </div>
+          )}
 
-            {/* Default Toggle */}
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isDefault}
-                  onChange={(e) => setIsDefault(e.target.checked)}
-                  disabled={isLoading}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-foreground">Set as default template</span>
-              </label>
-              <p className="text-xs text-foreground-tertiary mt-1">
-                New repositories will use the default template unless specified otherwise.
-              </p>
-            </div>
-
-            {/* Staging Mode Toggle - only for new templates */}
-            {!isEditMode && (
+          {/* Step 4: Options */}
+          {activeStep === 'options' && (
+            <>
+              {/* Default Toggle */}
               <div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={enableStaging}
-                    onChange={(e) => setEnableStaging(e.target.checked)}
+                    checked={isDefault}
+                    onChange={(e) => setIsDefault(e.target.checked)}
                     disabled={isLoading}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm text-foreground">Enable staging mode</span>
+                  <span className="text-sm text-foreground">Set as default template</span>
                 </label>
-                <p className="text-xs text-foreground-tertiary mt-1 ml-6">
-                  Keep container running after provisioning for manual customization.
-                  You can SSH into the container to install additional software before finalizing.
+                <p className="text-xs text-foreground-tertiary mt-1">
+                  New repositories will use the default template unless specified otherwise.
                 </p>
               </div>
-            )}
 
-            {/* Template Status Info */}
-            {isEditMode && template && (
-              <div className="bg-background-tertiary/50 rounded p-3 text-sm">
-                <div className="text-foreground-secondary">Status: <span className="text-foreground capitalize">{template.status}</span></div>
-                {template.vmid && (
-                  <div className="text-foreground-secondary">VMID: <span className="text-foreground">{template.vmid}</span></div>
-                )}
-                {template.node && (
-                  <div className="text-foreground-secondary">Node: <span className="text-foreground">{template.node}</span></div>
-                )}
-                {template.baseCtTemplate && (
-                  <div className="text-foreground-secondary">Base CT: <span className="text-foreground">{template.baseCtTemplate}</span></div>
-                )}
-                {template.errorMessage && (
-                  <div className="text-error mt-2">Error: {template.errorMessage}</div>
-                )}
-              </div>
-            )}
+              {/* Staging Mode Toggle - only for new templates */}
+              {!isEditMode && (
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableStaging}
+                      onChange={(e) => setEnableStaging(e.target.checked)}
+                      disabled={isLoading}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm text-foreground">Enable staging mode</span>
+                  </label>
+                  <p className="text-xs text-foreground-tertiary mt-1 ml-6">
+                    Keep container running after provisioning for manual customization.
+                    You can SSH into the container to install additional software before finalizing.
+                  </p>
+                </div>
+              )}
 
-            {/* Error */}
-            {error && (
-              <div className="text-error text-sm">{error}</div>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-foreground hover:text-foreground transition-colors"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-primary hover:bg-primary-hover text-foreground rounded transition-colors disabled:opacity-50"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Template'}
-              </button>
-            </div>
-          </form>
+              {/* Template Status Info - Edit mode only */}
+              {isEditMode && template && (
+                <div className="bg-background-tertiary/50 rounded p-3 text-sm">
+                  <div className="text-foreground-secondary">Status: <span className="text-foreground capitalize">{template.status}</span></div>
+                  {template.vmid && (
+                    <div className="text-foreground-secondary">VMID: <span className="text-foreground">{template.vmid}</span></div>
+                  )}
+                  {template.node && (
+                    <div className="text-foreground-secondary">Node: <span className="text-foreground">{template.node}</span></div>
+                  )}
+                  {template.baseCtTemplate && (
+                    <div className="text-foreground-secondary">Base CT: <span className="text-foreground">{template.baseCtTemplate}</span></div>
+                  )}
+                  {template.errorMessage && (
+                    <div className="text-error mt-2">Error: {template.errorMessage}</div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
+
+        {/* Footer Navigation */}
+        {isEditMode ? (
+          // Edit mode: Simple Save/Cancel buttons
+          <div className="p-4 border-t border-border flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 disabled:cursor-not-allowed rounded text-foreground transition-colors"
+            >
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        ) : (
+          // Create/Clone mode: Wizard navigation
+          <WizardNavigation
+            onBack={handleBack}
+            onNext={handleNext}
+            onCancel={onClose}
+            onFinish={handleSubmit}
+            isFirstStep={activeStep === 'basic-info'}
+            isLastStep={activeStep === 'options'}
+            canProceed={canProceed()}
+            isLoading={isLoading}
+            finishLabel="Create Template"
+          />
+        )}
       </div>
     </div>
   );
