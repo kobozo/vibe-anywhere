@@ -47,7 +47,6 @@ interface TerminalContextMenuProps {
   onClose: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
-  onReloadEnvVars?: () => void;
   onAddToGroup?: (groupId: string) => void;
   onStartMultiSelect: () => void;
   onSplitWithExisting: (direction: SplitDirection, tabId: string, currentGroup: TabGroupInfo | null) => void;
@@ -67,7 +66,6 @@ export function TerminalContextMenu({
   onClose,
   onDelete,
   onDuplicate,
-  onReloadEnvVars,
   onAddToGroup,
   onStartMultiSelect,
   onSplitWithExisting,
@@ -212,19 +210,6 @@ export function TerminalContextMenu({
           className={menuItemClass}
         >
           Duplicate
-        </button>
-      )}
-
-      {/* Reload Env Vars */}
-      {onReloadEnvVars && (
-        <button
-          onClick={() => {
-            onClose();
-            onReloadEnvVars();
-          }}
-          className={menuItemClass}
-        >
-          Reload Env Vars
         </button>
       )}
 

@@ -175,6 +175,24 @@ export function EnvVarEditor({
 
   return (
     <div className="space-y-4">
+      {/* Info banner */}
+      <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg">
+        <div className="flex items-start gap-2">
+          <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1 text-sm">
+            <p className="text-foreground font-medium mb-1">Environment variables are automatically synced</p>
+            <p className="text-foreground-secondary">
+              Changes are applied immediately to new terminal sessions. To load changes in your current shell, run:{' '}
+              <code className="px-1.5 py-0.5 bg-background-tertiary text-foreground rounded font-mono text-xs">
+                reload-env
+              </code>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Import actions bar */}
       {!disabled && (
         <div className="flex items-center gap-2">

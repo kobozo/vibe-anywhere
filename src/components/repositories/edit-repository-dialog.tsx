@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Repository, ProxmoxTemplate } from '@/lib/db/schema';
 import { EnvVarEditor, type EnvVar } from '@/components/env-vars/env-var-editor';
-import { ApplyEnvVarsDialog } from '@/components/env-vars/apply-env-vars-dialog';
 import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
 import { useGitIdentities } from '@/hooks/useGitIdentities';
 import { useAuth } from '@/hooks/useAuth';
@@ -76,9 +75,6 @@ export function EditRepositoryDialog({
   const [secretsLoading, setSecretsLoading] = useState(false);
   const [secretsModified, setSecretsModified] = useState(false);
 
-  // Apply env vars dialog state
-  const [showApplyDialog, setShowApplyDialog] = useState(false);
-
   // Load environment variables
   const loadEnvVars = useCallback(async (repoId: string) => {
     setEnvVarsLoading(true);
@@ -145,7 +141,6 @@ export function EditRepositoryDialog({
       setEnvVarsModified(false);
       setSelectedSecrets([]);
       setSecretsModified(false);
-      setShowApplyDialog(false); // Reset apply dialog state
       loadEnvVars(repository.id);
       loadRepositorySecrets(repository.id);
       fetchProxmoxSettings();
@@ -287,12 +282,9 @@ export function EditRepositoryDialog({
         _keepDialogOpen: envVarsModified,
       } as any);
 
-      // If env vars were modified, show apply dialog
-      if (envVarsModified) {
-        setShowApplyDialog(true);
-      } else {
-        onClose();
-      }
+      // Environment variables are automatically synced on save
+      // Users can run 'reload-env' in their terminals to apply changes
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save repository');
     }
@@ -735,16 +727,6 @@ export function EditRepositoryDialog({
         </form>
       </div>
 
-      {/* Apply env vars dialog */}
-      <ApplyEnvVarsDialog
-        isOpen={showApplyDialog}
-        repositoryId={repository.id}
-        repositoryName={repository.name}
-        onClose={() => {
-          setShowApplyDialog(false);
-          onClose();
-        }}
-      />
     </div>
   );
 }
