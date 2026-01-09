@@ -101,6 +101,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 /**
  * Update tmux environment variables
  * Sets variables in tmux server so new windows inherit them
+ * Also unsets any previously managed variables that were removed
  */
 async function updateTmuxEnvironment(
   containerId: string,
@@ -108,10 +109,43 @@ async function updateTmuxEnvironment(
   containerBackend: any
 ): Promise<void> {
   try {
-    const vmid = parseInt(containerId, 10);
-
-    // Build tmux set-environment commands
     const commands: string[] = [];
+
+    // Step 1: Get existing Session Hub env vars from /etc/profile.d/session-hub-env.sh
+    // This tells us which vars we previously managed, so we can unset removed ones
+    try {
+      const { stdout } = await containerBackend.executeCommand(containerId, [
+        'bash',
+        '-c',
+        'cat /etc/profile.d/session-hub-env.sh 2>/dev/null || true'
+      ]);
+
+      if (stdout) {
+        // Parse the file to extract variable names (lines like "export VAR_NAME='value'")
+        const existingVarNames = stdout
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.startsWith('export '))
+          .map(line => {
+            // Extract var name from "export VAR_NAME='value'" or "export VAR_NAME=value"
+            const match = line.match(/^export\s+([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+            return match ? match[1] : null;
+          })
+          .filter((name): name is string => name !== null);
+
+        // Unset any vars that were in the old file but not in the new envVars
+        for (const oldVarName of existingVarNames) {
+          if (!(oldVarName in envVars)) {
+            commands.push(`tmux set-environment -gu ${oldVarName}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Could not read existing env file for cleanup:', error);
+      // Continue anyway - not critical
+    }
+
+    // Step 2: Set all the new env vars
     for (const [key, value] of Object.entries(envVars)) {
       // Escape single quotes in value
       const escapedValue = value.replace(/'/g, "'\\''");
@@ -119,10 +153,12 @@ async function updateTmuxEnvironment(
     }
 
     // Execute all commands in one SSH session
-    const commandStr = commands.join(' && ');
-    await containerBackend.executeCommand(containerId, ['bash', '-c', commandStr]);
+    if (commands.length > 0) {
+      const commandStr = commands.join(' && ');
+      await containerBackend.executeCommand(containerId, ['bash', '-c', commandStr]);
+    }
 
-    console.log(`Updated tmux environment with ${Object.keys(envVars).length} variables`);
+    console.log(`Updated tmux environment: ${Object.keys(envVars).length} vars set, ${commands.length - Object.keys(envVars).length} vars unset`);
   } catch (error) {
     console.error('Failed to update tmux environment:', error);
     // Don't throw - this is not critical, /etc/profile.d/ was still updated
