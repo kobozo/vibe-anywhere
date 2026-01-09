@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getTemplateService } from '@/lib/services/template-service';
-import { getProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 import { config } from '@/lib/config';
 import {
   requireAuth,
@@ -101,7 +102,9 @@ export const DELETE = withErrorHandling(
     // If template was provisioned on Proxmox, delete it there first
     if (existing.vmid && config.container.backend === 'proxmox') {
       try {
-        const templateManager = getProxmoxTemplateManager();
+        // Get Proxmox client with database configuration
+        const proxmoxClient = await getProxmoxClientAsync();
+        const templateManager = new ProxmoxTemplateManager(proxmoxClient);
         // Use deleteProxmoxTemplate which just deletes from Proxmox without clearing old settings
         await templateManager.deleteProxmoxTemplate(existing.vmid);
         console.log(`Deleted Proxmox template VMID ${existing.vmid}`);

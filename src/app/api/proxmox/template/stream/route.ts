@@ -8,7 +8,8 @@
 
 import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
-import { getProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 
 /**
  * POST /api/proxmox/template/stream
@@ -38,7 +39,9 @@ export async function POST(request: NextRequest) {
     force?: boolean;
   };
 
-  const templateManager = getProxmoxTemplateManager();
+  // Get Proxmox client with database configuration
+  const proxmoxClient = await getProxmoxClientAsync();
+  const templateManager = new ProxmoxTemplateManager(proxmoxClient);
 
   // Check SSH key availability
   const sshPublicKey = templateManager.getSSHPublicKey();

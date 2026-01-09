@@ -273,25 +273,37 @@ export async function getProxmoxRuntimeConfig(): Promise<ProxmoxRuntimeConfig> {
         max: dbSettings.vmidMax ?? envConfig.vmidRange.max,
       },
     };
-  } catch {
-    // If DB fails, fall back to .env config entirely
-    return {
-      host: envConfig.host,
-      port: envConfig.port,
-      tokenId: envConfig.tokenId,
-      tokenSecret: envConfig.tokenSecret,
-      node: envConfig.node,
-      storage: envConfig.storage,
-      bridge: envConfig.bridge,
-      vlanTag: envConfig.vlanTag,
-      sshUser: envConfig.sshUser,
-      sshPrivateKeyPath: envConfig.sshPrivateKeyPath,
-      memoryMb: envConfig.memoryMb,
-      cores: envConfig.cores,
-      claudeConfigPath: envConfig.claudeConfigPath,
-      templateVmid: envConfig.templateVmid,
-      vmidRange: envConfig.vmidRange,
-    };
+  } catch (error) {
+    // Log the actual error for debugging
+    console.error('[Proxmox Config] Failed to load database settings:', error);
+
+    // If DB fails, fall back to .env config entirely (only if .env has required values)
+    if (envConfig.host && envConfig.tokenId && envConfig.tokenSecret && envConfig.node) {
+      console.warn('[Proxmox Config] Falling back to .env configuration');
+      return {
+        host: envConfig.host,
+        port: envConfig.port,
+        tokenId: envConfig.tokenId,
+        tokenSecret: envConfig.tokenSecret,
+        node: envConfig.node,
+        storage: envConfig.storage,
+        bridge: envConfig.bridge,
+        vlanTag: envConfig.vlanTag,
+        sshUser: envConfig.sshUser,
+        sshPrivateKeyPath: envConfig.sshPrivateKeyPath,
+        memoryMb: envConfig.memoryMb,
+        cores: envConfig.cores,
+        claudeConfigPath: envConfig.claudeConfigPath,
+        templateVmid: envConfig.templateVmid,
+        vmidRange: envConfig.vmidRange,
+      };
+    }
+
+    // No valid config in DB or .env, throw informative error
+    throw new Error(
+      'Proxmox configuration unavailable. Please configure Proxmox in Settings > Proxmox. ' +
+      `Database error: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 

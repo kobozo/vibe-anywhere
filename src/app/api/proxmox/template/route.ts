@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
-import { getProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 
 /**
  * GET /api/proxmox/template
@@ -24,7 +25,8 @@ export async function GET() {
       );
     }
 
-    const templateManager = getProxmoxTemplateManager();
+    const proxmoxClient = await getProxmoxClientAsync();
+    const templateManager = new ProxmoxTemplateManager(proxmoxClient);
     const status = await templateManager.getTemplateStatus();
     const sshPublicKey = templateManager.getSSHPublicKey();
 
@@ -70,7 +72,8 @@ export async function POST(request: NextRequest) {
       force?: boolean;
     };
 
-    const templateManager = getProxmoxTemplateManager();
+    const proxmoxClient = await getProxmoxClientAsync();
+    const templateManager = new ProxmoxTemplateManager(proxmoxClient);
 
     // Check SSH key availability
     const sshPublicKey = templateManager.getSSHPublicKey();
@@ -142,7 +145,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const templateManager = getProxmoxTemplateManager();
+    const proxmoxClient = await getProxmoxClientAsync();
+    const templateManager = new ProxmoxTemplateManager(proxmoxClient);
 
     // Get VMID from query param, database, or config
     const { searchParams } = new URL(request.url);

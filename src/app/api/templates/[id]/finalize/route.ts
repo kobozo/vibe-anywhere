@@ -9,7 +9,8 @@
 
 import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
-import { getProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
+import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 import { getTemplateService } from '@/lib/services/template-service';
 import { requireAuth } from '@/lib/api-utils';
 
@@ -77,7 +78,9 @@ export async function POST(
     );
   }
 
-  const templateManager = getProxmoxTemplateManager();
+  // Get Proxmox client with database configuration
+  const proxmoxClient = await getProxmoxClientAsync();
+  const templateManager = new ProxmoxTemplateManager(proxmoxClient);
 
   // Create a readable stream for SSE
   const encoder = new TextEncoder();
