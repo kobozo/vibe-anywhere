@@ -85,6 +85,7 @@ export class CliInstaller {
 
   /**
    * Ensure the reload-env alias exists in .bashrc
+   * Updates the alias if it's outdated (missing --no-comments)
    */
   async ensureBashrcAlias(): Promise<void> {
     if (!fs.existsSync(this.config.bashrcPath)) {
@@ -93,15 +94,32 @@ export class CliInstaller {
     }
 
     try {
-      const bashrc = await fs.promises.readFile(this.config.bashrcPath, 'utf8');
+      let bashrc = await fs.promises.readFile(this.config.bashrcPath, 'utf8');
+      const currentAliasLine = "alias reload-env='eval $(session-hub reload env --no-comments)'";
 
+      // Check if the correct (current) alias exists
+      if (bashrc.includes(currentAliasLine)) {
+        console.log('✓ reload-env alias is up-to-date in .bashrc');
+        return;
+      }
+
+      // Check if an old alias exists (without --no-comments)
+      const oldAliasRegex = /alias reload-env='eval \$\(session-hub reload env\)'/;
+      if (oldAliasRegex.test(bashrc)) {
+        // Update the old alias
+        bashrc = bashrc.replace(oldAliasRegex, currentAliasLine);
+        await fs.promises.writeFile(this.config.bashrcPath, bashrc, 'utf8');
+        console.log('✓ Updated reload-env alias in .bashrc (added --no-comments)');
+        return;
+      }
+
+      // No alias exists, add it
       if (!bashrc.includes('reload-env')) {
-        const aliasLine = "alias reload-env='eval $(session-hub reload env --no-comments)'";
-        const addition = `\n# Session Hub helper alias\n${aliasLine}\n`;
+        const addition = `\n# Session Hub helper alias\n${currentAliasLine}\n`;
         await fs.promises.appendFile(this.config.bashrcPath, addition);
         console.log('✓ Added reload-env alias to .bashrc');
       } else {
-        console.log('✓ reload-env alias already exists in .bashrc');
+        console.log('✓ reload-env alias already exists in .bashrc (unknown format)');
       }
     } catch (error) {
       console.warn('Could not update .bashrc:', error);

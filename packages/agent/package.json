@@ -1,6 +1,6 @@
 {
   "name": "@session-hub/agent",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "description": "Session Hub sidecar agent for LXC containers",
   "type": "module",
   "main": "dist/index.js",
