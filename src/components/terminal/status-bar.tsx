@@ -69,6 +69,7 @@ interface StatusBarProps {
   tabId: string;
   socket: Socket | null;
   isConnected: boolean;
+  terminalBackground?: string | null;
 }
 
 interface ContainerStats {
@@ -85,7 +86,7 @@ interface ContainerStats {
   };
 }
 
-export function StatusBar({ workspaceId, tabId, socket, isConnected }: StatusBarProps) {
+export function StatusBar({ workspaceId, tabId, socket, isConnected, terminalBackground }: StatusBarProps) {
   const { theme } = useTheme();
   const [stats, setStats] = useState<ContainerStats | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -206,7 +207,7 @@ export function StatusBar({ workspaceId, tabId, socket, isConnected }: StatusBar
     <div
       className="flex items-center justify-between px-3 py-1 text-xs shrink-0"
       style={{
-        backgroundColor: theme.terminal.background,
+        backgroundColor: terminalBackground || theme.terminal.background,
         borderTop: `1px solid ${theme.colors.border}`,
         color: theme.colors.foregroundTertiary,
       }}

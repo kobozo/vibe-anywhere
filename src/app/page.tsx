@@ -142,6 +142,8 @@ function Dashboard() {
   const deleteTabRef = useRef<((tabId: string) => Promise<void>) | null>(null);
   const workspaceTabsRef = useRef<TabInfo[]>([]);
   const tabBarRef = useRef<TabBarRef>(null);
+  // Track mounted terminal tabs to preserve xterm instances (and colors) when switching tabs
+  const [mountedTerminalIds, setMountedTerminalIds] = useState<Set<string>>(new Set());
 
   // Tab groups hook
   const {
@@ -655,7 +657,19 @@ function Dashboard() {
     setSelectedTab(null); // Will be auto-selected by TabBar
     setActiveGroupId(null); // Clear active group when switching workspace
     setActiveOperation(null); // Clear any pending operation when switching workspace
+    setMountedTerminalIds(new Set()); // Clear mounted terminals when switching workspace
   }, [setActiveGroupId]);
+
+  // Track mounted terminal tabs to preserve xterm instances when switching tabs
+  // This prevents colors set by terminal apps (vim, htop, etc.) from being reset
+  useEffect(() => {
+    if (selectedTab && selectedTab.tabType === 'terminal' && selectedTab.status === 'running') {
+      setMountedTerminalIds(prev => {
+        if (prev.has(selectedTab.id)) return prev;
+        return new Set(prev).add(selectedTab.id);
+      });
+    }
+  }, [selectedTab]);
 
   // Handle workspace state updates - update selectedWorkspace with new container status
   const handleWorkspaceUpdate = useCallback((update: WorkspaceStateUpdate) => {
@@ -1306,68 +1320,95 @@ function Dashboard() {
                       onTerminalContextMenu={handleTerminalContextMenu}
                     />
                   </div>
-                ) : selectedTab && selectedTab.tabType === 'dashboard' ? (
-                  // Dashboard panel - workspace overview
-                  <DashboardPanel
-                    workspace={selectedWorkspace}
-                    repository={selectedRepository}
-                    onRestartContainer={handleRestartContainer}
-                    onShutdownContainer={handleShutdownContainer}
-                    onStartContainer={handleStartContainer}
-                    onRedeployContainer={handleRedeployContainer}
-                    onDestroyContainer={handleDestroyContainer}
-                    onDeleteWorkspace={handleDeleteWorkspace}
-                  />
-                ) : selectedTab && selectedTab.tabType === 'git' ? (
-                  // Git panel - no terminal needed
-                  <GitPanel workspaceId={selectedWorkspace.id} />
-                ) : selectedTab && selectedTab.tabType === 'docker' ? (
-                  // Docker panel - no terminal needed
-                  <DockerPanel workspaceId={selectedWorkspace.id} containerIp={selectedWorkspace.containerIp ?? null} />
-                ) : selectedTab && selectedTab.status === 'running' ? (
-                  <Terminal
-                    key={selectedTab.id}
-                    tabId={selectedTab.id}
-                    workspaceId={selectedWorkspace.id}
-                    onConnectionChange={setIsTerminalConnected}
-                    onEnd={() => {
-                      setIsTerminalConnected(false);
-                      // Close the tab when session ends and switch to previous tab
-                      if (selectedTab && deleteTabRef.current) {
-                        const tabs = workspaceTabsRef.current;
-                        const currentIndex = tabs.findIndex(t => t.id === selectedTab.id);
-                        // Select the tab before this one, or the next one, or null
-                        const nextTab = currentIndex > 0
-                          ? tabs[currentIndex - 1]
-                          : tabs[currentIndex + 1] || null;
-                        setSelectedTab(nextTab);
-                        deleteTabRef.current(selectedTab.id).catch(console.error);
-                      }
-                    }}
-                    onContextMenu={handleTerminalContextMenu}
-                  />
-                ) : selectedTab ? (
-                  <div className="h-full flex items-center justify-center text-foreground-tertiary">
-                    <div className="text-center">
-                      <p className="text-lg">Tab is {selectedTab.status}</p>
-                      <p className="text-sm mt-2">
-                        {selectedTab.status === 'pending' || selectedTab.status === 'stopped'
-                          ? 'Click the tab to start it'
-                          : selectedTab.status === 'starting'
-                          ? 'Starting container...'
-                          : 'Tab encountered an error'}
-                      </p>
-                    </div>
-                  </div>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-foreground-tertiary">
-                    <div className="text-center">
-                      <p className="text-lg">No tab selected</p>
-                      <p className="text-sm mt-2">
-                        Create a new tab or select an existing one
-                      </p>
-                    </div>
-                  </div>
+                  <>
+                    {/* Always render mounted terminals to preserve xterm state (and colors) */}
+                    {/* Hide when dashboard/git/docker panel is selected */}
+                    {Array.from(mountedTerminalIds).map(tabId => {
+                      const tab = workspaceTabsRef.current.find(t => t.id === tabId);
+                      if (!tab || tab.status !== 'running') return null;
+                      const isActive = selectedTab?.id === tabId && selectedTab.tabType === 'terminal';
+                      return (
+                        <div
+                          key={tabId}
+                          className={isActive ? 'h-full' : 'hidden'}
+                        >
+                          <Terminal
+                            tabId={tabId}
+                            workspaceId={selectedWorkspace.id}
+                            onConnectionChange={isActive ? setIsTerminalConnected : undefined}
+                            onEnd={() => {
+                              setIsTerminalConnected(false);
+                              // Close the tab when session ends and switch to previous tab
+                              const tabs = workspaceTabsRef.current;
+                              const currentIndex = tabs.findIndex(t => t.id === tabId);
+                              const nextTab = currentIndex > 0
+                                ? tabs[currentIndex - 1]
+                                : tabs[currentIndex + 1] || null;
+                              setSelectedTab(nextTab);
+                              if (deleteTabRef.current) {
+                                deleteTabRef.current(tabId).catch(console.error);
+                              }
+                              // Remove from mounted set
+                              setMountedTerminalIds(prev => {
+                                const next = new Set(prev);
+                                next.delete(tabId);
+                                return next;
+                              });
+                            }}
+                            onContextMenu={handleTerminalContextMenu}
+                          />
+                        </div>
+                      );
+                    })}
+                    {/* Dashboard panel */}
+                    {selectedTab && selectedTab.tabType === 'dashboard' && (
+                      <DashboardPanel
+                        workspace={selectedWorkspace}
+                        repository={selectedRepository}
+                        onRestartContainer={handleRestartContainer}
+                        onShutdownContainer={handleShutdownContainer}
+                        onStartContainer={handleStartContainer}
+                        onRedeployContainer={handleRedeployContainer}
+                        onDestroyContainer={handleDestroyContainer}
+                        onDeleteWorkspace={handleDeleteWorkspace}
+                      />
+                    )}
+                    {/* Git panel */}
+                    {selectedTab && selectedTab.tabType === 'git' && (
+                      <GitPanel workspaceId={selectedWorkspace.id} />
+                    )}
+                    {/* Docker panel */}
+                    {selectedTab && selectedTab.tabType === 'docker' && (
+                      <DockerPanel workspaceId={selectedWorkspace.id} containerIp={selectedWorkspace.containerIp ?? null} />
+                    )}
+                    {/* Show pending/stopped message for non-running terminal tabs */}
+                    {selectedTab && selectedTab.tabType === 'terminal' && selectedTab.status !== 'running' && (
+                      <div className="h-full flex items-center justify-center text-foreground-tertiary">
+                        <div className="text-center">
+                          <p className="text-lg">Tab is {selectedTab.status}</p>
+                          <p className="text-sm mt-2">
+                            {selectedTab.status === 'pending' || selectedTab.status === 'stopped'
+                              ? 'Click the tab to start it'
+                              : selectedTab.status === 'starting'
+                              ? 'Starting container...'
+                              : 'Tab encountered an error'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Show no tab selected message */}
+                    {!selectedTab && (
+                      <div className="h-full flex items-center justify-center text-foreground-tertiary">
+                        <div className="text-center">
+                          <p className="text-lg">No tab selected</p>
+                          <p className="text-sm mt-2">
+                            Create a new tab or select an existing one
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </WorkspaceContent>

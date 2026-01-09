@@ -26,6 +26,7 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [isAttached, setIsAttached] = useState(false);
   const attachedTabIdRef = useRef<string | null>(null);
+  const initialTerminalThemeRef = useRef<typeof theme.terminal | null>(null);
   const { token } = useAuth();
   const { theme } = useTheme();
 
@@ -61,11 +62,18 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
 
     const container = terminalRef.current;
 
+    // Capture the theme at creation time - this won't change for this terminal instance
+    // This prevents app theme changes from overwriting colors set by terminal apps (vim, htop, etc.)
+    if (!initialTerminalThemeRef.current) {
+      initialTerminalThemeRef.current = theme.terminal;
+    }
+    const terminalTheme = initialTerminalThemeRef.current;
+
     const xterm = new XTerm({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: 'JetBrains Mono, Fira Code, monospace',
-      theme: theme.terminal,
+      theme: terminalTheme,
       allowTransparency: false,
       scrollback: 10000,
     });
@@ -101,18 +109,12 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      initialTerminalThemeRef.current = null;
     };
-  // Note: We don't include theme in deps to avoid recreating terminal on theme change
-  // Theme updates are handled separately below
+  // Note: We don't include theme in deps - terminal theme is frozen at creation time
+  // This prevents app theme changes from overwriting colors set by terminal apps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeFit]);
-
-  // Update terminal theme when app theme changes
-  useEffect(() => {
-    if (xtermRef.current) {
-      xtermRef.current.options.theme = theme.terminal;
-    }
-  }, [theme]);
 
   // Handle socket events
   useEffect(() => {
@@ -153,6 +155,9 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
 
     // Handle tab attached
     const handleAttached = (data: { tabId: string; reconnected?: boolean }) => {
+      // Only process events for this specific tab
+      if (data.tabId !== tabId) return;
+
       console.log('Received tab:attached for tabId:', data.tabId, 'reconnected:', data.reconnected);
       attachedTabIdRef.current = data.tabId;
       setIsAttached(true);
@@ -423,7 +428,7 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
   return (
     <div
       className="h-full w-full min-h-0 overflow-hidden flex flex-col"
-      style={{ backgroundColor: theme.terminal.background }}
+      style={{ backgroundColor: initialTerminalThemeRef.current?.background || theme.terminal.background }}
     >
       <div ref={terminalRef} className="flex-1 min-h-0" />
       {workspaceId && !hideStatusBar && (
@@ -432,6 +437,7 @@ export function Terminal({ tabId, workspaceId, onConnectionChange, onEnd, onCont
           tabId={tabId}
           socket={socket}
           isConnected={isConnected}
+          terminalBackground={initialTerminalThemeRef.current?.background}
         />
       )}
     </div>
