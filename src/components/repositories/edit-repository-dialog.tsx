@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Repository, ProxmoxTemplate } from '@/lib/db/schema';
 import { EnvVarEditor, type EnvVar } from '@/components/env-vars/env-var-editor';
+import { ApplyEnvVarsDialog } from '@/components/env-vars/apply-env-vars-dialog';
 import { useProxmoxSettings } from '@/hooks/useProxmoxSettings';
 import { useGitIdentities } from '@/hooks/useGitIdentities';
 import { useAuth } from '@/hooks/useAuth';
@@ -74,6 +75,9 @@ export function EditRepositoryDialog({
   const [selectedSecrets, setSelectedSecrets] = useState<Array<{ secretId: string; includeInEnvFile: boolean }>>([]);
   const [secretsLoading, setSecretsLoading] = useState(false);
   const [secretsModified, setSecretsModified] = useState(false);
+
+  // Apply env vars dialog state
+  const [showApplyDialog, setShowApplyDialog] = useState(false);
 
   // Load environment variables
   const loadEnvVars = useCallback(async (repoId: string) => {
@@ -277,7 +281,13 @@ export function EditRepositoryDialog({
         // Only include git identity if it was modified
         ...gitIdentityUpdates,
       });
-      onClose();
+
+      // If env vars were modified, show apply dialog
+      if (envVarsModified) {
+        setShowApplyDialog(true);
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save repository');
     }
@@ -719,6 +729,17 @@ export function EditRepositoryDialog({
           </div>
         </form>
       </div>
+
+      {/* Apply env vars dialog */}
+      <ApplyEnvVarsDialog
+        isOpen={showApplyDialog}
+        repositoryId={repository.id}
+        repositoryName={repository.name}
+        onClose={() => {
+          setShowApplyDialog(false);
+          onClose();
+        }}
+      />
     </div>
   );
 }

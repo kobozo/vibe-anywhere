@@ -803,6 +803,39 @@ function setupAgentNamespace(io: SocketServer): void {
       }
     });
 
+    // Handle environment variables request from agent
+    socket.on('env:request', async (data: { workspaceId: string }) => {
+      try {
+        if (!socket.workspaceId || socket.workspaceId !== data.workspaceId) {
+          socket.emit('env:response', { error: 'Unauthorized' });
+          return;
+        }
+
+        const workspaceService = await getWorkspaceService();
+        const workspace = await workspaceService.getWorkspace(data.workspaceId);
+
+        if (!workspace) {
+          socket.emit('env:response', { error: 'Workspace not found' });
+          return;
+        }
+
+        // Get merged env vars (same logic as container startup)
+        const { getEnvVarService } = await import('@/lib/services/env-var-service');
+        const envVarService = getEnvVarService();
+        const mergedEnvVars = await envVarService.getMergedEnvVars(
+          workspace.repositoryId,
+          workspace.templateId
+        );
+
+        socket.emit('env:response', { envVars: mergedEnvVars });
+      } catch (error) {
+        console.error('env:request handler error:', error);
+        socket.emit('env:response', {
+          error: error instanceof Error ? error.message : 'Failed to fetch environment variables'
+        });
+      }
+    });
+
     // Handle disconnect
     socket.on('disconnect', async () => {
       await agentRegistry.unregister(socket);

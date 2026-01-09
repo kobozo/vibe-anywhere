@@ -19,6 +19,7 @@ interface SidebarContextMenuProps {
   onRedeployWorkspace?: () => void;
   onDestroyWorkspace?: () => void;
   onDeleteWorkspace?: () => void;
+  onReloadEnvVars?: () => void;
   // Loading states
   isRedeploying?: boolean;
   isDestroying?: boolean;
@@ -38,6 +39,7 @@ export function SidebarContextMenu({
   onRedeployWorkspace,
   onDestroyWorkspace,
   onDeleteWorkspace,
+  onReloadEnvVars,
   isRedeploying,
   isDestroying,
 }: SidebarContextMenuProps) {
@@ -179,6 +181,23 @@ export function SidebarContextMenu({
             >
               <span className="w-4 text-center">■</span>
               Shutdown
+            </button>
+          )}
+
+          <div className="h-px bg-border my-1" />
+
+          {/* Reload Env Vars - only show if running */}
+          {isRunning && (
+            <button
+              onClick={() => {
+                onClose();
+                onReloadEnvVars?.();
+              }}
+              className={`${menuItemClass} ${isOperationInProgress ? disabledClass : ''}`}
+              disabled={isOperationInProgress}
+            >
+              <span className="w-4 text-center">🔄</span>
+              Reload Env Vars
             </button>
           )}
 

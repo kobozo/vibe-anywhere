@@ -452,6 +452,33 @@ export class AgentWebSocket {
   }
 
   /**
+   * Request environment variables from Session Hub
+   * Returns a promise that resolves with the merged env vars
+   */
+  async requestEnvVars(): Promise<Record<string, string>> {
+    if (!this.socket?.connected) {
+      throw new Error('Not connected to Session Hub');
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Environment variable request timed out'));
+      }, 5000);
+
+      // Listen for response
+      this.socket!.once('env:response', (data: { envVars: Record<string, string> }) => {
+        clearTimeout(timeout);
+        resolve(data.envVars);
+      });
+
+      // Send request
+      this.socket!.emit('env:request', {
+        workspaceId: this.config.workspaceId
+      });
+    });
+  }
+
+  /**
    * Disconnect from Session Hub
    */
   disconnect(): void {

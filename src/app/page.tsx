@@ -1570,6 +1570,28 @@ function Dashboard() {
                 console.error('Error duplicating tab:', error);
               }
             }}
+            onReloadEnvVars={async () => {
+              try {
+                const response = await fetch(`/api/workspaces/${selectedWorkspace.id}/env-vars/reload`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+                });
+
+                if (response.ok) {
+                  // Success - terminal will show notification
+                  console.log('Environment variables reloaded');
+                } else {
+                  const errorData = await response.json();
+                  console.error('Reload env vars failed:', errorData);
+                  const message = errorData.error?.message || errorData.error || 'Unknown error';
+                  const details = errorData.error?.details ? `\n\nDetails: ${JSON.stringify(errorData.error.details, null, 2)}` : '';
+                  alert(`Failed to reload env vars: ${message}${details}`);
+                }
+              } catch (error) {
+                console.error('Failed to reload env vars:', error);
+                alert('Failed to reload environment variables');
+              }
+            }}
             onAddToGroup={async (groupId) => {
               try {
                 await addTabToGroup(groupId, tab.id);

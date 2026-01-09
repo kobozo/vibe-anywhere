@@ -495,6 +495,29 @@ export function RepositoryTree({
     }
   };
 
+  const handleReloadEnvVars = async (workspace: Workspace) => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/env-vars/reload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+
+      if (response.ok) {
+        // Show success notification - the terminal will show the reload message
+        alert(`Environment variables reloaded for workspace: ${workspace.name}\n\nNew terminals will use updated values. Run 'reload-env' in existing shells.`);
+      } else {
+        const errorData = await response.json();
+        console.error('Reload env vars failed:', errorData);
+        const message = errorData.error?.message || errorData.error || 'Unknown error';
+        const details = errorData.error?.details ? `\n\nDetails: ${JSON.stringify(errorData.error.details, null, 2)}` : '';
+        alert(`Failed to reload env vars: ${message}${details}`);
+      }
+    } catch (error) {
+      console.error('Error reloading env vars:', error);
+      alert('Failed to reload environment variables');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-border">
@@ -772,6 +795,11 @@ export function RepositoryTree({
           onDeleteWorkspace={() => {
             if (contextMenu.workspace) {
               handleDeleteWorkspaceClick(contextMenu.workspace);
+            }
+          }}
+          onReloadEnvVars={() => {
+            if (contextMenu.workspace) {
+              handleReloadEnvVars(contextMenu.workspace);
             }
           }}
           isRedeploying={contextMenu.workspace ? redeployingWorkspaces.has(contextMenu.workspace.id) : false}

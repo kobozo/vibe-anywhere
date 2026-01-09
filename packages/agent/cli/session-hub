@@ -1,0 +1,230 @@
+#!/usr/bin/env node
+
+// dist/ipc-client.js
+import * as http from "http";
+import * as fs from "fs";
+var IpcClient = class {
+  socketPath;
+  constructor(config = {}) {
+    if (config.socketPath) {
+      this.socketPath = config.socketPath;
+    } else if (config.workspaceId) {
+      this.socketPath = `/tmp/session-hub-agent-${config.workspaceId}.sock`;
+    } else {
+      const workspaceId = process.env.WORKSPACE_ID;
+      if (!workspaceId) {
+        throw new Error("Could not determine workspace ID. Set WORKSPACE_ID environment variable or provide socketPath.");
+      }
+      this.socketPath = `/tmp/session-hub-agent-${workspaceId}.sock`;
+    }
+  }
+  /**
+   * Check if the agent socket exists
+   */
+  isAgentRunning() {
+    return fs.existsSync(this.socketPath);
+  }
+  /**
+   * Make HTTP request to the agent over Unix socket
+   */
+  async request(method, path, data) {
+    if (!this.isAgentRunning()) {
+      throw new Error(`Agent not running. Socket not found at: ${this.socketPath}`);
+    }
+    return new Promise((resolve, reject) => {
+      const options = {
+        socketPath: this.socketPath,
+        method,
+        path,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      };
+      const req = http.request(options, (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        res.on("end", () => {
+          try {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              const parsed = body ? JSON.parse(body) : {};
+              resolve(parsed);
+            } else {
+              reject(new Error(`HTTP ${res.statusCode}: ${body}`));
+            }
+          } catch (error) {
+            reject(new Error(`Failed to parse response: ${error}`));
+          }
+        });
+      });
+      req.on("error", (error) => {
+        reject(new Error(`Request failed: ${error.message}`));
+      });
+      if (data) {
+        req.write(JSON.stringify(data));
+      }
+      req.end();
+    });
+  }
+  /**
+   * Get environment variables from the server
+   */
+  async getEnvVars() {
+    return this.request("GET", "/env-vars");
+  }
+  /**
+   * Get agent status
+   */
+  async getStatus() {
+    return this.request("GET", "/status");
+  }
+  /**
+   * Trigger a refresh of environment variables (updates /etc/profile.d/)
+   */
+  async refreshEnvVars() {
+    return this.request("POST", "/refresh-env-vars");
+  }
+};
+
+// dist/commands/reload-env.js
+async function reloadEnv() {
+  try {
+    const client = new IpcClient();
+    if (!client.isAgentRunning()) {
+      console.error("Error: Session Hub agent is not running.");
+      console.error("Make sure you are inside a Session Hub workspace.");
+      process.exit(1);
+    }
+    const envVars = await client.getEnvVars();
+    console.error("# Note: This command only prints export statements.");
+    console.error("# To execute them, use: eval $(session-hub reload env)");
+    console.error("# Or simply use the alias: reload-env");
+    console.error("");
+    for (const [key, value] of Object.entries(envVars)) {
+      const escapedValue = value.replace(/'/g, "'\\''");
+      console.log(`export ${key}='${escapedValue}'`);
+    }
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+// dist/commands/status.js
+async function showStatus() {
+  try {
+    const client = new IpcClient();
+    if (!client.isAgentRunning()) {
+      console.log("Status: Agent not running");
+      console.log("Make sure you are inside a Session Hub workspace.");
+      process.exit(1);
+    }
+    const status = await client.getStatus();
+    console.log("Session Hub Agent Status");
+    console.log("========================");
+    console.log(`Version:        ${status.version}`);
+    console.log(`Connected:      ${status.connected ? "Yes" : "No"}`);
+    console.log(`Workspace ID:   ${status.workspaceId}`);
+    console.log(`Server URL:     ${status.sessionHubUrl}`);
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+// dist/commands/info.js
+async function showInfo() {
+  try {
+    const client = new IpcClient();
+    if (!client.isAgentRunning()) {
+      console.log("Error: Agent not running");
+      console.log("Make sure you are inside a Session Hub workspace.");
+      process.exit(1);
+    }
+    const status = await client.getStatus();
+    console.log("Workspace Information");
+    console.log("====================");
+    console.log(`Workspace ID: ${status.workspaceId}`);
+    console.log(`Agent Version: ${status.version}`);
+    console.log(`Server: ${status.sessionHubUrl}`);
+    console.log(`Status: ${status.connected ? "Connected" : "Disconnected"}`);
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+// dist/version.js
+var VERSION = "1.8.3";
+
+// dist/commands/help.js
+function showHelp() {
+  console.log(`Session Hub CLI v${VERSION}`);
+  console.log("");
+  console.log("Usage: session-hub <command> [options]");
+  console.log("");
+  console.log("Commands:");
+  console.log("  reload env          Reload environment variables in current shell");
+  console.log("                      Usage: eval $(session-hub reload env)");
+  console.log("");
+  console.log("  status              Show agent status and connection info");
+  console.log("  info                Show workspace information");
+  console.log("  help                Show this help message");
+  console.log("  --version, -v       Show version number");
+  console.log("");
+  console.log("Examples:");
+  console.log("  # Reload environment variables");
+  console.log("  eval $(session-hub reload env)");
+  console.log("");
+  console.log("  # Or use the alias (if configured)");
+  console.log("  reload-env");
+  console.log("");
+  console.log("  # Check agent status");
+  console.log("  session-hub status");
+  console.log("");
+  console.log("For more information, visit: https://github.com/session-hub/session-hub");
+}
+
+// dist/index.js
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.length === 0) {
+    showHelp();
+    process.exit(0);
+  }
+  const command = args[0];
+  const subcommand = args[1];
+  if (command === "--version" || command === "-v") {
+    console.log(VERSION);
+    process.exit(0);
+  }
+  if (command === "help" || command === "--help" || command === "-h") {
+    showHelp();
+    process.exit(0);
+  }
+  if (command === "reload" && subcommand === "env") {
+    await reloadEnv();
+    process.exit(0);
+  }
+  if (command === "env" && subcommand === "reload") {
+    await reloadEnv();
+    process.exit(0);
+  }
+  if (command === "status") {
+    await showStatus();
+    process.exit(0);
+  }
+  if (command === "info") {
+    await showInfo();
+    process.exit(0);
+  }
+  console.error(`Unknown command: ${args.join(" ")}`);
+  console.error("");
+  showHelp();
+  process.exit(1);
+}
+main().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});

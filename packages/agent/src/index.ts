@@ -11,8 +11,16 @@ import { selfUpdate } from './updater.js';
 import { GitHandler } from './git-handler.js';
 import { DockerHandler } from './docker-handler.js';
 import { StatsHandler } from './stats-handler.js';
+import { AgentIpcServer } from './ipc-server.js';
+import { CliInstaller } from './cli-installer.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// ES module compatibility: get __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Directory for clipboard-pasted files (images, etc.)
 // Use workspace directory so Claude Code can access the files
@@ -451,6 +459,47 @@ function getExtFromMimeType(mimeType: string): string {
   return mimeToExt[mimeType] || '.bin';
 }
 
+// Initialize IPC server for CLI communication (wrapped to prevent startup failures)
+let ipcServer: AgentIpcServer | null = null;
+try {
+  ipcServer = new AgentIpcServer(
+    {
+      workspaceId: config.workspaceId,
+      version: config.version,
+      sessionHubUrl: config.sessionHubUrl,
+    },
+    wsClient
+  );
+
+  // Start IPC server
+  ipcServer.start().catch(error => {
+    console.error('Failed to start IPC server:', error);
+    // Continue without IPC server - not critical for agent operation
+  });
+} catch (error) {
+  console.error('Failed to initialize IPC server:', error);
+  // Continue - IPC server is optional
+}
+
+// Initialize CLI installer (wrapped in try-catch to prevent startup failures)
+try {
+  const cliInstaller = new CliInstaller({
+    version: config.version,
+    cliSourcePath: path.join(__dirname, '../cli/session-hub'),
+    cliInstallPath: '/usr/local/bin/session-hub',
+    bashrcPath: '/home/kobozo/.bashrc',
+  });
+
+  // Ensure CLI is installed (async, don't block startup)
+  cliInstaller.ensureCliInstalled().catch(error => {
+    console.error('Failed to install/update CLI:', error);
+    // Continue - CLI installation is not critical for agent operation
+  });
+} catch (error) {
+  console.error('Failed to initialize CLI installer:', error);
+  // Continue - CLI is optional
+}
+
 // Start connection
 wsClient.connect();
 
@@ -470,6 +519,13 @@ async function shutdown(signal: string) {
   console.log(`Received ${signal}, shutting down...`);
 
   wsClient.disconnect();
+
+  // Stop IPC server (if it was initialized)
+  if (ipcServer) {
+    await ipcServer.stop().catch(error => {
+      console.error('Error stopping IPC server:', error);
+    });
+  }
 
   // Don't cleanup tmux - let it persist for reconnection
   // await tmuxManager.cleanup();
