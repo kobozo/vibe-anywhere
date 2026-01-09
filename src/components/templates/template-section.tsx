@@ -16,7 +16,7 @@ export function TemplateSection({
   onAddTemplate,
   onSelectTemplate,
 }: TemplateSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const getStatusIcon = (template: ProxmoxTemplate) => {
     switch (template.status) {
