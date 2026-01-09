@@ -377,6 +377,42 @@ export class ProxmoxClient {
   }
 
   /**
+   * Try to query common storage locations when storage list is empty
+   * Returns storage configs for common storage names that may have CT templates
+   */
+  private async tryCommonStorages(nodeName: string): Promise<Array<any>> {
+    const commonStorageNames = ['local', 'local-zfs', 'local-btrfs', 'pve-storage'];
+    const storages: Array<any> = [];
+
+    console.log(`[CT Templates] Storage list empty, checking common storage names...`);
+
+    for (const storageName of commonStorageNames) {
+      try {
+        // Instead of getting storage config, try to query content directly
+        const content = await this.proxmox.nodes.$(nodeName).storage.$(storageName).content.$get({
+          content: 'vztmpl',
+        });
+
+        if (content && content.length > 0) {
+          console.log(`[CT Templates] Storage ${storageName} has ${content.length} template(s)`);
+          storages.push({
+            storage: storageName,
+            content: 'vztmpl',
+          });
+        } else {
+          console.log(`[CT Templates] Storage ${storageName} exists but has no vztmpl content`);
+        }
+      } catch (error: any) {
+        console.log(`[CT Templates] Storage ${storageName} error: ${error.message || error}`);
+      }
+    }
+
+    console.log(`[CT Templates] Common storage check found ${storages.length} storage(s)`);
+
+    return storages;
+  }
+
+  /**
    * List all CT templates stored on Proxmox storage
    * Scans all storages on all nodes that support vztmpl content type
    */
@@ -402,29 +438,81 @@ export class ProxmoxClient {
     try {
       // Get all nodes in the cluster
       const nodes = await this.getNodes();
+      console.log(`[CT Templates] Found ${nodes.length} node(s) in Proxmox cluster`);
 
       for (const nodeInfo of nodes) {
         const nodeName = nodeInfo.node;
 
         try {
-          // List all storages on this node
-          const storages = await this.proxmox.nodes.$(nodeName).storage.$get();
+          // Try to list storages - first at node level, then at cluster level
+          let storages;
+          try {
+            storages = await this.proxmox.nodes.$(nodeName).storage.$get();
+            console.log(`[CT Templates] Raw storage response:`, JSON.stringify(storages).substring(0, 500));
+            console.log(`[CT Templates] Storage type:`, typeof storages, `isArray:`, Array.isArray(storages));
+            console.log(`[CT Templates] Node ${nodeName}: Found ${storages.length} storage(s) from node API`);
+          } catch (nodeStorageError) {
+            console.log(`[CT Templates] Failed to get storages from node API:`, nodeStorageError);
+            console.log(`[CT Templates] Trying cluster level...`);
+            // Try cluster-level storage list
+            try {
+              storages = await this.proxmox.storage.$get();
+              console.log(`[CT Templates] Cluster storage response:`, JSON.stringify(storages).substring(0, 500));
+              console.log(`[CT Templates] Found ${storages.length} storage(s) from cluster API`);
+            } catch (clusterError) {
+              console.log(`[CT Templates] Cluster storage query failed:`, clusterError);
+              storages = [];
+            }
+          }
 
-          for (const storage of storages) {
+          // If no storages found, try configured storage first, then common names
+          if (storages.length === 0) {
+            console.log(`[CT Templates] No storages from API, trying configured storage: ${this.runtimeConfig.storage}`);
+            // Try the configured storage from settings
+            const configuredStorage = this.runtimeConfig.storage;
+            if (configuredStorage) {
+              try {
+                // Try to query this storage directly
+                const content = await this.proxmox.nodes.$(nodeName).storage.$(configuredStorage).content.$get({
+                  content: 'vztmpl',
+                });
+                console.log(`[CT Templates] Configured storage ${configuredStorage} has ${(content || []).length} templates`);
+                // If we got content, fake a storage object
+                if (content && content.length > 0) {
+                  storages = [{
+                    storage: configuredStorage,
+                    content: 'vztmpl',
+                  }];
+                }
+              } catch (error) {
+                console.log(`[CT Templates] Configured storage ${configuredStorage} not accessible or has no vztmpl content`);
+              }
+            }
+          }
+
+          const storagesToCheck = storages.length > 0
+            ? storages
+            : await this.tryCommonStorages(nodeName);
+
+          for (const storage of storagesToCheck) {
             // Check if this storage supports vztmpl content type
             const contentTypes = String(storage.content || '').split(',');
+            console.log(`[CT Templates] Storage ${storage.storage}: Content types = ${contentTypes.join(', ')}`);
+
             if (!contentTypes.includes('vztmpl')) {
               continue;
             }
 
             const storageId = String(storage.storage || '');
             if (!storageId) continue;
+            console.log(`[CT Templates] Storage ${storageId} supports vztmpl, listing content...`);
 
             try {
               // List vztmpl content in this storage
               const content = await this.proxmox.nodes.$(nodeName).storage.$(storageId).content.$get({
                 content: 'vztmpl',
               });
+              console.log(`[CT Templates] Storage ${storageId}: Found ${(content || []).length} template(s)`);
 
               for (const item of content || []) {
                 const volid = String(item.volid || '');

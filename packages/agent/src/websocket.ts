@@ -1,5 +1,5 @@
 /**
- * WebSocket client for connecting to Session Hub
+ * WebSocket client for connecting to Vibe Anywhere
  * Handles authentication, reconnection, and message routing
  */
 
@@ -57,7 +57,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Connect to Session Hub
+   * Connect to Vibe Anywhere
    */
   connect(): void {
     if (this.socket?.connected || this.isConnecting) {
@@ -67,7 +67,7 @@ export class AgentWebSocket {
     this.isConnecting = true;
     this.shouldReconnect = true;
 
-    console.log(`Connecting to Session Hub at ${this.config.sessionHubUrl}...`);
+    console.log(`Connecting to Vibe Anywhere at ${this.config.sessionHubUrl}...`);
 
     // Connect to the /agent namespace
     this.socket = io(`${this.config.sessionHubUrl}/agent`, {
@@ -91,7 +91,7 @@ export class AgentWebSocket {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('Connected to Session Hub');
+      console.log('Connected to Vibe Anywhere');
       this.isConnecting = false;
       this.reconnectAttempts = 0;
 
@@ -107,7 +107,7 @@ export class AgentWebSocket {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log(`Disconnected from Session Hub: ${reason}`);
+      console.log(`Disconnected from Vibe Anywhere: ${reason}`);
       this.stopHeartbeat();
       this.events.onDisconnected(reason);
 
@@ -126,7 +126,7 @@ export class AgentWebSocket {
       }
     });
 
-    // Session Hub -> Agent messages
+    // Vibe Anywhere -> Agent messages
     this.socket.on('agent:registered', async (data) => {
       console.log('Registration confirmed:', data);
 
@@ -363,7 +363,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Send tab output to Session Hub
+   * Send tab output to Vibe Anywhere
    */
   sendOutput(tabId: string, data: string): void {
     if (!this.socket?.connected) return;
@@ -372,7 +372,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Notify Session Hub that a tab process ended
+   * Notify Vibe Anywhere that a tab process ended
    */
   sendTabEnded(tabId: string, exitCode: number): void {
     if (!this.socket?.connected) return;
@@ -381,7 +381,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Notify Session Hub that a tab was created
+   * Notify Vibe Anywhere that a tab was created
    */
   sendTabCreated(tabId: string, windowIndex: number): void {
     if (!this.socket?.connected) return;
@@ -408,7 +408,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Report an error to Session Hub
+   * Report an error to Vibe Anywhere
    */
   sendError(code: string, message: string, tabId?: string): void {
     if (!this.socket?.connected) return;
@@ -417,7 +417,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Send file upload result back to Session Hub
+   * Send file upload result back to Vibe Anywhere
    */
   sendFileUploaded(requestId: string, success: boolean, filePath?: string, error?: string): void {
     if (!this.socket?.connected) return;
@@ -525,12 +525,12 @@ export class AgentWebSocket {
   }
 
   /**
-   * Request environment variables from Session Hub
+   * Request environment variables from Vibe Anywhere
    * Returns a promise that resolves with the merged env vars
    */
   async requestEnvVars(): Promise<Record<string, string>> {
     if (!this.socket?.connected) {
-      throw new Error('Not connected to Session Hub');
+      throw new Error('Not connected to Vibe Anywhere');
     }
 
     return new Promise((resolve, reject) => {
@@ -552,7 +552,7 @@ export class AgentWebSocket {
   }
 
   /**
-   * Disconnect from Session Hub
+   * Disconnect from Vibe Anywhere
    */
   disconnect(): void {
     this.shouldReconnect = false;

@@ -1,5 +1,5 @@
 /**
- * IPC Client for communicating with Session Hub Agent
+ * IPC Client for communicating with Vibe Anywhere Agent
  * Uses Unix socket for local communication
  */
 
@@ -25,14 +25,14 @@ export class IpcClient {
     if (config.socketPath) {
       this.socketPath = config.socketPath;
     } else if (config.workspaceId) {
-      this.socketPath = `/tmp/session-hub-agent-${config.workspaceId}.sock`;
+      this.socketPath = `/tmp/vibe-anywhere-agent-${config.workspaceId}.sock`;
     } else {
       // Try to detect workspace ID from environment
       const workspaceId = process.env.WORKSPACE_ID;
       if (!workspaceId) {
         throw new Error('Could not determine workspace ID. Set WORKSPACE_ID environment variable or provide socketPath.');
       }
-      this.socketPath = `/tmp/session-hub-agent-${workspaceId}.sock`;
+      this.socketPath = `/tmp/vibe-anywhere-agent-${workspaceId}.sock`;
     }
   }
 

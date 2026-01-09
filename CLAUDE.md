@@ -1,7 +1,7 @@
-# Session Hub - Project Knowledge Base
+# Vibe Anywhere - Project Knowledge Base
 
 ## Project Overview
-Session Hub is a web application for running persistent Claude Code CLI instances on a Linux server. It enables multiple parallel AI coding sessions, each isolated in its own Git worktree and Docker container.
+Vibe Anywhere is a web application for running persistent Claude Code CLI instances on a Linux server. It enables multiple parallel AI coding sessions, each isolated in its own Git worktree and Docker container.
 
 ## Tech Stack
 - **Frontend**: Next.js 15, React 19, TypeScript
@@ -61,7 +61,7 @@ This creates `agent-bundle.tar.gz` which is served to containers for updates.
 ## Architecture
 
 ```
-/home/devops/session-hub/
+/home/devops/vibe-anywhere/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # REST API endpoints
@@ -154,6 +154,33 @@ See `.env.example` for all required variables:
 - `terminal:end` - Session ended
 - `error` - Error message
 
+## Proxmox Setup
+
+### API Token Configuration
+
+**⚠️ CRITICAL**: When creating a Proxmox API token for Vibe Anywhere, you **MUST** disable Privilege Separation.
+
+```bash
+# Create token without privilege separation
+pveum user token add root@pam vibe-anywhere --privsep 0
+```
+
+**Why this matters:**
+- API tokens with Privilege Separation enabled do NOT inherit user permissions
+- Even root tokens will get `403 Permission Denied` errors when accessing storage
+- Required permissions: `Datastore.Audit`, `Datastore.AllocateSpace`, `VM.*`, `Sys.*`
+- Disabling privsep allows the token to inherit all permissions from the root user
+
+**Symptoms of incorrect token setup:**
+- Connection test succeeds ✓
+- CT Templates list remains empty ✗
+- Console shows: `403 Permission check failed (/storage/local, Datastore.Audit|Datastore.AllocateSpace)`
+
+**Via Web UI:**
+- Datacenter → Permissions → API Tokens → Add
+- **UNCHECK "Privilege Separation"** checkbox
+- This is the #1 issue users encounter during Proxmox setup
+
 ## Proxmox LXC Configuration
 
 ### Tech Stack Installation
@@ -173,13 +200,13 @@ The Proxmox LXC template contains:
 - Claude Code CLI (installed per-user in `~/.npm-global`)
 - GitHub CLI (gh)
 - tmux, git, vim, jq
-- Session Hub Agent (systemd service)
+- Vibe Anywhere Agent (systemd service)
 
 ### Container User
 | Setting | Value |
 |---------|-------|
 | Username | `kobozo` |
-| Password | `SessionHub2024!` |
+| Password | `VibeAnywhere2024!` |
 | Sudo | NOPASSWD (passwordless) |
 | Groups | sudo, docker |
 | Home | `/home/kobozo` |
@@ -192,12 +219,12 @@ The Proxmox LXC template contains:
 ## Troubleshooting
 
 ### `.next` Permission Denied During Build
-If you see permission errors like `EACCES: permission denied, open '/home/devops/session-hub/.next/trace'`, the `.next` directory is owned by another user (likely root from a previous dev session).
+If you see permission errors like `EACCES: permission denied, open '/home/devops/vibe-anywhere/.next/trace'`, the `.next` directory is owned by another user (likely root from a previous dev session).
 
 **Fix:**
 ```bash
 # Restart the dev Docker container to reset permissions
-docker restart session-hub-dev
+docker restart vibe-anywhere-dev
 
 # Or if you have sudo access:
 sudo rm -rf .next

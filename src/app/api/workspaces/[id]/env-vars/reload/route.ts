@@ -77,7 +77,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       if (backendType === 'ProxmoxBackend') {
         console.log('Using SSH fallback for env var sync');
-        await containerBackend.injectEnvVars(workspace.containerId, mergedEnvVars);
+        if (containerBackend.injectEnvVars) {
+          await containerBackend.injectEnvVars(workspace.containerId, mergedEnvVars);
+        }
         await updateTmuxEnvironmentViaSSH(workspace.containerId, mergedEnvVars, containerBackend);
         console.log(`Updated env vars via SSH for workspace ${workspaceId}`);
       } else {
@@ -142,14 +144,14 @@ async function updateTmuxEnvironmentViaSSH(
         // Parse the file to extract variable names (lines like "export VAR_NAME='value'")
         const existingVarNames = stdout
           .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.startsWith('export '))
-          .map(line => {
+          .map((line: string) => line.trim())
+          .filter((line: string) => line.startsWith('export '))
+          .map((line: string) => {
             // Extract var name from "export VAR_NAME='value'" or "export VAR_NAME=value"
             const match = line.match(/^export\s+([A-Za-z_][A-Za-z0-9_]*)\s*=/);
             return match ? match[1] : null;
           })
-          .filter((name): name is string => name !== null);
+          .filter((name: string | null): name is string => name !== null);
 
         // Unset any vars that were in the old file but not in the new envVars
         for (const oldVarName of existingVarNames) {
@@ -190,7 +192,7 @@ async function updateTmuxEnvironmentViaSSH(
 async function sendNotificationToTabs(workspaceId: string): Promise<void> {
   try {
     const tabService = getTabService();
-    const tabs = await tabService.getTabsByWorkspace(workspaceId);
+    const tabs = await tabService.listTabs(workspaceId);
 
     // Filter for running tabs only
     const runningTabs = tabs.filter(tab => tab.status === 'running');

@@ -1,5 +1,5 @@
 /**
- * Session Hub Sidecar Agent
+ * Vibe Anywhere Sidecar Agent
  * Main entry point
  */
 
@@ -39,9 +39,9 @@ if (process.argv.includes('--version')) {
   process.exit(0);
 }
 
-console.log(`Session Hub Agent v${config.version}`);
+console.log(`Vibe Anywhere Agent v${config.version}`);
 console.log(`Workspace ID: ${config.workspaceId}`);
-console.log(`Session Hub URL: ${config.sessionHubUrl}`);
+console.log(`Vibe Anywhere URL: ${config.sessionHubUrl}`);
 
 // Initialize components
 const bufferManager = new OutputBufferManager(config.bufferSize);
@@ -56,7 +56,7 @@ const tmuxManager = new TmuxManager(
     onOutput: (tabId, data) => {
       // Buffer locally
       bufferManager.append(tabId, data);
-      // Send to Session Hub
+      // Send to Vibe Anywhere
       wsClient.sendOutput(tabId, data);
     },
     onExit: (tabId, exitCode) => {
@@ -72,7 +72,7 @@ const tmuxManager = new TmuxManager(
 
 const wsClient = new AgentWebSocket(config, {
   onConnected: async () => {
-    console.log('Connected to Session Hub');
+    console.log('Connected to Vibe Anywhere');
 
     // Initialize tmux if not already done
     try {
@@ -90,7 +90,7 @@ const wsClient = new AgentWebSocket(config, {
     console.log('Registration confirmed:', data);
 
     if (data.recoveryMode) {
-      // Send current state to Session Hub
+      // Send current state to Vibe Anywhere
       const windows = tmuxManager.getWindowStatus();
       wsClient.sendState(
         windows.map(w => ({
@@ -485,8 +485,8 @@ try {
 try {
   const cliInstaller = new CliInstaller({
     version: config.version,
-    cliSourcePath: path.join(__dirname, '../cli/session-hub'),
-    cliInstallPath: '/usr/local/bin/session-hub',
+    cliSourcePath: path.join(__dirname, '../cli/vibe-anywhere'),
+    cliInstallPath: '/usr/local/bin/vibe-anywhere',
     bashrcPath: '/home/kobozo/.bashrc',
   });
 
@@ -547,4 +547,4 @@ process.on('unhandledRejection', (reason) => {
   // Don't exit - try to keep running
 });
 
-console.log('Agent started, connecting to Session Hub...');
+console.log('Agent started, connecting to Vibe Anywhere...');

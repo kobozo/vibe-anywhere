@@ -9,13 +9,13 @@ var IpcClient = class {
     if (config.socketPath) {
       this.socketPath = config.socketPath;
     } else if (config.workspaceId) {
-      this.socketPath = `/tmp/session-hub-agent-${config.workspaceId}.sock`;
+      this.socketPath = `/tmp/vibe-anywhere-agent-${config.workspaceId}.sock`;
     } else {
       const workspaceId = process.env.WORKSPACE_ID;
       if (!workspaceId) {
         throw new Error("Could not determine workspace ID. Set WORKSPACE_ID environment variable or provide socketPath.");
       }
-      this.socketPath = `/tmp/session-hub-agent-${workspaceId}.sock`;
+      this.socketPath = `/tmp/vibe-anywhere-agent-${workspaceId}.sock`;
     }
   }
   /**
@@ -92,14 +92,14 @@ async function reloadEnv(options = {}) {
   try {
     const client = new IpcClient();
     if (!client.isAgentRunning()) {
-      console.error("Error: Session Hub agent is not running.");
-      console.error("Make sure you are inside a Session Hub workspace.");
+      console.error("Error: Vibe Anywhere agent is not running.");
+      console.error("Make sure you are inside a Vibe Anywhere workspace.");
       process.exit(1);
     }
     const envVars = await client.getEnvVars();
     if (!options.noComments) {
       console.error("# Note: This command only prints export statements.");
-      console.error("# To execute them, use: eval $(session-hub reload env)");
+      console.error("# To execute them, use: eval $(vibe-anywhere reload env)");
       console.error("# Or simply use the alias: reload-env");
       console.error("");
     }
@@ -119,12 +119,12 @@ async function showStatus() {
     const client = new IpcClient();
     if (!client.isAgentRunning()) {
       console.log("Status: Agent not running");
-      console.log("Make sure you are inside a Session Hub workspace.");
+      console.log("Make sure you are inside a Vibe Anywhere workspace.");
       process.exit(1);
     }
     const status = await client.getStatus();
-    console.log("Session Hub Agent Status");
-    console.log("========================");
+    console.log("Vibe Anywhere Agent Status");
+    console.log("==========================");
     console.log(`Version:        ${status.version}`);
     console.log(`Connected:      ${status.connected ? "Yes" : "No"}`);
     console.log(`Workspace ID:   ${status.workspaceId}`);
@@ -141,7 +141,7 @@ async function showInfo() {
     const client = new IpcClient();
     if (!client.isAgentRunning()) {
       console.log("Error: Agent not running");
-      console.log("Make sure you are inside a Session Hub workspace.");
+      console.log("Make sure you are inside a Vibe Anywhere workspace.");
       process.exit(1);
     }
     const status = await client.getStatus();
@@ -162,13 +162,13 @@ var VERSION = "1.8.3";
 
 // dist/commands/help.js
 function showHelp() {
-  console.log(`Session Hub CLI v${VERSION}`);
+  console.log(`Vibe Anywhere CLI v${VERSION}`);
   console.log("");
-  console.log("Usage: session-hub <command> [options]");
+  console.log("Usage: vibe-anywhere <command> [options]");
   console.log("");
   console.log("Commands:");
   console.log("  reload env          Reload environment variables in current shell");
-  console.log("                      Usage: eval $(session-hub reload env)");
+  console.log("                      Usage: eval $(vibe-anywhere reload env)");
   console.log("");
   console.log("  status              Show agent status and connection info");
   console.log("  info                Show workspace information");
@@ -177,15 +177,15 @@ function showHelp() {
   console.log("");
   console.log("Examples:");
   console.log("  # Reload environment variables");
-  console.log("  eval $(session-hub reload env)");
+  console.log("  eval $(vibe-anywhere reload env)");
   console.log("");
   console.log("  # Or use the alias (if configured)");
   console.log("  reload-env");
   console.log("");
   console.log("  # Check agent status");
-  console.log("  session-hub status");
+  console.log("  vibe-anywhere status");
   console.log("");
-  console.log("For more information, visit: https://github.com/session-hub/session-hub");
+  console.log("For more information, visit: https://github.com/kobozo/vibe-anywhere");
 }
 
 // dist/index.js

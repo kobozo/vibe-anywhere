@@ -1,4 +1,4 @@
-# Session Hub - Production Dockerfile
+# Vibe Anywhere - Production Dockerfile
 # Multi-stage build for optimized image size
 
 # =============================================================================
@@ -52,7 +52,7 @@ RUN apk add --no-cache \
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 sessionhub
+    && adduser --system --uid 1001 vibeanywhere
 
 # Set production environment
 ENV NODE_ENV=production
@@ -74,10 +74,10 @@ COPY --from=builder /app/docker ./docker
 
 # Create directories for runtime
 RUN mkdir -p /app/logs \
-    && chown -R sessionhub:nodejs /app
+    && chown -R vibeanywhere:nodejs /app
 
 # Switch to non-root user
-USER sessionhub
+USER vibeanywhere
 
 EXPOSE 3000
 

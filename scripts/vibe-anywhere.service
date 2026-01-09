@@ -1,14 +1,14 @@
 [Unit]
-Description=Session Hub - Claude Code Session Manager
-Documentation=https://github.com/kobozo/session-hub
+Description=Vibe Anywhere - Claude Code Session Manager
+Documentation=https://github.com/kobozo/vibe-anywhere
 After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=sessionhub
-Group=sessionhub
-WorkingDirectory=/opt/session-hub
-EnvironmentFile=/opt/session-hub/.env
+User=vibeanywhere
+Group=vibeanywhere
+WorkingDirectory=/opt/vibe-anywhere
+EnvironmentFile=/opt/vibe-anywhere/.env
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=10
@@ -19,7 +19,7 @@ StandardError=journal
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/opt/session-hub /home/sessionhub
+ReadWritePaths=/opt/vibe-anywhere /home/vibeanywhere
 PrivateTmp=true
 
 [Install]

@@ -1,5 +1,5 @@
 /**
- * IPC Server for Session Hub Agent
+ * IPC Server for Vibe Anywhere Agent
  * Provides local HTTP API over Unix socket for CLI communication
  */
 
@@ -23,7 +23,7 @@ export class AgentIpcServer {
   constructor(config: IpcServerConfig, wsClient: AgentWebSocket) {
     this.config = config;
     this.wsClient = wsClient;
-    this.socketPath = `/tmp/session-hub-agent-${config.workspaceId}.sock`;
+    this.socketPath = `/tmp/vibe-anywhere-agent-${config.workspaceId}.sock`;
   }
 
   /**
@@ -127,11 +127,11 @@ export class AgentIpcServer {
   }
 
   /**
-   * Handle GET /env-vars - Fetch environment variables from Session Hub server
+   * Handle GET /env-vars - Fetch environment variables from Vibe Anywhere server
    */
   private async handleGetEnvVars(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
-      // Request env vars from Session Hub server via WebSocket
+      // Request env vars from Vibe Anywhere server via WebSocket
       const envVars = await this.wsClient.requestEnvVars();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });

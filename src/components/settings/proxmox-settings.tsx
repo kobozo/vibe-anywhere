@@ -125,7 +125,7 @@ function ConnectionForm({
         <label className="block text-xs text-foreground-secondary mb-1">Token ID</label>
         <input
           type="text"
-          placeholder="root@pam!session-hub"
+          placeholder="root@pam!vibe-anywhere"
           value={tokenId}
           onChange={(e) => setTokenId(e.target.value)}
           className="w-full px-2 py-1.5 bg-background-tertiary border border-border-secondary rounded text-sm text-foreground"

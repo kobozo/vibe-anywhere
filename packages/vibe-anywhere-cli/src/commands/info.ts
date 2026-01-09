@@ -10,7 +10,7 @@ export async function showInfo(): Promise<void> {
 
     if (!client.isAgentRunning()) {
       console.log('Error: Agent not running');
-      console.log('Make sure you are inside a Session Hub workspace.');
+      console.log('Make sure you are inside a Vibe Anywhere workspace.');
       process.exit(1);
     }
 

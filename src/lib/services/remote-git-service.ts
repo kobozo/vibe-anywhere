@@ -28,7 +28,7 @@ export class RemoteGitService {
 
   constructor() {
     // Use /tmp for temporary SSH key files
-    this.tempDir = '/tmp/session-hub-git';
+    this.tempDir = '/tmp/vibe-anywhere-git';
   }
 
   /**

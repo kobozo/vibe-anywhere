@@ -1,6 +1,6 @@
 /**
  * EnvStateManager
- * Manages persistent environment variable state in /workspace/.session-hub-env-state.json
+ * Manages persistent environment variable state in /workspace/.vibe-anywhere-env-state.json
  * Tracks what variables were synced to enable diff-based updates
  */
 
@@ -31,7 +31,7 @@ export class EnvStateManager {
   constructor(workspaceId: string) {
     // Store state in user's home directory (not workspace folder)
     const homeDir = process.env.HOME || '/home/kobozo';
-    this.stateFilePath = `${homeDir}/.session-hub-env-state.json`;
+    this.stateFilePath = `${homeDir}/.vibe-anywhere-env-state.json`;
   }
 
   /**

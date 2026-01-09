@@ -10,8 +10,8 @@ export async function reloadEnv(options: { noComments?: boolean } = {}): Promise
     const client = new IpcClient();
 
     if (!client.isAgentRunning()) {
-      console.error('Error: Session Hub agent is not running.');
-      console.error('Make sure you are inside a Session Hub workspace.');
+      console.error('Error: Vibe Anywhere agent is not running.');
+      console.error('Make sure you are inside a Vibe Anywhere workspace.');
       process.exit(1);
     }
 
@@ -22,7 +22,7 @@ export async function reloadEnv(options: { noComments?: boolean } = {}): Promise
     // Skip if --no-comments flag is used (for alias usage)
     if (!options.noComments) {
       console.error('# Note: This command only prints export statements.');
-      console.error('# To execute them, use: eval $(session-hub reload env)');
+      console.error('# To execute them, use: eval $(vibe-anywhere reload env)');
       console.error('# Or simply use the alias: reload-env');
       console.error('');
     }

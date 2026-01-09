@@ -1,4 +1,4 @@
-# Session Hub - Development Override
+# Vibe Anywhere - Development Override
 # This file is automatically loaded by docker-compose in development
 #
 # Features:
@@ -14,7 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: session-hub-dev
+    container_name: vibe-anywhere-dev
     environment:
       NODE_ENV: development
       APP_HOME_DIR: /data
@@ -36,7 +36,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:rw
 
       # App data directory (cloned repos, worktrees, SSH keys)
-      - ${HOST_DATA_PATH:-session-hub-data}:/data:rw
+      - ${HOST_DATA_PATH:-vibe-anywhere-data}:/data:rw
 
       # Git repositories from host (for local/symlinked repos)
       - ${HOST_REPO_PATH:-./repos}:/repos:rw
@@ -50,4 +50,4 @@ services:
 # Development-specific volumes
 volumes:
   .next-cache:
-    name: session-hub-next-cache
+    name: vibe-anywhere-next-cache

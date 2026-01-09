@@ -30,13 +30,13 @@ export function sanitizeTag(input: string): string {
 
 /**
  * Build tags string for a workspace container
- * Includes: session-hub, repository name, tech stack IDs
+ * Includes: vibe-anywhere, repository name, tech stack IDs
  */
 export function buildWorkspaceTags(
   repoName: string,
   techStackIds: string[]
 ): string {
-  const tags: string[] = ['session-hub'];
+  const tags: string[] = ['vibe-anywhere'];
 
   // Add sanitized repo name
   const sanitizedRepoName = sanitizeTag(repoName);
@@ -57,10 +57,10 @@ export function buildWorkspaceTags(
 
 /**
  * Build tags string for a template container
- * Includes: session-hub, tech stack IDs
+ * Includes: vibe-anywhere, tech stack IDs
  */
 export function buildTemplateTags(techStackIds: string[]): string {
-  const tags: string[] = ['session-hub'];
+  const tags: string[] = ['vibe-anywhere'];
 
   // Add tech stack IDs as tags
   for (const stackId of techStackIds) {

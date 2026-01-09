@@ -10,14 +10,14 @@ export async function showStatus(): Promise<void> {
 
     if (!client.isAgentRunning()) {
       console.log('Status: Agent not running');
-      console.log('Make sure you are inside a Session Hub workspace.');
+      console.log('Make sure you are inside a Vibe Anywhere workspace.');
       process.exit(1);
     }
 
     const status = await client.getStatus();
 
-    console.log('Session Hub Agent Status');
-    console.log('========================');
+    console.log('Vibe Anywhere Agent Status');
+    console.log('==========================');
     console.log(`Version:        ${status.version}`);
     console.log(`Connected:      ${status.connected ? 'Yes' : 'No'}`);
     console.log(`Workspace ID:   ${status.workspaceId}`);

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Build script for session-hub CLI
+# Build script for vibe-anywhere CLI
 # Creates a standalone executable
 
 set -e
 
-echo "Building session-hub CLI..."
+echo "Building vibe-anywhere CLI..."
 
 # Build TypeScript
 npm run build
@@ -14,11 +14,11 @@ npm run build
 chmod +x dist/index.js
 
 # Create a wrapper script that uses the Node.js binary
-cat > dist/session-hub << 'EOF'
+cat > dist/vibe-anywhere << 'EOF'
 #!/usr/bin/env node
 require('./index.js');
 EOF
 
-chmod +x dist/session-hub
+chmod +x dist/vibe-anywhere
 
-echo "✓ Build complete: dist/session-hub"
+echo "✓ Build complete: dist/vibe-anywhere"

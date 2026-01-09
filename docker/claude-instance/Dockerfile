@@ -24,7 +24,7 @@ RUN install -m 0755 -d /etc/apt/keyrings \
 
 # Configure git
 RUN git config --global init.defaultBranch main \
-    && git config --global user.email "claude@session-hub.local" \
+    && git config --global user.email "claude@vibe-anywhere.local" \
     && git config --global user.name "Claude Code"
 
 # Install Claude Code CLI globally

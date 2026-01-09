@@ -139,6 +139,14 @@ export interface IContainerBackend {
    * @param techStackIds - Array of tech stack IDs to install (e.g., ['nodejs', 'python'])
    */
   installTechStacks?(containerId: string, techStackIds: string[]): Promise<void>;
+
+  /**
+   * Inject environment variables into a running container (Proxmox only)
+   * Used to sync environment variables to LXC containers
+   * @param containerId - Container ID (VMID as string)
+   * @param envVars - Environment variables to inject
+   */
+  injectEnvVars?(containerId: string, envVars: Record<string, string>): Promise<void>;
 }
 
 /**
@@ -157,7 +165,7 @@ export interface DockerBackendConfig {
 export interface ProxmoxBackendConfig {
   host: string;
   port: number;
-  tokenId: string;             // e.g., 'root@pam!session-hub'
+  tokenId: string;             // e.g., 'root@pam!vibe-anywhere'
   tokenSecret: string;
   node: string;                // Proxmox node name
   templateVmid: number;        // Base LXC template VMID

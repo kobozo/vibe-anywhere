@@ -1,6 +1,6 @@
 /**
  * Agent self-updater
- * Downloads and installs new versions when instructed by Session Hub
+ * Downloads and installs new versions when instructed by Vibe Anywhere
  */
 
 import { exec as execCb, spawn } from 'child_process';
@@ -13,9 +13,9 @@ import * as http from 'http';
 
 const exec = promisify(execCb);
 
-const AGENT_DIR = '/opt/session-hub-agent';
-const NEW_DIR = '/opt/session-hub-agent-new';
-const BACKUP_DIR = '/opt/session-hub-agent-backup';
+const AGENT_DIR = '/opt/vibe-anywhere-agent';
+const NEW_DIR = '/opt/vibe-anywhere-agent-new';
+const BACKUP_DIR = '/opt/vibe-anywhere-agent-backup';
 
 export interface UpdateResult {
   success: boolean;
@@ -119,7 +119,7 @@ export async function selfUpdate(bundleUrl: string, newVersion: string): Promise
     // This is cleaner than exit(0) and ensures proper service restart
     setTimeout(async () => {
       try {
-        await exec('sudo systemctl restart session-hub-agent');
+        await exec('sudo systemctl restart vibe-anywhere-agent');
       } catch {
         // If systemctl fails, fall back to exit
         process.exit(0);

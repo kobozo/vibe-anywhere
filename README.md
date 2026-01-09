@@ -1,4 +1,6 @@
-# Session Hub
+![Vibe Anywhere Logo](./public/logo.svg)
+
+# Vibe Anywhere
 
 A web application for running persistent Claude Code CLI instances on a Linux server with multiple parallel sessions.
 
@@ -14,10 +16,10 @@ A web application for running persistent Claude Code CLI instances on a Linux se
 
 ## Quick Install
 
-Install Session Hub as a service on Debian/Ubuntu with a single command:
+Install Vibe Anywhere as a service on Debian/Ubuntu with a single command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kobozo/session-hub/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kobozo/vibe-anywhere/main/scripts/install.sh | sudo bash
 ```
 
 The installer will:
@@ -26,7 +28,7 @@ The installer will:
 - Set up the database and create an admin user
 - Install and start the systemd service
 
-After installation, access Session Hub at `http://your-server:51420`
+After installation, access Vibe Anywhere at `http://your-server:51420`
 
 ## Manual Installation
 
@@ -42,8 +44,8 @@ After installation, access Session Hub at `http://your-server:51420`
 
 ```bash
 # Clone the repository
-git clone https://github.com/kobozo/session-hub.git
-cd session-hub
+git clone https://github.com/kobozo/vibe-anywhere.git
+cd vibe-anywhere
 
 # Install dependencies
 npm install
@@ -89,27 +91,78 @@ CONTAINER_BACKEND=docker  # or "proxmox"
 
 See `.env.example` for all available options including Proxmox configuration.
 
+## Proxmox Setup
+
+If using Proxmox as your container backend, you need to create an API token with proper permissions.
+
+### Creating a Proxmox API Token
+
+**⚠️ IMPORTANT**: The API token **MUST** be created with **Privilege Separation DISABLED** to work correctly.
+
+#### Via Proxmox Web UI:
+
+1. Navigate to **Datacenter** → **Permissions** → **API Tokens**
+2. Click **Add**
+3. Select user: `root@pam` (or your preferred user)
+4. Enter token ID: `vibe-anywhere` (or your preferred name)
+5. **⚠️ UNCHECK "Privilege Separation"** - This is critical!
+6. Click **Add**
+7. **Copy the token secret** - it's only shown once!
+
+#### Via Proxmox Shell:
+
+```bash
+# Create token without privilege separation (inherits all user permissions)
+pveum user token add root@pam vibe-anywhere --privsep 0
+
+# This will output the token secret - save it!
+```
+
+### Why Disable Privilege Separation?
+
+When Privilege Separation is enabled, the API token does NOT inherit the user's permissions. Vibe Anywhere needs these permissions:
+- `Datastore.Audit` - To list and access storage containing CT templates
+- `Datastore.AllocateSpace` - To create containers
+- `VM.Allocate`, `VM.Config.*`, `VM.Console`, `VM.PowerMgmt` - To manage containers
+- `Pool.Audit`, `Sys.Audit`, `Sys.Modify` - For resource management
+
+Disabling privilege separation allows the token to inherit all permissions from the root user, avoiding permission issues.
+
+### Required Proxmox Storage Configuration
+
+Make sure you have a storage configured with CT template support:
+- Storage must have `vztmpl` content type enabled
+- Common storage names: `local`, `local-zfs`, `local-btrfs`
+- Check storage config: `pvesm status` (shows available storages and their content types)
+
+### Troubleshooting
+
+**CT Templates list is empty after configuration:**
+- Check API token privilege separation is disabled: `pveum user token list root@pam`
+- Verify storage has vztmpl content: `pvesm status | grep vztmpl`
+- Check console logs: `docker logs vibe-anywhere-dev` (look for `[CT Templates]` messages)
+
 ## Service Management
 
-If installed via the install script, Session Hub runs as a systemd service:
+If installed via the install script, Vibe Anywhere runs as a systemd service:
 
 ```bash
 # Check status
-sudo systemctl status session-hub
+sudo systemctl status vibe-anywhere
 
 # Start/Stop/Restart
-sudo systemctl start session-hub
-sudo systemctl stop session-hub
-sudo systemctl restart session-hub
+sudo systemctl start vibe-anywhere
+sudo systemctl stop vibe-anywhere
+sudo systemctl restart vibe-anywhere
 
 # View logs
-sudo journalctl -u session-hub -f
+sudo journalctl -u vibe-anywhere -f
 
 # View recent logs
-sudo journalctl -u session-hub --since "1 hour ago"
+sudo journalctl -u vibe-anywhere --since "1 hour ago"
 ```
 
-Configuration file: `/opt/session-hub/.env`
+Configuration file: `/opt/vibe-anywhere/.env`
 
 ## Usage
 

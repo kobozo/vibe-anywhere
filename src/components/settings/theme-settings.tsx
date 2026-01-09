@@ -79,7 +79,7 @@ export function ThemeSettings() {
           }}
         >
           <div>
-            <span style={{ color: themes[themeName].terminal.green }}>user@session-hub</span>
+            <span style={{ color: themes[themeName].terminal.green }}>user@vibe-anywhere</span>
             <span style={{ color: themes[themeName].terminal.foreground }}>:</span>
             <span style={{ color: themes[themeName].terminal.blue }}>~</span>
             <span style={{ color: themes[themeName].terminal.foreground }}>$ </span>

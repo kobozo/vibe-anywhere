@@ -1,8 +1,8 @@
-# Session Hub - TODO
+# Vibe Anywhere - TODO
 
 ## Project Rename
 
-- [ ] **Rename project to vibe-anywhere** - Complete project rename from "session-hub" to "vibe-anywhere". This includes: directory names, package.json, Docker images/containers, documentation (README, CLAUDE.md, TODO.md), code references, environment variables, database references, UI text, git references, and any other mentions throughout the codebase.
+- [x] **Rename project to vibe-anywhere** - Complete project rename from "session-hub" to "vibe-anywhere". This includes: directory names, package.json, Docker images/containers, documentation (README, CLAUDE.md, TODO.md), code references, environment variables, database references, UI text, git references, and any other mentions throughout the codebase.
 
 ## Environment Variables
 
@@ -97,6 +97,29 @@
 - [ ] **Fixed height settings modal** - Settings modal height changes based on content. Give it a fixed height with scrollable content area. Keep bottom action buttons always visible outside the scroll area.
 
 - [ ] **Tabbed create template modal** - The create template modal shows everything in one view. Convert to a tabbed/wizard approach like other modals (add repository, create workspace, etc.).
+
+## Setup & Installation
+
+- [ ] **Default admin user on migration** - Automatically create a default admin user during database migrations with a randomly generated password. Add a CLI command (e.g., `npm run user:password` or docker exec command) to retrieve or reset the admin password. This ensures fresh installations have immediate access without manual user seeding.
+
+## Proxmox Integration
+
+- [x] **CT template storage detection issue - SOLVED** - After configuring Proxmox connection, CT templates list returns empty even though connection test succeeds.
+
+  **Root cause found**: API tokens with "Privilege Separation" enabled do NOT inherit user permissions. Even root tokens need explicit `Datastore.Audit` and `Datastore.AllocateSpace` permissions to access storage content.
+
+  **Solution**: Disable "Privilege Separation" on the API token (`pveum user token modify root@pam TOKEN_NAME --privsep 0`) or manually assign datastore permissions to the token.
+
+  **Code improvements made**:
+  - Added detailed error logging showing exact permission errors (403 Permission check failed)
+  - Added fallback logic to try configured storage and common storage names
+  - Added warnings in console when no templates found pointing to permission issues
+  - **Documented in README.md** with prominent warnings and step-by-step instructions
+  - **Documented in CLAUDE.md** for developers
+
+- [ ] **Add UI warning for empty CT templates** - When CT templates list is empty after successful Proxmox connection, show a helpful alert in the UI explaining the likely cause (API token privilege separation) with a link to documentation. Currently only logs to console which users won't see.
+
+- [ ] **Validate .env token matches database settings** - When Proxmox is configured in the UI, validate that the fallback .env PROXMOX_TOKEN_ID matches the database settings. Mismatches cause 401 errors during template provisioning when code falls back to .env config. Consider removing .env fallback entirely once Proxmox is configured via UI, or show warning if they don't match.
 
 ## Onboarding
 

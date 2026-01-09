@@ -72,7 +72,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     // Stop the agent service first
     await execSSHCommand(
       { host: workspace.containerIp, username: 'root' },
-      ['systemctl', 'stop', 'session-hub-agent'],
+      ['systemctl', 'stop', 'vibe-anywhere-agent'],
       { workingDir: '/' }
     ).catch(() => {
       // Service might not be running
@@ -80,7 +80,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
     // Download and install the new agent bundle
     const updateScript = `
-      cd /opt/session-hub-agent
+      cd /opt/vibe-anywhere-agent
 
       # Download agent bundle
       echo "Downloading agent bundle from ${bundleUrl}..."
@@ -104,7 +104,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
       fi
 
       # Ensure kobozo owns everything
-      chown -R kobozo:kobozo /opt/session-hub-agent
+      chown -R kobozo:kobozo /opt/vibe-anywhere-agent
 
       echo "Agent bundle installed successfully"
     `;
@@ -112,13 +112,13 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     await execSSHCommand(
       { host: workspace.containerIp, username: 'root' },
       ['bash', '-c', updateScript],
-      { workingDir: '/opt/session-hub-agent' }
+      { workingDir: '/opt/vibe-anywhere-agent' }
     );
 
     // Start the agent service
     await execSSHCommand(
       { host: workspace.containerIp, username: 'root' },
-      ['systemctl', 'start', 'session-hub-agent'],
+      ['systemctl', 'start', 'vibe-anywhere-agent'],
       { workingDir: '/' }
     );
 

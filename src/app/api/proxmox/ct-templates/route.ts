@@ -1,6 +1,6 @@
 /**
  * API endpoint for fetching available CT templates from Proxmox storage
- * Returns apt-based templates (Debian, Ubuntu) that work with Session Hub provisioning
+ * Returns apt-based templates (Debian, Ubuntu) that work with Vibe Anywhere provisioning
  *
  * This scans all nodes and storages for vztmpl content
  */
@@ -66,6 +66,13 @@ export async function GET() {
     // Fetch stored templates from Proxmox storage
     const client = await getProxmoxClientAsync();
     const storedTemplates = await client.listStoredCtTemplates();
+
+    // If no templates found, it might be a permission issue
+    if (storedTemplates.length === 0) {
+      console.warn('[CT Templates] No templates found - this may indicate missing API token permissions');
+      console.warn('[CT Templates] Required permissions: Datastore.Audit and Datastore.AllocateSpace');
+      console.warn('[CT Templates] Tip: Disable "Privilege Separation" on your API token to inherit all user permissions');
+    }
 
     // Filter to supported OS types and transform to our format
     const ctTemplates: CtTemplate[] = storedTemplates

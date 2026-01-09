@@ -66,7 +66,7 @@ export class SSHKeyService {
           '-t', keyType,
           '-f', tempPrivateKeyPath,
           '-N', '', // No passphrase
-          '-C', comment || 'session-hub-key',
+          '-C', comment || 'vibe-anywhere-key',
         ];
 
         // For RSA, specify key size

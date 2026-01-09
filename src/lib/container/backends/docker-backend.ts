@@ -43,7 +43,7 @@ export class DockerBackend implements IContainerBackend {
     };
 
     const container = await this.docker.createContainer({
-      name: `session-hub-workspace-${workspaceId}`,
+      name: `vibe-anywhere-workspace-${workspaceId}`,
       Image: containerConfig.image || this.claudeImage,
       WorkingDir: '/workspace',
       Tty: true,

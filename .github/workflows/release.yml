@@ -35,50 +35,50 @@ jobs:
       - name: Prepare release package
         run: |
           # Create release directory
-          mkdir -p release/session-hub
+          mkdir -p release/vibe-anywhere
 
           # Copy standalone build
-          cp -r .next/standalone/* release/session-hub/
+          cp -r .next/standalone/* release/vibe-anywhere/
 
           # Copy static files to correct location
-          mkdir -p release/session-hub/.next/static
-          cp -r .next/static/* release/session-hub/.next/static/
+          mkdir -p release/vibe-anywhere/.next/static
+          cp -r .next/static/* release/vibe-anywhere/.next/static/
 
           # Copy public folder
           if [ -d "public" ]; then
-            cp -r public release/session-hub/
+            cp -r public release/vibe-anywhere/
           fi
 
           # Copy docker files
-          cp -r docker release/session-hub/
+          cp -r docker release/vibe-anywhere/
 
           # Copy scripts
-          cp -r scripts release/session-hub/
+          cp -r scripts release/vibe-anywhere/
 
           # Copy configuration templates
-          cp .env.example release/session-hub/
+          cp .env.example release/vibe-anywhere/
 
           # Copy database files for migrations
-          cp -r drizzle release/session-hub/ 2>/dev/null || true
-          cp drizzle.config.ts release/session-hub/ 2>/dev/null || true
+          cp -r drizzle release/vibe-anywhere/ 2>/dev/null || true
+          cp drizzle.config.ts release/vibe-anywhere/ 2>/dev/null || true
 
           # Copy package.json for scripts
-          cp package.json release/session-hub/
+          cp package.json release/vibe-anywhere/
 
           # Create version file
-          echo "${{ inputs.version }}" > release/session-hub/VERSION
+          echo "${{ inputs.version }}" > release/vibe-anywhere/VERSION
 
           # Create tarball
           cd release
-          tar -czvf session-hub-v${{ inputs.version }}.tar.gz session-hub
+          tar -czvf vibe-anywhere-v${{ inputs.version }}.tar.gz vibe-anywhere
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ inputs.version }}
-          name: Session Hub v${{ inputs.version }}
+          name: Vibe Anywhere v${{ inputs.version }}
           body: |
-            ## Session Hub v${{ inputs.version }}
+            ## Vibe Anywhere v${{ inputs.version }}
 
             ### Installation
 
@@ -90,7 +90,7 @@ jobs:
 
             See the [commit history](https://github.com/${{ github.repository }}/commits/v${{ inputs.version }}) for details.
           files: |
-            release/session-hub-v${{ inputs.version }}.tar.gz
+            release/vibe-anywhere-v${{ inputs.version }}.tar.gz
           draft: false
           prerelease: false
         env:

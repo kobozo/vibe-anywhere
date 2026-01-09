@@ -19,7 +19,7 @@ interface AuthContextValue extends AuthState {
   logout: () => void;
 }
 
-const AUTH_STORAGE_KEY = 'session-hub-auth';
+const AUTH_STORAGE_KEY = 'vibe-anywhere-auth';
 
 export function useAuthState(): AuthContextValue {
   const [state, setState] = useState<AuthState>({

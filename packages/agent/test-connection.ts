@@ -1,5 +1,5 @@
 /**
- * Test script to simulate agent connection to Session Hub
+ * Test script to simulate agent connection to Vibe Anywhere
  * Run with: npx tsx packages/agent/test-connection.ts
  */
 
@@ -11,7 +11,7 @@ const AGENT_TOKEN = process.env.AGENT_TOKEN || 'test-token-abc';
 
 console.log('Agent Test Script');
 console.log('==================');
-console.log(`Session Hub URL: ${SESSION_HUB_URL}`);
+console.log(`Vibe Anywhere URL: ${SESSION_HUB_URL}`);
 console.log(`Workspace ID: ${WORKSPACE_ID}`);
 console.log(`Agent Token: ${AGENT_TOKEN.substring(0, 8)}...`);
 console.log('');
@@ -25,7 +25,7 @@ const socket: Socket = io(`${SESSION_HUB_URL}/agent`, {
 });
 
 socket.on('connect', () => {
-  console.log('✓ Connected to Session Hub');
+  console.log('✓ Connected to Vibe Anywhere');
   console.log(`  Socket ID: ${socket.id}`);
 
   // Register the agent

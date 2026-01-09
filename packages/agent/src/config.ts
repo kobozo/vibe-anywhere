@@ -34,7 +34,7 @@ function optionalEnv(name: string, defaultValue: string): string {
 }
 
 export interface AgentConfig {
-  /** Session Hub WebSocket URL (e.g., wss://session-hub.example.com) */
+  /** Vibe Anywhere WebSocket URL (e.g., wss://vibe-anywhere.example.com) */
   sessionHubUrl: string;
   /** Workspace ID this agent belongs to */
   workspaceId: string;

@@ -3,7 +3,7 @@ import './globals.css';
 import { ThemeProvider } from '@/lib/theme';
 
 export const metadata: Metadata = {
-  title: 'Session Hub - Claude Code Manager',
+  title: 'Vibe Anywhere - Claude Code Manager',
   description: 'Web interface for managing persistent Claude Code sessions',
   icons: {
     icon: '/favicon.svg',

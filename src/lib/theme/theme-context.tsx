@@ -20,7 +20,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = 'session-hub-theme';
+const STORAGE_KEY = 'vibe-anywhere-theme';
 
 function applyThemeToDOM(theme: AppTheme) {
   const root = document.documentElement;

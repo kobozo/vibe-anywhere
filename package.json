@@ -1,5 +1,5 @@
 {
-  "name": "session-hub",
+  "name": "vibe-anywhere",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f app",
     "docker:shell": "docker compose exec app sh",
-    "docker:claude-image": "docker build -t session-hub/claude-instance:latest -f docker/claude-instance/Dockerfile .",
+    "docker:claude-image": "docker build -t vibe-anywhere/claude-instance:latest -f docker/claude-instance/Dockerfile .",
     "setup": "npm run docker:up && npm run db:migrate && npm run docker:claude-image"
   },
   "dependencies": {

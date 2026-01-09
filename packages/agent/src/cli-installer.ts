@@ -1,6 +1,6 @@
 /**
- * CLI Installer for Session Hub CLI
- * Manages installation and updates of the session-hub CLI tool
+ * CLI Installer for Vibe Anywhere CLI
+ * Manages installation and updates of the vibe-anywhere CLI tool
  */
 
 import { exec } from 'child_process';
@@ -13,7 +13,7 @@ const execAsync = promisify(exec);
 export interface CliInstallerConfig {
   version: string;
   cliSourcePath: string; // Path to CLI binary in agent bundle
-  cliInstallPath: string; // Where to install CLI (e.g., /usr/local/bin/session-hub)
+  cliInstallPath: string; // Where to install CLI (e.g., /usr/local/bin/vibe-anywhere)
   bashrcPath: string; // Path to user's .bashrc
 }
 
@@ -25,7 +25,7 @@ export class CliInstaller {
    */
   async isCliUpToDate(): Promise<boolean> {
     try {
-      const { stdout } = await execAsync('session-hub --version');
+      const { stdout } = await execAsync('vibe-anywhere --version');
       const cliVersion = stdout.trim();
       return cliVersion === this.config.version;
     } catch {
@@ -37,7 +37,7 @@ export class CliInstaller {
    * Install or update the CLI
    */
   async installCli(): Promise<void> {
-    console.log(`Installing session-hub CLI v${this.config.version}...`);
+    console.log(`Installing vibe-anywhere CLI v${this.config.version}...`);
 
     // Check if source CLI exists
     if (!fs.existsSync(this.config.cliSourcePath)) {
@@ -71,7 +71,7 @@ export class CliInstaller {
 
     // Verify installation
     try {
-      const { stdout } = await execAsync('session-hub --version');
+      const { stdout } = await execAsync('vibe-anywhere --version');
       const installedVersion = stdout.trim();
       if (installedVersion === this.config.version) {
         console.log(`✓ CLI version verified: ${installedVersion}`);
@@ -95,7 +95,7 @@ export class CliInstaller {
 
     try {
       let bashrc = await fs.promises.readFile(this.config.bashrcPath, 'utf8');
-      const currentAliasLine = "alias reload-env='eval $(session-hub reload env --no-comments)'";
+      const currentAliasLine = "alias reload-env='eval $(vibe-anywhere reload env --no-comments)'";
 
       // Check if the correct (current) alias exists
       if (bashrc.includes(currentAliasLine)) {
@@ -104,7 +104,7 @@ export class CliInstaller {
       }
 
       // Check if an old alias exists (without --no-comments)
-      const oldAliasRegex = /alias reload-env='eval \$\(session-hub reload env\)'/;
+      const oldAliasRegex = /alias reload-env='eval \$\(vibe-anywhere reload env\)'/;
       if (oldAliasRegex.test(bashrc)) {
         // Update the old alias
         bashrc = bashrc.replace(oldAliasRegex, currentAliasLine);
@@ -115,7 +115,7 @@ export class CliInstaller {
 
       // No alias exists, add it
       if (!bashrc.includes('reload-env')) {
-        const addition = `\n# Session Hub helper alias\n${currentAliasLine}\n`;
+        const addition = `\n# Vibe Anywhere helper alias\n${currentAliasLine}\n`;
         await fs.promises.appendFile(this.config.bashrcPath, addition);
         console.log('✓ Added reload-env alias to .bashrc');
       } else {

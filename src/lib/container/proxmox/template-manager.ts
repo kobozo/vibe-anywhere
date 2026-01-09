@@ -17,7 +17,7 @@ const DEFAULT_OS_TEMPLATE = 'debian-12-standard';
 
 /**
  * Core provisioning script - Essential packages only
- * Node.js is always installed because the Session Hub agent requires it
+ * Node.js is always installed because the Vibe Anywhere agent requires it
  * Other tech stacks (Python, etc.) are installed separately based on configuration
  */
 const CORE_PROVISIONING_SCRIPT = `
@@ -62,7 +62,7 @@ apt-get install -y tmux
 
 # Configure tmux
 cat > /etc/tmux.conf << 'TMUXEOF'
-# Session Hub tmux configuration
+# Vibe Anywhere tmux configuration
 # Disable mouse mode to allow browser text selection
 set -g mouse off
 
@@ -82,7 +82,7 @@ setw -g pane-base-index 1
 TMUXEOF
 chmod 644 /etc/tmux.conf
 
-# Install Node.js 22 (required for Session Hub agent)
+# Install Node.js 22 (required for Vibe Anywhere agent)
 echo "[5/9] Installing Node.js 22..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
@@ -105,15 +105,15 @@ mkdir -p /workspace
 chown kobozo:kobozo /workspace
 chmod 755 /workspace
 
-# Setup Session Hub agent directory
-echo "[8/9] Setting up Session Hub agent..."
-mkdir -p /opt/session-hub-agent
-chown -R kobozo:kobozo /opt/session-hub-agent
+# Setup Vibe Anywhere agent directory
+echo "[8/9] Setting up Vibe Anywhere agent..."
+mkdir -p /opt/vibe-anywhere-agent
+chown -R kobozo:kobozo /opt/vibe-anywhere-agent
 
 # Create systemd service for agent
-cat > /etc/systemd/system/session-hub-agent.service << 'EOF'
+cat > /etc/systemd/system/vibe-anywhere-agent.service << 'EOF'
 [Unit]
-Description=Session Hub Sidecar Agent
+Description=Vibe Anywhere Sidecar Agent
 After=network-online.target
 Wants=network-online.target
 
@@ -121,18 +121,18 @@ Wants=network-online.target
 Type=simple
 User=kobozo
 Group=kobozo
-WorkingDirectory=/opt/session-hub-agent
-ExecStart=/usr/bin/node /opt/session-hub-agent/dist/index.js
+WorkingDirectory=/opt/vibe-anywhere-agent
+ExecStart=/usr/bin/node /opt/vibe-anywhere-agent/dist/index.js
 Restart=always
 RestartSec=5
-EnvironmentFile=-/etc/session-hub-agent.env
+EnvironmentFile=-/etc/vibe-anywhere-agent.env
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable session-hub-agent
+systemctl enable vibe-anywhere-agent
 
 # Configure SSH and git
 echo "[9/9] Configuring SSH and git..."
@@ -140,14 +140,14 @@ systemctl enable ssh
 
 # Configure git globally
 git config --global init.defaultBranch main
-git config --global user.email "claude@session-hub.local"
+git config --global user.email "claude@vibe-anywhere.local"
 git config --global user.name "Claude Code"
 git config --global --add safe.directory /workspace
 git config --global --add safe.directory '*'
 
 # Configure git for kobozo user
 su - kobozo -c "git config --global init.defaultBranch main"
-su - kobozo -c "git config --global user.email 'claude@session-hub.local'"
+su - kobozo -c "git config --global user.email 'claude@vibe-anywhere.local'"
 su - kobozo -c "git config --global user.name 'Claude Code'"
 su - kobozo -c "git config --global --add safe.directory /workspace"
 su - kobozo -c "git config --global --add safe.directory '*'"
@@ -200,7 +200,7 @@ export type ProgressCallback = (progress: CreateTemplateProgress) => void;
 export type LogCallback = (type: 'stdout' | 'stderr', data: string) => void;
 
 /**
- * Manages Proxmox LXC templates for Session Hub
+ * Manages Proxmox LXC templates for Vibe Anywhere
  */
 export class ProxmoxTemplateManager {
   private client: ProxmoxClient;
@@ -301,7 +301,7 @@ export class ProxmoxTemplateManager {
   }
 
   /**
-   * Get Session Hub's SSH public key
+   * Get Vibe Anywhere's SSH public key
    */
   getSSHPublicKey(): string | null {
     const keyPaths = [
@@ -429,11 +429,11 @@ export class ProxmoxTemplateManager {
     };
 
     // Generate hostname from name (sanitize for valid hostname)
-    const hostname = (name || 'session-hub-template')
+    const hostname = (name || 'vibe-anywhere-template')
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/^-+|-+$/g, '')
-      .substring(0, 63) || 'session-hub-template';
+      .substring(0, 63) || 'vibe-anywhere-template';
 
     // Determine if we're cloning from a parent template or creating from base OS
     if (parentVmid) {
@@ -442,7 +442,7 @@ export class ProxmoxTemplateManager {
 
       const cloneUpid = await this.client.cloneLxc(parentVmid, vmid, {
         hostname,
-        description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
+        description: name ? `Vibe Anywhere template: ${name}` : 'Vibe Anywhere Claude instance template',
         storage: storageId,
         full: true, // Full clone for templates
       });
@@ -494,7 +494,7 @@ export class ProxmoxTemplateManager {
       const templateTags = buildTemplateTags(techStacks);
       const upid = await this.client.createLxcWithSSHKeys(vmid, osTemplate, {
         hostname,
-        description: name ? `Session Hub template: ${name}` : 'Session Hub Claude instance template',
+        description: name ? `Vibe Anywhere template: ${name}` : 'Vibe Anywhere Claude instance template',
         storage: storageId,
         memory,
         cores,

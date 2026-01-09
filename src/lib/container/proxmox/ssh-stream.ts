@@ -939,7 +939,7 @@ export async function syncWorkspaceFromContainer(
 
 /**
  * Setup SSH access to a container via pct exec on the Proxmox host
- * This adds the Session Hub server's SSH public key to the container's authorized_keys
+ * This adds the Vibe Anywhere server's SSH public key to the container's authorized_keys
  * Must be called before any SSH-based operations (rsync, agent provisioning)
  */
 export async function setupContainerSSHAccess(
@@ -1022,7 +1022,7 @@ export async function setupContainerSSHAccess(
 
     # Configure tmux to disable mouse mode (allows browser text selection)
     cat > /etc/tmux.conf << TMUXEOF
-# Session Hub tmux configuration
+# Vibe Anywhere tmux configuration
 # Disable mouse mode to allow browser text selection
 set -g mouse off
 

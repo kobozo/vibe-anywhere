@@ -1,4 +1,4 @@
-# Session Hub - Docker Compose Configuration
+# Vibe Anywhere - Docker Compose Configuration
 # Production-ready stack with PostgreSQL
 #
 # Usage:
@@ -8,19 +8,19 @@
 
 services:
   # ==========================================================================
-  # Session Hub Application
+  # Vibe Anywhere Application
   # ==========================================================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: session-hub
+    container_name: vibe-anywhere
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
     environment:
       # Database
-      DATABASE_URL: postgresql://sessionhub:${POSTGRES_PASSWORD:-sessionhub_dev_password}@postgres:5432/sessionhub
+      DATABASE_URL: postgresql://vibeanywhere:${POSTGRES_PASSWORD:-vibeanywhere_dev_password}@postgres:5432/vibeanywhere
 
       # Server
       NODE_ENV: ${NODE_ENV:-production}
@@ -39,9 +39,9 @@ services:
       # Container backend
       CONTAINER_BACKEND: ${CONTAINER_BACKEND:-docker}
       DOCKER_SOCKET: /var/run/docker.sock
-      CLAUDE_IMAGE: ${CLAUDE_IMAGE:-session-hub/claude-instance:latest}
+      CLAUDE_IMAGE: ${CLAUDE_IMAGE:-vibe-anywhere/claude-instance:latest}
 
-      # Session Hub URL (for Proxmox agents to connect back)
+      # Vibe Anywhere URL (for Proxmox agents to connect back)
       SESSION_HUB_URL: ${SESSION_HUB_URL:-http://localhost:3000}
 
       # Session settings
@@ -53,13 +53,13 @@ services:
 
       # App data directory (cloned repos, worktrees, SSH keys)
       # This persists across container restarts
-      - ${HOST_DATA_PATH:-session-hub-data}:/data:rw
+      - ${HOST_DATA_PATH:-vibe-anywhere-data}:/data:rw
 
       # Git repositories from host (for local/symlinked repos)
       - ${HOST_REPO_PATH:-./repos}:/repos:rw
 
       # SSH keys for Proxmox (optional)
-      - ${HOST_SSH_PATH:-~/.ssh}:/home/sessionhub/.ssh:ro
+      - ${HOST_SSH_PATH:-~/.ssh}:/home/vibeanywhere/.ssh:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,39 +70,39 @@ services:
       start_period: 40s
       retries: 3
     networks:
-      - session-hub-network
+      - vibe-anywhere-network
 
   # ==========================================================================
   # PostgreSQL Database
   # ==========================================================================
   postgres:
     image: postgres:16-alpine
-    container_name: session-hub-db
+    container_name: vibe-anywhere-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: sessionhub
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sessionhub_dev_password}
-      POSTGRES_DB: sessionhub
+      POSTGRES_USER: vibeanywhere
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vibeanywhere_dev_password}
+      POSTGRES_DB: vibeanywhere
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sessionhub -d sessionhub"]
+      test: ["CMD-SHELL", "pg_isready -U vibeanywhere -d vibeanywhere"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - session-hub-network
+      - vibe-anywhere-network
 
   # ==========================================================================
   # pgAdmin (Debug profile only)
   # ==========================================================================
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: session-hub-pgadmin
+    container_name: vibe-anywhere-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@sessionhub.local
+      PGADMIN_DEFAULT_EMAIL: admin@vibeanywhere.local
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
@@ -112,21 +112,21 @@ services:
     profiles:
       - debug
     networks:
-      - session-hub-network
+      - vibe-anywhere-network
 
 # ==========================================================================
 # Volumes
 # ==========================================================================
 volumes:
   postgres_data:
-    name: session-hub-postgres
-  session-hub-data:
-    name: session-hub-data
+    name: vibe-anywhere-postgres
+  vibe-anywhere-data:
+    name: vibe-anywhere-data
 
 # ==========================================================================
 # Networks
 # ==========================================================================
 networks:
-  session-hub-network:
-    name: session-hub
+  vibe-anywhere-network:
+    name: vibe-anywhere
     driver: bridge

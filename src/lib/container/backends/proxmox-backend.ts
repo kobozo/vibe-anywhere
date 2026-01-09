@@ -65,8 +65,8 @@ export class ProxmoxBackend implements IContainerBackend {
 
     // Clone the template
     const upid = await client.cloneLxc(templateVmid, newVmid, {
-      hostname: `session-hub-${workspaceId.substring(0, 8)}`,
-      description: `Session Hub workspace: ${workspaceId}`,
+      hostname: `vibe-anywhere-${workspaceId.substring(0, 8)}`,
+      description: `Vibe Anywhere workspace: ${workspaceId}`,
       storage: cfg.storage,
       full: true, // Full clone for isolation
     });
@@ -660,7 +660,7 @@ EOF
       try {
         await execSSHCommand(
           { host: ip, username: 'root' },
-          ['systemctl', 'stop', 'session-hub-agent'],
+          ['systemctl', 'stop', 'vibe-anywhere-agent'],
           { workingDir: '/' }
         );
         console.log(`Stopped existing agent service in container ${vmid}`);
@@ -674,14 +674,14 @@ EOF
       await execSSHCommand(
         { host: ip, username: 'root' },
         ['bash', '-c', `
-          cat > /etc/session-hub-agent.env << 'EOF'
+          cat > /etc/vibe-anywhere-agent.env << 'EOF'
 SESSION_HUB_URL=${sessionHubUrl}
 WORKSPACE_ID=${workspaceId}
 AGENT_TOKEN=${agentToken}
 AGENT_VERSION=${agentVersion}
 EOF
-          chown kobozo:kobozo /etc/session-hub-agent.env
-          chmod 600 /etc/session-hub-agent.env
+          chown kobozo:kobozo /etc/vibe-anywhere-agent.env
+          chmod 600 /etc/vibe-anywhere-agent.env
         `],
         { workingDir: '/' }
       );
@@ -692,7 +692,7 @@ EOF
       await execSSHCommand(
         { host: ip, username: 'root' },
         ['bash', '-c', `
-          cd /opt/session-hub-agent
+          cd /opt/vibe-anywhere-agent
 
           # Download agent bundle
           echo "Downloading agent bundle from ${agentBundleUrl}..."
@@ -713,18 +713,18 @@ EOF
           fi
 
           # Ensure kobozo owns everything in the agent directory
-          chown -R kobozo:kobozo /opt/session-hub-agent
+          chown -R kobozo:kobozo /opt/vibe-anywhere-agent
 
           echo "Agent bundle installed"
         `],
-        { workingDir: '/opt/session-hub-agent' }
+        { workingDir: '/opt/vibe-anywhere-agent' }
       );
       console.log(`Agent bundle installed in container ${vmid}`);
 
       // 4. Start the agent service with the correct configuration
       await execSSHCommand(
         { host: ip, username: 'root' },
-        ['systemctl', 'start', 'session-hub-agent'],
+        ['systemctl', 'start', 'vibe-anywhere-agent'],
         { workingDir: '/' }
       );
       console.log(`Agent service started in container ${vmid}`);
@@ -744,7 +744,7 @@ EOF
 
   /**
    * Inject environment variables into a running container
-   * Writes to /etc/profile.d/session-hub-env.sh for persistence across shell sessions
+   * Writes to /etc/profile.d/vibe-anywhere-env.sh for persistence across shell sessions
    */
   async injectEnvVars(containerId: string, envVars: Record<string, string>): Promise<void> {
     if (!envVars || Object.keys(envVars).length === 0) {
@@ -770,7 +770,7 @@ EOF
       return `export ${key}='${escapedValue}'`;
     });
 
-    const envContent = `# Session Hub Environment Variables
+    const envContent = `# Vibe Anywhere Environment Variables
 # Auto-generated - do not edit manually
 ${envLines.join('\n')}
 `;
@@ -781,10 +781,10 @@ ${envLines.join('\n')}
       await execSSHCommand(
         { host: ip, username: 'root' },
         ['bash', '-c', `
-          cat > /etc/profile.d/session-hub-env.sh << 'ENVEOF'
+          cat > /etc/profile.d/vibe-anywhere-env.sh << 'ENVEOF'
 ${envContent}
 ENVEOF
-          chmod 644 /etc/profile.d/session-hub-env.sh
+          chmod 644 /etc/profile.d/vibe-anywhere-env.sh
         `],
         { workingDir: '/' }
       );

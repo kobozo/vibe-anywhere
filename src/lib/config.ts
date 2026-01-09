@@ -12,7 +12,7 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(16),
 
   // App Home Directory - where all repos, worktrees, and SSH keys are stored
-  APP_HOME_DIR: z.string().default('/opt/session-hub'),
+  APP_HOME_DIR: z.string().default('/opt/vibe-anywhere'),
 
   // DEPRECATED: Git worktrees are no longer used. Repos are cloned directly in containers.
   // These are kept only for legacy session API backward compatibility.
@@ -24,12 +24,12 @@ const envSchema = z.object({
 
   // Docker Configuration
   DOCKER_SOCKET: z.string().default('/var/run/docker.sock'),
-  CLAUDE_IMAGE: z.string().default('session-hub/claude-instance:latest'),
+  CLAUDE_IMAGE: z.string().default('vibe-anywhere/claude-instance:latest'),
 
   // Proxmox Configuration (required if CONTAINER_BACKEND='proxmox')
   PROXMOX_HOST: z.string().optional(),
   PROXMOX_PORT: z.string().default('8006').transform(Number),
-  PROXMOX_TOKEN_ID: z.string().optional(),      // e.g., 'root@pam!session-hub'
+  PROXMOX_TOKEN_ID: z.string().optional(),      // e.g., 'root@pam!vibe-anywhere'
   PROXMOX_TOKEN_SECRET: z.string().optional(),
   PROXMOX_NODE: z.string().optional(),          // e.g., 'pve'
   PROXMOX_STORAGE: z.string().default('local-lvm'),

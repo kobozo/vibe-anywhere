@@ -22,7 +22,7 @@ interface CtTemplate {
   node: string;
 }
 
-// Selection can be a CT template or Session Hub template
+// Selection can be a CT template or Vibe Anywhere template
 type BaseSelection =
   | { type: 'ct'; id: string; volid: string; name: string }
   | { type: 'template'; id: string; template: ProxmoxTemplate }
@@ -72,7 +72,7 @@ export function TemplateDialog({
   const [ctTemplatesLoading, setCtTemplatesLoading] = useState(false);
   const [ctTemplatesError, setCtTemplatesError] = useState<string | null>(null);
 
-  // Selected base (either CT template or Session Hub template)
+  // Selected base (either CT template or Vibe Anywhere template)
   const [selectedBaseValue, setSelectedBaseValue] = useState<string>('');
 
   const isEditMode = !!template;
@@ -104,7 +104,7 @@ export function TemplateDialog({
     }
   }, [isOpen, isEditMode, isCloneMode, token]);
 
-  // Get available Session Hub templates for dropdown (only ready templates, excluding current if editing)
+  // Get available Vibe Anywhere templates for dropdown (only ready templates, excluding current if editing)
   const availableParentTemplates = useMemo(() => {
     return templates.filter(t =>
       t.status === 'ready' &&
@@ -131,7 +131,7 @@ export function TemplateDialog({
     return null;
   }, [selectedBaseValue, ctTemplates, templates]);
 
-  // Effective parent: either forced (from Clone button) or user-selected Session Hub template
+  // Effective parent: either forced (from Clone button) or user-selected Vibe Anywhere template
   const effectiveParent = useMemo(() => {
     if (parentTemplate) return parentTemplate; // Forced clone mode
     if (selectedBase?.type === 'template') {
@@ -251,7 +251,7 @@ export function TemplateDialog({
   const handleBaseChange = (newValue: string) => {
     setSelectedBaseValue(newValue);
 
-    // If selecting a Session Hub template, filter out inherited stacks
+    // If selecting a Vibe Anywhere template, filter out inherited stacks
     if (newValue.startsWith('tpl:')) {
       const tplId = newValue.slice(4);
       const parent = templates.find(t => t.id === tplId);
@@ -276,7 +276,7 @@ export function TemplateDialog({
 
     // Require base selection for new templates (not in clone mode)
     if (!isEditMode && !isCloneMode && !selectedBase) {
-      setError('Please select a base (CT template or Session Hub template)');
+      setError('Please select a base (CT template or Vibe Anywhere template)');
       return;
     }
 
@@ -376,9 +376,9 @@ export function TemplateDialog({
                       </optgroup>
                     )}
 
-                    {/* Session Hub Templates Group */}
+                    {/* Vibe Anywhere Templates Group */}
                     {availableParentTemplates.length > 0 && (
-                      <optgroup label="Session Hub Templates">
+                      <optgroup label="Vibe Anywhere Templates">
                         {availableParentTemplates.map((t) => (
                           <option key={`tpl:${t.id}`} value={`tpl:${t.id}`}>
                             {t.name} {t.techStacks && t.techStacks.length > 0 ? `(${t.techStacks.join(', ')})` : ''}
@@ -393,7 +393,7 @@ export function TemplateDialog({
                     ? 'Create from a fresh OS image with full provisioning.'
                     : selectedBase?.type === 'template'
                     ? 'Clone from an existing template to inherit its configuration and tech stacks.'
-                    : 'Select a CT template (OS image) or an existing Session Hub template.'}
+                    : 'Select a CT template (OS image) or an existing Vibe Anywhere template.'}
                 </p>
               </div>
             )}
@@ -413,7 +413,7 @@ export function TemplateDialog({
               </div>
             )}
 
-            {/* Selected base info (when Session Hub template selected via dropdown) */}
+            {/* Selected base info (when Vibe Anywhere template selected via dropdown) */}
             {!isCloneMode && selectedBase?.type === 'template' && effectiveParent && (
               <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded">
                 <div className="text-sm text-purple-300">
@@ -436,7 +436,7 @@ export function TemplateDialog({
                   <span className="text-foreground font-medium">{selectedBase.name}</span>
                 </div>
                 <div className="text-xs text-blue-400 mt-1">
-                  Full provisioning will be performed (Node.js, Git, Session Hub Agent, etc.)
+                  Full provisioning will be performed (Node.js, Git, Vibe Anywhere Agent, etc.)
                 </div>
               </div>
             )}

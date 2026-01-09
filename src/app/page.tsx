@@ -1183,7 +1183,7 @@ function Dashboard() {
       {/* Header */}
       <header className="h-14 flex-shrink-0 border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-foreground">Session Hub</h1>
+          <h1 className="text-lg font-bold text-foreground">Vibe Anywhere</h1>
           {selectedRepository && (
             <>
               <span className="text-foreground-tertiary">/</span>

@@ -1,7 +1,7 @@
 {
-  "name": "@session-hub/agent",
-  "version": "1.8.5",
-  "description": "Session Hub sidecar agent for LXC containers",
+  "name": "@vibe-anywhere/agent",
+  "version": "2.0.0",
+  "description": "Vibe Anywhere sidecar agent for LXC containers",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "bundle": "npm run build && npm run bundle:cli && tar -czf agent-bundle.tar.gz dist cli package.json package-lock.json",
-    "bundle:cli": "cd ../session-hub-cli && npm install && npm run build && mkdir -p ../agent/cli && cp dist/session-hub ../agent/cli/session-hub && chmod +x ../agent/cli/session-hub"
+    "bundle:cli": "cd ../vibe-anywhere-cli && npm install && npm run build && mkdir -p ../agent/cli && cp dist/vibe-anywhere ../agent/cli/vibe-anywhere && chmod +x ../agent/cli/vibe-anywhere"
   },
   "dependencies": {
     "simple-git": "^3.27.0",

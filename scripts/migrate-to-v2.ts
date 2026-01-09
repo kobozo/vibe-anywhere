@@ -1,5 +1,5 @@
 /**
- * Migration script: Session Hub v1 → v2
+ * Migration script: Vibe Anywhere v1 → v2
  *
  * Creates new tables for the hierarchical model:
  * - repositories

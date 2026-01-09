@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const STORAGE_KEY = 'session-hub-ui-state';
+const STORAGE_KEY = 'vibe-anywhere-ui-state';
 
 interface UIState {
   expandedRepos: string[];
