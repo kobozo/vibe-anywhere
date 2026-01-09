@@ -1,1 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#3b82f6"/><text x="50" y="68" font-size="50" text-anchor="middle" fill="white" font-family="system-ui">SH</text></svg>
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#0EA5E9;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle (globe representation) -->
+  <circle cx="100" cy="100" r="85" fill="none" stroke="url(#waveGradient)" stroke-width="2" opacity="0.3"/>
+
+  <!-- Outer wave circle -->
+  <path d="M 100 20 Q 130 30, 140 50 T 180 100 Q 170 130, 150 150 T 100 180 Q 70 170, 50 150 T 20 100 Q 30 70, 50 50 T 100 20"
+        fill="none"
+        stroke="url(#waveGradient)"
+        stroke-width="3"
+        opacity="0.6"/>
+
+  <!-- Inner wave layers - creating vibe/wave effect -->
+  <path d="M 100 40 Q 120 45, 130 60 T 160 100 Q 155 120, 140 130 T 100 160 Q 80 155, 70 140 T 40 100 Q 45 80, 60 70 T 100 40"
+        fill="none"
+        stroke="url(#waveGradient)"
+        stroke-width="4"
+        opacity="0.7">
+    <animate attributeName="opacity" values="0.7;0.9;0.7" dur="3s" repeatCount="indefinite"/>
+  </path>
+
+  <path d="M 100 55 Q 115 58, 120 70 T 145 100 Q 142 115, 130 120 T 100 145 Q 85 142, 80 130 T 55 100 Q 58 85, 70 80 T 100 55"
+        fill="none"
+        stroke="url(#waveGradient)"
+        stroke-width="5"
+        opacity="0.8">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" begin="1s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Central code brackets representing coding/development -->
+  <g fill="url(#accentGradient)">
+    <!-- Left bracket -->
+    <path d="M 75 80 L 70 80 L 70 120 L 75 120 M 70 100 L 65 100"
+          stroke="url(#accentGradient)"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"/>
+
+    <!-- Right bracket -->
+    <path d="M 125 80 L 130 80 L 130 120 L 125 120 M 130 100 L 135 100"
+          stroke="url(#accentGradient)"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"/>
+  </g>
+
+  <!-- Connecting dots representing "anywhere" connectivity -->
+  <circle cx="100" cy="50" r="3" fill="url(#waveGradient)" opacity="0.8">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="150" cy="100" r="3" fill="url(#waveGradient)" opacity="0.8">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" begin="0.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="100" cy="150" r="3" fill="url(#waveGradient)" opacity="0.8">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" begin="1s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="50" cy="100" r="3" fill="url(#waveGradient)" opacity="0.8">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" begin="1.5s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Subtle connection lines -->
+  <line x1="100" y1="50" x2="150" y2="100" stroke="url(#waveGradient)" stroke-width="1" opacity="0.2"/>
+  <line x1="150" y1="100" x2="100" y2="150" stroke="url(#waveGradient)" stroke-width="1" opacity="0.2"/>
+  <line x1="100" y1="150" x2="50" y2="100" stroke="url(#waveGradient)" stroke-width="1" opacity="0.2"/>
+  <line x1="50" y1="100" x2="100" y2="50" stroke="url(#waveGradient)" stroke-width="1" opacity="0.2"/>
+</svg>

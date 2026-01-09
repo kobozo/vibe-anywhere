@@ -1183,6 +1183,13 @@ function Dashboard() {
       {/* Header */}
       <header className="h-14 flex-shrink-0 border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center gap-3">
+          <img
+            src="/logo.svg"
+            alt="Vibe Anywhere"
+            width={24}
+            height={24}
+            className="w-6 h-6 flex-shrink-0"
+          />
           <h1 className="text-lg font-bold text-foreground">Vibe Anywhere</h1>
           {selectedRepository && (
             <>
