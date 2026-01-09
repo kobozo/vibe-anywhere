@@ -1491,7 +1491,12 @@ function Dashboard() {
       {/* Template Details Modal */}
       <TemplateDetailsModal
         isOpen={!!selectedTemplate}
-        template={selectedTemplate}
+        template={
+          // Always get fresh template from the array to reflect status updates
+          selectedTemplate
+            ? templates.find(t => t.id === selectedTemplate.id) || selectedTemplate
+            : null
+        }
         templates={templates}
         onClose={() => {
           // Always allow closing - provisioning continues in background
