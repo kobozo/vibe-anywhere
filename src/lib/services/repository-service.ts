@@ -1,4 +1,4 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, asc, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { repositories, type Repository } from '@/lib/db/schema';
 
@@ -96,7 +96,7 @@ export class RepositoryService {
       .select()
       .from(repositories)
       .where(eq(repositories.userId, userId))
-      .orderBy(desc(repositories.updatedAt));
+      .orderBy(asc(sql`lower(${repositories.name})`));
   }
 
   /**
