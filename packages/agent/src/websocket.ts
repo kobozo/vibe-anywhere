@@ -5,6 +5,8 @@
 
 import { io, Socket } from 'socket.io-client';
 import type { AgentConfig } from './config.js';
+import { EnvStateManager } from './env-state-manager.js';
+import { applyEnvVarChanges } from './env-sync.js';
 
 export interface AgentEvents {
   onConnected: () => void;
@@ -44,11 +46,15 @@ export class AgentWebSocket {
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private isConnecting: boolean = false;
   private shouldReconnect: boolean = true;
+  private envStateManager: EnvStateManager;
 
   constructor(
     private config: AgentConfig,
     private events: AgentEvents
-  ) {}
+  ) {
+    // Initialize env state manager
+    this.envStateManager = new EnvStateManager(config.workspaceId);
+  }
 
   /**
    * Connect to Session Hub
@@ -121,8 +127,17 @@ export class AgentWebSocket {
     });
 
     // Session Hub -> Agent messages
-    this.socket.on('agent:registered', (data) => {
+    this.socket.on('agent:registered', async (data) => {
       console.log('Registration confirmed:', data);
+
+      // Load env var state after registration
+      try {
+        await this.envStateManager.loadState();
+      } catch (error) {
+        console.error('Failed to load env var state:', error);
+        // Continue anyway - non-critical error
+      }
+
       this.events.onRegistered(data);
     });
 
@@ -212,6 +227,57 @@ export class AgentWebSocket {
     // Stats events
     this.socket.on('stats:request', (data) => {
       this.events.onStatsRequest(data);
+    });
+
+    // Environment variable update event
+    this.socket.on('env:update', async (data: {
+      workspaceId: string;
+      repositoryId: string;
+      envVars: Record<string, string>;
+    }) => {
+      try {
+        console.log(`Received env:update for workspace ${data.workspaceId}`);
+
+        // Compute diff from current state
+        const diff = this.envStateManager.computeDiff(
+          data.envVars,
+          data.repositoryId
+        );
+
+        console.log(`Env var diff: +${Object.keys(diff.toAdd).length} -${diff.toRemove.length} ~${Object.keys(diff.toChange).length}`);
+
+        // Apply changes to system
+        await applyEnvVarChanges(data.envVars, diff);
+
+        // Save new state
+        await this.envStateManager.saveState(
+          data.envVars,
+          data.workspaceId,
+          data.repositoryId
+        );
+
+        // Send success response
+        this.socket!.emit('env:update:response', {
+          workspaceId: data.workspaceId,
+          success: true,
+          applied: {
+            added: Object.keys(diff.toAdd).length,
+            removed: diff.toRemove.length,
+            changed: Object.keys(diff.toChange).length,
+          }
+        });
+
+        console.log(`Env vars updated successfully for workspace ${data.workspaceId}`);
+      } catch (error) {
+        console.error('Failed to update env vars:', error);
+
+        // Send error response
+        this.socket!.emit('env:update:response', {
+          workspaceId: data.workspaceId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     });
 
     this.socket.on('error', (error) => {

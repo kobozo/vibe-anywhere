@@ -52,32 +52,50 @@ export async function POST(request: NextRequest, context: RouteContext) {
       workspace.templateId
     );
 
-    // Get container backend
-    const containerBackend = await getContainerBackendAsync();
+    // NEW: Push to agent via WebSocket (v1.8.4+)
+    const { pushEnvVarsToAgent } = await import('@/lib/websocket/server');
 
-    // Update /etc/profile.d/session-hub-env.sh
-    // Check by constructor name to avoid instanceof issues with lazy-loaded modules
-    const backendType = containerBackend?.constructor?.name;
-    if (backendType === 'ProxmoxBackend') {
-      await containerBackend.injectEnvVars(workspace.containerId, mergedEnvVars);
-      console.log(`Updated env vars for workspace ${workspaceId}`);
-    } else {
-      // Docker backend doesn't support runtime injection
-      return NextResponse.json(
-        {
-          error: {
-            message: 'Environment variable reload is only supported for Proxmox LXC containers',
-            details: {
-              backendType: backendType || 'unknown',
-            }
-          }
-        },
-        { status: 400 }
+    try {
+      // Try agent push first
+      const result = await pushEnvVarsToAgent(
+        workspaceId,
+        mergedEnvVars,
+        workspace.repositoryId
       );
-    }
 
-    // Update tmux environment (new feature in this endpoint)
-    await updateTmuxEnvironment(workspace.containerId, mergedEnvVars, containerBackend);
+      if (!result.success) {
+        throw new Error(result.error || 'Agent failed to apply env vars');
+      }
+
+      console.log(`Agent successfully updated env vars for workspace ${workspaceId}:`, result.applied);
+    } catch (error) {
+      console.warn('Failed to push env vars via agent, falling back to SSH method:', error);
+
+      // FALLBACK: Use SSH method for backwards compatibility (agents < v1.8.4)
+      const containerBackend = await getContainerBackendAsync();
+      const backendType = containerBackend?.constructor?.name;
+
+      if (backendType === 'ProxmoxBackend') {
+        console.log('Using SSH fallback for env var sync');
+        await containerBackend.injectEnvVars(workspace.containerId, mergedEnvVars);
+        await updateTmuxEnvironmentViaSSH(workspace.containerId, mergedEnvVars, containerBackend);
+        console.log(`Updated env vars via SSH for workspace ${workspaceId}`);
+      } else {
+        // Docker backend doesn't support runtime injection
+        return NextResponse.json(
+          {
+            error: {
+              message: 'Environment variable reload is only supported for Proxmox LXC containers',
+              details: {
+                backendType: backendType || 'unknown',
+                agentError: error instanceof Error ? error.message : String(error),
+              }
+            }
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Send notification to active tabs
     await sendNotificationToTabs(workspaceId);
@@ -99,11 +117,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
 }
 
 /**
- * Update tmux environment variables
+ * Update tmux environment variables via SSH (FALLBACK METHOD for agents < v1.8.4)
  * Sets variables in tmux server so new windows inherit them
  * Also unsets any previously managed variables that were removed
  */
-async function updateTmuxEnvironment(
+async function updateTmuxEnvironmentViaSSH(
   containerId: string,
   envVars: Record<string, string>,
   containerBackend: any

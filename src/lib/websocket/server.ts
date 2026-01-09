@@ -1038,3 +1038,62 @@ async function handleStagingAttach(socket: AuthenticatedSocket, templateId: stri
   console.log(`[StagingAttach] Emitting staging:attached for ${templateId}`);
   socket.emit('staging:attached', { templateId });
 }
+
+/**
+ * Push environment variable update to agent via WebSocket
+ * @param workspaceId - Workspace to update
+ * @param envVars - Complete set of environment variables
+ * @param repositoryId - Repository ID for tracking
+ * @returns Promise that resolves when agent confirms receipt
+ */
+export async function pushEnvVarsToAgent(
+  workspaceId: string,
+  envVars: Record<string, string>,
+  repositoryId: string
+): Promise<{ success: boolean; error?: string; applied?: { added: number; removed: number; changed: number } }> {
+  const agentRegistry = getAgentRegistry();
+
+  if (!agentRegistry.hasAgent(workspaceId)) {
+    throw new Error('Agent not connected');
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Agent did not respond to env:update within 30s'));
+    }, 30000);
+
+    // Get agent socket
+    const socket = agentRegistry.getAgentSocket(workspaceId);
+    if (!socket) {
+      clearTimeout(timeout);
+      reject(new Error('Agent socket not found'));
+      return;
+    }
+
+    // Listen for response (only once)
+    socket.once('env:update:response', (data: {
+      workspaceId: string;
+      success: boolean;
+      error?: string;
+      applied?: { added: number; removed: number; changed: number };
+    }) => {
+      clearTimeout(timeout);
+
+      if (data.success) {
+        console.log(`Agent applied env vars for workspace ${workspaceId}:`, data.applied);
+        resolve({ success: true, applied: data.applied });
+      } else {
+        console.error(`Agent failed to apply env vars for workspace ${workspaceId}:`, data.error);
+        resolve({ success: false, error: data.error });
+      }
+    });
+
+    // Send the update command
+    console.log(`Pushing ${Object.keys(envVars).length} env vars to agent for workspace ${workspaceId}`);
+    socket.emit('env:update', {
+      workspaceId,
+      repositoryId,
+      envVars,
+    });
+  });
+}
