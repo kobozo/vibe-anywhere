@@ -6,6 +6,8 @@ import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SidebarContextMenu } from './sidebar-context-menu';
 
+type SortOption = 'name-asc' | 'name-desc' | 'updated-desc' | 'updated-asc' | 'created-desc' | 'created-asc';
+
 interface RepositoryTreeProps {
   onSelectWorkspace: (workspace: Workspace | null, repository: Repository) => void;
   selectedWorkspaceId?: string | null;
@@ -62,6 +64,45 @@ export function RepositoryTree({
     repository?: Repository;
     workspace?: Workspace;
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('name-asc');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter and sort repositories
+  const filteredAndSortedRepos = useMemo(() => {
+    let result = [...repositories];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(repo =>
+        repo.name.toLowerCase().includes(query) ||
+        repo.description?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      switch (sortOption) {
+        case 'name-asc':
+          return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        case 'name-desc':
+          return b.name.toLowerCase().localeCompare(a.name.toLowerCase());
+        case 'updated-desc':
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        case 'updated-asc':
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case 'created-desc':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'created-asc':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [repositories, searchQuery, sortOption]);
 
   // Extract all workspace IDs for WebSocket subscription
   const allWorkspaceIds = useMemo(() => {
@@ -459,13 +500,74 @@ export function RepositoryTree({
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Repositories</h2>
-          <button
-            onClick={onAddRepository}
-            className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-primary-foreground transition-colors"
-          >
-            + Add
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-1.5 rounded transition-colors ${
+                showFilters || searchQuery ? 'bg-primary/20 text-primary' : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary'
+              }`}
+              title="Filter & Sort"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+            </button>
+            <button
+              onClick={onAddRepository}
+              className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-primary-foreground transition-colors"
+            >
+              + Add
+            </button>
+          </div>
         </div>
+
+        {/* Filter and Sort Controls */}
+        {showFilters && (
+          <div className="mt-3 space-y-2">
+            {/* Search Input */}
+            <div className="relative">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-tertiary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search repositories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 text-sm bg-background-secondary border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-tertiary hover:text-foreground"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as SortOption)}
+              className="w-full px-2.5 py-1.5 text-sm bg-background-secondary border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="updated-desc">Recently Updated</option>
+              <option value="updated-asc">Oldest Updated</option>
+              <option value="created-desc">Recently Created</option>
+              <option value="created-asc">Oldest Created</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
@@ -486,7 +588,19 @@ export function RepositoryTree({
           </div>
         )}
 
-        {repositories.map((repo) => (
+        {!isLoading && repositories.length > 0 && filteredAndSortedRepos.length === 0 && (
+          <div className="text-center text-foreground-secondary py-8">
+            <p>No matching repositories.</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-sm text-primary hover:underline mt-2"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+
+        {filteredAndSortedRepos.map((repo) => (
           <div key={repo.id} className="mb-1">
             {/* Repository header */}
             <div
