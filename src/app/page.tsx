@@ -914,13 +914,14 @@ function Dashboard() {
     resourceMemory?: number | null;
     resourceCpuCores?: number | null;
     resourceDiskSize?: number | null;
+    _keepDialogOpen?: boolean;
   }) => {
     if (!editingRepository) return;
 
     setIsEditRepoLoading(true);
     try {
       // Save repository metadata (includes resources)
-      const { envVars, ...repoUpdates } = updates;
+      const { envVars, _keepDialogOpen, ...repoUpdates } = updates;
       const response = await fetch(`/api/repositories/${editingRepository.id}`, {
         method: 'PATCH',
         headers: {
@@ -953,7 +954,11 @@ function Dashboard() {
       }
 
       await fetchRepositories();
-      setEditingRepository(null);
+
+      // Only close dialog if child didn't request to keep it open
+      if (!_keepDialogOpen) {
+        setEditingRepository(null);
+      }
     } finally {
       setIsEditRepoLoading(false);
     }

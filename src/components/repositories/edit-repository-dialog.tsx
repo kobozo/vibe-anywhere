@@ -143,6 +143,7 @@ export function EditRepositoryDialog({
       setEnvVarsModified(false);
       setSelectedSecrets([]);
       setSecretsModified(false);
+      setShowApplyDialog(false); // Reset apply dialog state
       loadEnvVars(repository.id);
       loadRepositorySecrets(repository.id);
       fetchProxmoxSettings();
@@ -280,7 +281,9 @@ export function EditRepositoryDialog({
         } : {}),
         // Only include git identity if it was modified
         ...gitIdentityUpdates,
-      });
+        // Tell parent to keep dialog open if env vars were modified
+        _keepDialogOpen: envVarsModified,
+      } as any);
 
       // If env vars were modified, show apply dialog
       if (envVarsModified) {
