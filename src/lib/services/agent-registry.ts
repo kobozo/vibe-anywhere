@@ -224,6 +224,14 @@ class AgentRegistry {
   }
 
   /**
+   * Get agent socket for a workspace
+   */
+  getAgentSocket(workspaceId: string): Socket | undefined {
+    const agent = this.agents.get(workspaceId);
+    return agent?.socket;
+  }
+
+  /**
    * Check if a workspace has a connected agent
    */
   hasAgent(workspaceId: string): boolean {
