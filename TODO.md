@@ -90,6 +90,10 @@
 
 - [ ] **Light blue theme border contrast** - Borders in the light blue theme are too light and hard to see. Increase border color contrast for better visibility.
 
+## Settings
+
+- [ ] **Tab templates card layout** - In the settings modal, change tab templates from list view to card layout with 3 cards per row for better visual presentation.
+
 ## Onboarding
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
