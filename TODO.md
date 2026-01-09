@@ -84,7 +84,7 @@
 
 - [ ] **Collapsible sidebar** - Minimize sidebar to icon-only rail view.
 
-- [ ] **Persist filter/sort preferences** - Remember user's filter and sort settings across sessions.
+- [x] **Persist filter/sort preferences** - Remember user's filter and sort settings across sessions.
 
 ## Themes
 
