@@ -96,6 +96,8 @@
 
 - [ ] **Fixed height settings modal** - Settings modal height changes based on content. Give it a fixed height with scrollable content area. Keep bottom action buttons always visible outside the scroll area.
 
+- [ ] **Tabbed create template modal** - The create template modal shows everything in one view. Convert to a tabbed/wizard approach like other modals (add repository, create workspace, etc.).
+
 ## Onboarding
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
