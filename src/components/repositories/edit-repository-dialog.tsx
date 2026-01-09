@@ -89,7 +89,9 @@ export function EditRepositoryDialog({
         },
       });
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        // API wraps response in { data: { envVars, inheritedEnvVars } }
+        const data = result.data || result;
         setEnvVars(data.envVars || []);
         setInheritedEnvVars(data.inheritedEnvVars || {});
       }
