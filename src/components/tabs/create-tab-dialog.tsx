@@ -186,7 +186,7 @@ export function CreateTabDialog({
                           : 'border-border-secondary bg-background-tertiary/50 hover:bg-background-tertiary'}`}
                     >
                       <div className="w-6 h-6 flex-shrink-0">
-                        {getTemplateIcon(option.icon, option.isStatic ? false : option.isBuiltIn, 'w-6 h-6 text-foreground')}
+                        {getTemplateIcon(option.icon, option.isStatic || !!option.isBuiltIn, 'w-6 h-6 text-foreground')}
                       </div>
                       <div>
                         <div className="text-sm font-medium text-foreground">{option.name}</div>

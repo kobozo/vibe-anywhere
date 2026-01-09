@@ -46,9 +46,9 @@
 
 - [ ] **AI-assisted terminal input** - Add shortcut/button/context menu option that opens an input modal. User types what they want to do, AI proposes a CLI command. Options: Accept (inputs command and presses enter), Correct (sends feedback in same chat session for refinement), Decline (closes modal).
 
-- [ ] **Terminal color customization** - Current theme overwrites terminal colors set by apps. Extend the theme with dedicated terminal color settings, or allow terminals to use their own color schemes independently.
+- [x] **Terminal color customization** - Current theme overwrites terminal colors set by apps. Extend the theme with dedicated terminal color settings, or allow terminals to use their own color schemes independently.
 
-- [ ] **Fix tab template icons** - Git and Claude icons in the "add new tab" template dropdown don't display correctly. They show correct icons once opened as actual tabs.
+- [x] **Fix tab template icons** - Git and Claude icons in the "add new tab" template dropdown don't display correctly. They show correct icons once opened as actual tabs.
 
 ## Sidebar
 
