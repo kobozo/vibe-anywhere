@@ -9,7 +9,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getWorkspaceService } from '@/lib/services/workspace-service';
 import { getEnvVarService } from '@/lib/services/env-var-service';
 import { getContainerBackendAsync } from '@/lib/services';
-import { ProxmoxBackend } from '@/lib/container/backends/proxmox-backend';
 import { getTabService } from '@/lib/services/tab-service';
 
 interface RouteContext {
@@ -57,7 +56,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const containerBackend = await getContainerBackendAsync();
 
     // Update /etc/profile.d/session-hub-env.sh
-    if (containerBackend instanceof ProxmoxBackend) {
+    // Check by constructor name to avoid instanceof issues with lazy-loaded modules
+    const backendType = containerBackend?.constructor?.name;
+    if (backendType === 'ProxmoxBackend') {
       await containerBackend.injectEnvVars(workspace.containerId, mergedEnvVars);
       console.log(`Updated env vars for workspace ${workspaceId}`);
     } else {
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           error: {
             message: 'Environment variable reload is only supported for Proxmox LXC containers',
             details: {
-              backendType: containerBackend?.constructor?.name || 'unknown',
+              backendType: backendType || 'unknown',
             }
           }
         },
