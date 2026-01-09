@@ -497,9 +497,9 @@ export function RepositoryTree({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border">
+      <div className="px-3 py-2 border-b border-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Repositories</h2>
+          <h2 className="text-sm font-medium text-foreground-secondary uppercase tracking-wide">Repositories</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -514,7 +514,7 @@ export function RepositoryTree({
             </button>
             <button
               onClick={onAddRepository}
-              className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-primary-foreground transition-colors"
+              className="px-2 py-1 bg-primary hover:bg-primary-hover rounded text-xs text-primary-foreground transition-colors"
             >
               + Add
             </button>

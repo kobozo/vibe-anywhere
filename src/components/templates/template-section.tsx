@@ -52,23 +52,23 @@ export function TemplateSection({
   return (
     <div className="border-t border-border">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="px-3 py-2">
         <div className="flex items-center justify-between">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 text-foreground hover:text-foreground"
+            className="flex items-center gap-2 text-foreground-secondary hover:text-foreground"
           >
-            <span className="text-foreground-secondary text-xs w-4">
+            <span className="text-xs w-4">
               {isExpanded ? '▾' : '▸'}
             </span>
-            <h2 className="text-lg font-semibold">Images</h2>
-            <span className="text-xs text-foreground-tertiary ml-1">
+            <h2 className="text-sm font-medium uppercase tracking-wide">Images</h2>
+            <span className="text-xs text-foreground-tertiary">
               ({templates.length})
             </span>
           </button>
           <button
             onClick={onAddTemplate}
-            className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-foreground transition-colors"
+            className="px-2 py-1 bg-primary hover:bg-primary-hover rounded text-xs text-primary-foreground transition-colors"
           >
             + Add
           </button>
