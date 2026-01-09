@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SidebarContextMenu } from './sidebar-context-menu';
 
 interface RepositoryTreeProps {
   onSelectWorkspace: (workspace: Workspace | null, repository: Repository) => void;
@@ -56,6 +57,11 @@ export function RepositoryTree({
   const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
   const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    position: { x: number; y: number };
+    repository?: Repository;
+    workspace?: Workspace;
+  } | null>(null);
 
   // Extract all workspace IDs for WebSocket subscription
   const allWorkspaceIds = useMemo(() => {
@@ -350,6 +356,104 @@ export function RepositoryTree({
     }
   };
 
+  // Context menu handlers
+  const handleRepoContextMenu = (e: React.MouseEvent, repo: Repository) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      position: { x: e.clientX, y: e.clientY },
+      repository: repo,
+    });
+  };
+
+  const handleWorkspaceContextMenu = (e: React.MouseEvent, workspace: Workspace) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      position: { x: e.clientX, y: e.clientY },
+      workspace: workspace,
+    });
+  };
+
+  // Workspace action handlers
+  const handleStartWorkspace = async (workspace: Workspace) => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+
+      if (response.ok) {
+        // Refresh workspace list
+        const workspacesResponse = await fetch(`/api/repositories/${workspace.repositoryId}/workspaces`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        });
+        if (workspacesResponse.ok) {
+          const { data } = await workspacesResponse.json();
+          setWorkspacesByRepo(prev => ({ ...prev, [workspace.repositoryId]: data.workspaces }));
+        }
+      } else {
+        const { error } = await response.json();
+        alert(`Failed to start workspace: ${error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error starting workspace:', error);
+      alert('Failed to start workspace');
+    }
+  };
+
+  const handleRestartWorkspace = async (workspace: Workspace) => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/restart`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+
+      if (response.ok) {
+        // Refresh workspace list
+        const workspacesResponse = await fetch(`/api/repositories/${workspace.repositoryId}/workspaces`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        });
+        if (workspacesResponse.ok) {
+          const { data } = await workspacesResponse.json();
+          setWorkspacesByRepo(prev => ({ ...prev, [workspace.repositoryId]: data.workspaces }));
+        }
+      } else {
+        const { error } = await response.json();
+        alert(`Failed to restart workspace: ${error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error restarting workspace:', error);
+      alert('Failed to restart workspace');
+    }
+  };
+
+  const handleShutdownWorkspace = async (workspace: Workspace) => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/shutdown`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+
+      if (response.ok) {
+        // Refresh workspace list
+        const workspacesResponse = await fetch(`/api/repositories/${workspace.repositoryId}/workspaces`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+        });
+        if (workspacesResponse.ok) {
+          const { data } = await workspacesResponse.json();
+          setWorkspacesByRepo(prev => ({ ...prev, [workspace.repositoryId]: data.workspaces }));
+        }
+      } else {
+        const { error } = await response.json();
+        alert(`Failed to shutdown workspace: ${error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error shutting down workspace:', error);
+      alert('Failed to shutdown workspace');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
@@ -390,6 +494,7 @@ export function RepositoryTree({
                 // Select repository to show dashboard
                 onSelectWorkspace(null, repo);
               }}
+              onContextMenu={(e) => handleRepoContextMenu(e, repo)}
               className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
                 hover:bg-background-tertiary/50 ${
                   selectedRepositoryId === repo.id && !selectedWorkspaceId
@@ -443,6 +548,7 @@ export function RepositoryTree({
                       <div
                         key={workspace.id}
                         onClick={() => onSelectWorkspace(workspace, repo)}
+                        onContextMenu={(e) => handleWorkspaceContextMenu(e, workspace)}
                         className={`flex items-center gap-2 px-2 py-1.5 ml-2 rounded cursor-pointer group relative
                           hover:bg-background-tertiary/50
                           ${selectedWorkspaceId === workspace.id ? 'bg-primary/20 text-primary' : 'text-foreground'}`}
@@ -501,6 +607,63 @@ export function RepositoryTree({
         onConfirm={confirmDestroyContainer}
         onCancel={() => setWorkspaceToDestroy(null)}
       />
+
+      {/* Sidebar Context Menu */}
+      {contextMenu && (
+        <SidebarContextMenu
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          repository={contextMenu.repository}
+          onEditRepository={() => {
+            if (contextMenu.repository) {
+              onEditRepository(contextMenu.repository);
+            }
+          }}
+          onAddWorkspace={() => {
+            if (contextMenu.repository) {
+              onAddWorkspace(contextMenu.repository.id);
+            }
+          }}
+          onDeleteRepository={() => {
+            if (contextMenu.repository) {
+              setRepoToDelete(contextMenu.repository);
+            }
+          }}
+          workspace={contextMenu.workspace}
+          onStartWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleStartWorkspace(contextMenu.workspace);
+            }
+          }}
+          onRestartWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleRestartWorkspace(contextMenu.workspace);
+            }
+          }}
+          onShutdownWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleShutdownWorkspace(contextMenu.workspace);
+            }
+          }}
+          onRedeployWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleRedeployContainer(contextMenu.workspace);
+            }
+          }}
+          onDestroyWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleDestroyContainerClick(contextMenu.workspace);
+            }
+          }}
+          onDeleteWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleDeleteWorkspaceClick(contextMenu.workspace);
+            }
+          }}
+          isRedeploying={contextMenu.workspace ? redeployingWorkspaces.has(contextMenu.workspace.id) : false}
+          isDestroying={contextMenu.workspace ? destroyingWorkspaces.has(contextMenu.workspace.id) : false}
+        />
+      )}
     </div>
   );
 }
