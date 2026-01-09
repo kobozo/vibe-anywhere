@@ -35,13 +35,15 @@ async function main() {
 
   // Reload env command
   if (command === 'reload' && subcommand === 'env') {
-    await reloadEnv();
+    const noComments = args.includes('--no-comments');
+    await reloadEnv({ noComments });
     process.exit(0);
   }
 
   // Alternate syntax: env reload
   if (command === 'env' && subcommand === 'reload') {
-    await reloadEnv();
+    const noComments = args.includes('--no-comments');
+    await reloadEnv({ noComments });
     process.exit(0);
   }
 

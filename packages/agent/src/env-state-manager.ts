@@ -29,7 +29,9 @@ export class EnvStateManager {
   private currentState: EnvVarState | null = null;
 
   constructor(workspaceId: string) {
-    this.stateFilePath = `/workspace/.session-hub-env-state.json`;
+    // Store state in user's home directory (not workspace folder)
+    const homeDir = process.env.HOME || '/home/kobozo';
+    this.stateFilePath = `${homeDir}/.session-hub-env-state.json`;
   }
 
   /**
@@ -152,9 +154,9 @@ export class EnvStateManager {
       await fs.promises.rename(tempPath, this.stateFilePath);
 
       this.currentState = newState;
-      console.log(`Saved env var state: ${Object.keys(envVars).length} variables`);
+      console.log(`Saved env var state to ${this.stateFilePath}: ${Object.keys(envVars).length} variables`);
     } catch (error) {
-      console.error('Failed to save env var state:', error);
+      console.error(`Failed to save env var state to ${this.stateFilePath}:`, error);
       // Clean up temp file if it exists
       try {
         await fs.promises.unlink(tempPath);

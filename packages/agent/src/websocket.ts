@@ -236,7 +236,9 @@ export class AgentWebSocket {
       envVars: Record<string, string>;
     }) => {
       try {
-        console.log(`Received env:update for workspace ${data.workspaceId}`);
+        console.log(`[ENV-UPDATE] Received env:update for workspace ${data.workspaceId}`);
+        console.log(`[ENV-UPDATE] Repository ID: ${data.repositoryId}`);
+        console.log(`[ENV-UPDATE] Received ${Object.keys(data.envVars).length} variables`);
 
         // Compute diff from current state
         const diff = this.envStateManager.computeDiff(
@@ -244,17 +246,21 @@ export class AgentWebSocket {
           data.repositoryId
         );
 
-        console.log(`Env var diff: +${Object.keys(diff.toAdd).length} -${diff.toRemove.length} ~${Object.keys(diff.toChange).length}`);
+        console.log(`[ENV-UPDATE] Diff computed: +${Object.keys(diff.toAdd).length} added, -${diff.toRemove.length} removed, ~${Object.keys(diff.toChange).length} changed`);
 
         // Apply changes to system
+        console.log('[ENV-UPDATE] Applying changes to /etc/profile.d/ and tmux...');
         await applyEnvVarChanges(data.envVars, diff);
+        console.log('[ENV-UPDATE] Changes applied successfully');
 
         // Save new state
+        console.log('[ENV-UPDATE] Saving state file...');
         await this.envStateManager.saveState(
           data.envVars,
           data.workspaceId,
           data.repositoryId
         );
+        console.log('[ENV-UPDATE] State file saved successfully');
 
         // Send success response
         this.socket!.emit('env:update:response', {
@@ -267,9 +273,10 @@ export class AgentWebSocket {
           }
         });
 
-        console.log(`Env vars updated successfully for workspace ${data.workspaceId}`);
+        console.log(`[ENV-UPDATE] ✓ Complete! Env vars updated successfully for workspace ${data.workspaceId}`);
       } catch (error) {
-        console.error('Failed to update env vars:', error);
+        console.error('[ENV-UPDATE] ✗ Failed to update env vars:', error);
+        console.error('[ENV-UPDATE] Error details:', error instanceof Error ? error.stack : error);
 
         // Send error response
         this.socket!.emit('env:update:response', {

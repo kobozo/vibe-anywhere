@@ -5,7 +5,7 @@
 
 import { IpcClient } from '../ipc-client.js';
 
-export async function reloadEnv(): Promise<void> {
+export async function reloadEnv(options: { noComments?: boolean } = {}): Promise<void> {
   try {
     const client = new IpcClient();
 
@@ -19,10 +19,13 @@ export async function reloadEnv(): Promise<void> {
     const envVars = await client.getEnvVars();
 
     // Output usage hint to stderr (won't be captured by eval)
-    console.error('# Note: This command only prints export statements.');
-    console.error('# To execute them, use: eval $(session-hub reload env)');
-    console.error('# Or simply use the alias: reload-env');
-    console.error('');
+    // Skip if --no-comments flag is used (for alias usage)
+    if (!options.noComments) {
+      console.error('# Note: This command only prints export statements.');
+      console.error('# To execute them, use: eval $(session-hub reload env)');
+      console.error('# Or simply use the alias: reload-env');
+      console.error('');
+    }
 
     // Output export statements for eval
     for (const [key, value] of Object.entries(envVars)) {

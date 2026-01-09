@@ -88,7 +88,7 @@ var IpcClient = class {
 };
 
 // dist/commands/reload-env.js
-async function reloadEnv() {
+async function reloadEnv(options = {}) {
   try {
     const client = new IpcClient();
     if (!client.isAgentRunning()) {
@@ -97,10 +97,12 @@ async function reloadEnv() {
       process.exit(1);
     }
     const envVars = await client.getEnvVars();
-    console.error("# Note: This command only prints export statements.");
-    console.error("# To execute them, use: eval $(session-hub reload env)");
-    console.error("# Or simply use the alias: reload-env");
-    console.error("");
+    if (!options.noComments) {
+      console.error("# Note: This command only prints export statements.");
+      console.error("# To execute them, use: eval $(session-hub reload env)");
+      console.error("# Or simply use the alias: reload-env");
+      console.error("");
+    }
     for (const [key, value] of Object.entries(envVars)) {
       const escapedValue = value.replace(/'/g, "'\\''");
       console.log(`export ${key}='${escapedValue}'`);
@@ -204,11 +206,13 @@ async function main() {
     process.exit(0);
   }
   if (command === "reload" && subcommand === "env") {
-    await reloadEnv();
+    const noComments = args.includes("--no-comments");
+    await reloadEnv({ noComments });
     process.exit(0);
   }
   if (command === "env" && subcommand === "reload") {
-    await reloadEnv();
+    const noComments = args.includes("--no-comments");
+    await reloadEnv({ noComments });
     process.exit(0);
   }
   if (command === "status") {

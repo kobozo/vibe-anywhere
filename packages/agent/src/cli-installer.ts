@@ -96,7 +96,7 @@ export class CliInstaller {
       const bashrc = await fs.promises.readFile(this.config.bashrcPath, 'utf8');
 
       if (!bashrc.includes('reload-env')) {
-        const aliasLine = "alias reload-env='eval $(session-hub reload env)'";
+        const aliasLine = "alias reload-env='eval $(session-hub reload env --no-comments)'";
         const addition = `\n# Session Hub helper alias\n${aliasLine}\n`;
         await fs.promises.appendFile(this.config.bashrcPath, addition);
         console.log('✓ Added reload-env alias to .bashrc');
