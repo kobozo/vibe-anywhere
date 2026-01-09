@@ -697,25 +697,48 @@ EOF
           # Download agent bundle
           echo "Downloading agent bundle from ${agentBundleUrl}..."
           curl -fSL -o agent-bundle.tar.gz "${agentBundleUrl}" || {
-            echo "Failed to download agent bundle"
+            echo "ERROR: Failed to download agent bundle from ${agentBundleUrl}"
             exit 1
           }
 
+          # Verify download
+          if [ ! -f agent-bundle.tar.gz ] || [ ! -s agent-bundle.tar.gz ]; then
+            echo "ERROR: Agent bundle file is missing or empty"
+            exit 1
+          fi
+
           # Extract bundle
           echo "Extracting agent bundle..."
-          tar -xzf agent-bundle.tar.gz
+          tar -xzf agent-bundle.tar.gz || {
+            echo "ERROR: Failed to extract agent bundle"
+            exit 1
+          }
           rm agent-bundle.tar.gz
 
-          # Install dependencies if package.json exists
-          if [ -f package.json ]; then
-            echo "Installing agent dependencies..."
-            npm install --production --ignore-scripts 2>/dev/null || true
+          # Verify extraction
+          if [ ! -f package.json ]; then
+            echo "ERROR: package.json not found after extraction"
+            ls -la /opt/vibe-anywhere-agent/
+            exit 1
+          fi
+
+          # Install dependencies
+          echo "Installing agent dependencies..."
+          npm install --production --ignore-scripts || {
+            echo "ERROR: Failed to install agent dependencies"
+            exit 1
+          }
+
+          # Verify critical dependencies
+          if [ ! -d node_modules/socket.io-client ]; then
+            echo "ERROR: socket.io-client not installed"
+            exit 1
           fi
 
           # Ensure kobozo owns everything in the agent directory
           chown -R kobozo:kobozo /opt/vibe-anywhere-agent
 
-          echo "Agent bundle installed"
+          echo "Agent bundle installed successfully"
         `],
         { workingDir: '/opt/vibe-anywhere-agent' }
       );
