@@ -124,7 +124,6 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
-                <span className="text-warning">📁</span>
                 {repository.name}
               </h1>
               {repository.description && (

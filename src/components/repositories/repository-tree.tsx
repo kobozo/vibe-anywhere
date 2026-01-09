@@ -408,28 +408,24 @@ export function RepositoryTree({
               >
                 {expandedRepos.has(repo.id) ? '▾' : '▸'}
               </span>
-              <span className="text-warning text-sm">📁</span>
               <span className={`flex-1 text-sm truncate ${
                 selectedRepositoryId === repo.id && !selectedWorkspaceId
                   ? 'text-primary'
                   : 'text-foreground'
               }`}>{repo.name}</span>
-              <span className="text-xs text-foreground-tertiary" title={repo.cloneUrl}>
-                🔗
-              </span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onEditRepository(repo);
                 }}
-                className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-primary px-1"
+                className="text-foreground-secondary hover:text-primary px-1 transition-colors"
                 title="Edit repository"
               >
                 ✎
               </button>
               <button
                 onClick={(e) => handleDeleteRepoClick(e, repo)}
-                className="opacity-0 group-hover:opacity-100 text-foreground-tertiary hover:text-error px-1"
+                className="text-foreground-secondary hover:text-error px-1 transition-colors"
                 title="Delete repository"
               >
                 ×
