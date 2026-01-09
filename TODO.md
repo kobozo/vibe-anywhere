@@ -94,6 +94,8 @@
 
 - [ ] **Tab templates card layout** - In the settings modal, change tab templates from list view to card layout with 3 cards per row for better visual presentation.
 
+- [ ] **Fixed height settings modal** - Settings modal height changes based on content. Give it a fixed height with scrollable content area. Keep bottom action buttons always visible outside the scroll area.
+
 ## Onboarding
 
 - [ ] **New user setup wizard** - When a new user signs in and has no repositories/workspaces, show a guided wizard to set up their first environment (add repository, configure SSH key, create first workspace, etc.).
