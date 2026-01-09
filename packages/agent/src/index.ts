@@ -15,12 +15,6 @@ import { AgentIpcServer } from './ipc-server.js';
 import { CliInstaller } from './cli-installer.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-// ES module compatibility: get __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // Directory for clipboard-pasted files (images, etc.)
 // Use workspace directory so Claude Code can access the files
@@ -485,7 +479,8 @@ try {
 try {
   const cliInstaller = new CliInstaller({
     version: config.version,
-    cliSourcePath: path.join(__dirname, '../cli/vibe-anywhere'),
+    // For SEA binary, CLI is at fixed location in deployment
+    cliSourcePath: '/opt/vibe-anywhere-agent/vibe-anywhere',
     cliInstallPath: '/usr/local/bin/vibe-anywhere',
     bashrcPath: '/home/kobozo/.bashrc',
   });

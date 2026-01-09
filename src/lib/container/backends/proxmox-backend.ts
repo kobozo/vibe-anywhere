@@ -715,25 +715,16 @@ EOF
           }
           rm agent-bundle.tar.gz
 
-          # Verify extraction
-          if [ ! -f package.json ]; then
-            echo "ERROR: package.json not found after extraction"
+          # Verify extraction - check for binary
+          if [ ! -f vibe-anywhere-agent ]; then
+            echo "ERROR: Agent binary not found after extraction"
             ls -la /opt/vibe-anywhere-agent/
             exit 1
           fi
 
-          # Install dependencies
-          echo "Installing agent dependencies..."
-          npm install --production --ignore-scripts || {
-            echo "ERROR: Failed to install agent dependencies"
-            exit 1
-          }
-
-          # Verify critical dependencies
-          if [ ! -d node_modules/socket.io-client ]; then
-            echo "ERROR: socket.io-client not installed"
-            exit 1
-          fi
+          # Make binaries executable
+          chmod +x vibe-anywhere-agent
+          chmod +x vibe-anywhere
 
           # Ensure kobozo owns everything in the agent directory
           chown -R kobozo:kobozo /opt/vibe-anywhere-agent

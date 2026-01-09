@@ -32,6 +32,12 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Build agent binary
+        run: |
+          cd packages/agent
+          npm run bundle
+          cd ../..
+
       - name: Prepare release package
         run: |
           # Create release directory
@@ -64,6 +70,10 @@ jobs:
 
           # Copy package.json for scripts
           cp package.json release/vibe-anywhere/
+
+          # Copy agent bundle
+          mkdir -p release/vibe-anywhere/packages/agent
+          cp packages/agent/agent-bundle.tar.gz release/vibe-anywhere/packages/agent/
 
           # Create version file
           echo "${{ inputs.version }}" > release/vibe-anywhere/VERSION

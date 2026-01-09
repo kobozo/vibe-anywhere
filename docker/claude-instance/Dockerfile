@@ -30,6 +30,17 @@ RUN git config --global init.defaultBranch main \
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
+# Install Vibe Anywhere Agent (standalone binary - no Node.js required for agent)
+# Copy agent bundle from build context
+COPY packages/agent/agent-bundle.tar.gz /tmp/agent-bundle.tar.gz
+RUN mkdir -p /opt/vibe-anywhere-agent && \
+    cd /opt/vibe-anywhere-agent && \
+    tar -xzf /tmp/agent-bundle.tar.gz && \
+    chmod +x vibe-anywhere-agent && \
+    chmod +x vibe-anywhere && \
+    ln -s /opt/vibe-anywhere-agent/vibe-anywhere /usr/local/bin/vibe-anywhere && \
+    rm /tmp/agent-bundle.tar.gz
+
 # Create workspace directory
 WORKDIR /workspace
 
@@ -40,7 +51,8 @@ RUN groupadd -g 999 docker || true \
     && usermod -aG docker node \
     && chown -R node:node /workspace \
     && mkdir -p /home/node/.claude \
-    && chown -R node:node /home/node/.claude
+    && chown -R node:node /home/node/.claude \
+    && chown -R node:node /opt/vibe-anywhere-agent
 
 # Switch to non-root user (node user has UID 1000)
 USER node

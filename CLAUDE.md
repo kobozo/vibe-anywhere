@@ -40,23 +40,49 @@ Vibe Anywhere is a web application for running persistent Claude Code CLI instan
 ### Agent Changes (packages/agent)
 Every change to the agent requires a version bump. The server detects outdated agents and prompts users to update.
 
+**Agent Architecture:** Standalone binary (Node.js SEA) - no external Node.js required in containers.
+
 **Semantic Versioning (MAJOR.MINOR.PATCH):**
 | Type | When to use | Example |
 |------|-------------|---------|
-| **MAJOR** | Breaking changes, protocol changes, incompatible API | Agent can't communicate with older server |
+| **MAJOR** | Breaking changes, protocol changes, incompatible API | Agent can't communicate with older server, architecture changes |
 | **MINOR** | New features, new capabilities, backward compatible | Added new command support, new event handlers |
 | **PATCH** | Bug fixes, small improvements, no new features | Fixed command display, performance tweaks |
 
 **Files to update:**
 1. `packages/agent/package.json` - bump `version` field
-2. `src/lib/services/agent-registry.ts` - update `EXPECTED_AGENT_VERSION`
+2. `packages/vibe-anywhere-cli/package.json` - bump `version` field (keep in sync)
+3. `src/lib/services/agent-registry.ts` - update `EXPECTED_AGENT_VERSION`
 
-**After changes:**
+**Build process:**
 ```bash
 cd packages/agent && npm run bundle
 ```
 
-This creates `agent-bundle.tar.gz` which is served to containers for updates.
+**What this does:**
+1. Bundles agent code with esbuild (all dependencies included)
+2. Creates Node.js SEA (Single Executable Application) binary
+3. Bundles CLI helper tool
+4. Creates `agent-bundle.tar.gz` (~8-12MB compressed)
+
+**Bundle contents:**
+- `dist/vibe-anywhere-agent` - Standalone binary (~25-35MB)
+- `cli/vibe-anywhere` - CLI helper (~7KB)
+- `package.json` - Metadata
+
+**Update process:**
+1. Agent downloads bundle from server
+2. Extracts to `/opt/vibe-anywhere-agent-new`
+3. Tests new binary
+4. Atomically swaps directories
+5. Systemd restarts service (~1-2 sec disconnect)
+6. Agent auto-reconnects via WebSocket
+
+**Benefits:**
+- No Node.js installation required in containers
+- No version conflicts with developer environments
+- Self-contained deployment
+- Simpler dependency management
 
 ## Architecture
 
@@ -192,15 +218,52 @@ Tech stacks (Node.js, Python, Claude CLI, etc.) are defined in `src/lib/containe
 3. Add the path to `~/.bashrc`
 4. Install packages as the `kobozo` user
 
+### Creating a Proxmox LXC Template
+
+**📖 Full Guide**: See `docs/PROXMOX-TEMPLATE-SETUP.md` for detailed instructions.
+
+**Quick Steps:**
+1. Create a base Debian 12 LXC container
+2. Install base packages (git, curl, tmux, etc.)
+3. Create `kobozo` user with NOPASSWD sudo
+4. Copy and run the template preparation script:
+   ```bash
+   # Inside container
+   export AGENT_URL="http://your-server:3000/api/workspaces/agent/bundle"
+   /path/to/scripts/prepare-proxmox-template.sh
+   ```
+5. Stop container and convert to template
+
+**⚠️ CRITICAL**: Always use `scripts/prepare-proxmox-template.sh` before creating the template. This ensures:
+- Agent binary is installed correctly
+- Systemd service uses binary (not Node.js)
+- Workspace-specific config is cleared
+- Service is disabled (enabled per workspace)
+- Machine identifiers are reset
+
+**Common Issue**: If agent doesn't connect after workspace creation, verify:
+```bash
+# Check systemd service is using binary
+pct exec <vmid> -- grep ExecStart /etc/systemd/system/vibe-anywhere-agent.service
+# Should show: ExecStart=/opt/vibe-anywhere-agent/dist/vibe-anywhere-agent
+# NOT: ExecStart=/usr/bin/node /opt/vibe-anywhere-agent/dist/index.js
+```
+
 ### Template (VMID 150)
 The Proxmox LXC template contains:
 - Debian 12 (Bookworm)
+- Basic utilities: tmux, git, vim, curl, wget, sudo
+- **Vibe Anywhere Agent v3.0.0** (standalone binary - no Node.js dependency)
+  - Binary: `/opt/vibe-anywhere-agent/dist/vibe-anywhere-agent`
+  - CLI: `/usr/local/bin/vibe-anywhere`
+  - Systemd service (disabled in template, enabled per workspace)
+
+**Optional** (can be installed via tech stacks):
 - Node.js 22.x
 - Docker
-- Claude Code CLI (installed per-user in `~/.npm-global`)
+- Claude Code CLI
 - GitHub CLI (gh)
-- tmux, git, vim, jq
-- Vibe Anywhere Agent (systemd service)
+- Python, Rust, Go, etc.
 
 ### Container User
 | Setting | Value |
@@ -234,4 +297,4 @@ npm run build
 **Prevention**: The dev container runs as `devops` user. If you ever run `npm run dev` or `npm run build` as root, it will create files owned by root.
 
 ---
-*Last updated: 2026-01-06*
+*Last updated: 2026-01-09*

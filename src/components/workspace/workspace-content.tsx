@@ -74,9 +74,17 @@ export function WorkspaceContent({
   });
 
   // Subscribe to startup progress (for displaying actual progress steps)
-  const { hasError } = useStartupProgress({
+  const { hasError, isReady } = useStartupProgress({
     workspaceId: workspace.id,
   });
+
+  // When progress reaches 'ready', complete the operation
+  useEffect(() => {
+    if (isReady && activeOperation) {
+      console.log('[WorkspaceContent] Progress reached ready - operation complete');
+      onOperationComplete?.();
+    }
+  }, [isReady, activeOperation, onOperationComplete]);
 
   // Agent can only connect if container is running, so agentConnected implies container is ready
   const isContainerReady = agentConnected;
@@ -87,6 +95,7 @@ export function WorkspaceContent({
     agentConnected,
     activeOperation,
     hasError,
+    isReady,
     isContainerReady,
   });
 

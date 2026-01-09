@@ -29,7 +29,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '2.0.0';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '3.0.0';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();

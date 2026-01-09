@@ -1,0 +1,19 @@
+[Unit]
+Description=Vibe Anywhere Agent
+Documentation=https://github.com/kobozo/vibe-anywhere
+After=network.target
+
+[Service]
+Type=simple
+User=kobozo
+Group=kobozo
+WorkingDirectory=/opt/vibe-anywhere-agent
+ExecStart=/opt/vibe-anywhere-agent/vibe-anywhere-agent
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

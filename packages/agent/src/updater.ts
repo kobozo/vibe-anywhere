@@ -63,8 +63,10 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 }
 
 /**
- * Perform self-update
+ * Perform self-update (binary version)
+ * Downloads standalone binary bundle and atomically swaps directories
  * Uses sudo for directory operations since agent runs as kobozo but /opt needs root
+ * Service restart via systemd causes ~1-2 sec disconnect with auto-reconnection
  */
 export async function selfUpdate(bundleUrl: string, newVersion: string): Promise<UpdateResult> {
   console.log(`Starting self-update to version ${newVersion}...`);
@@ -87,13 +89,9 @@ export async function selfUpdate(bundleUrl: string, newVersion: string): Promise
     await exec(`tar -xzf agent-bundle.tar.gz`, { cwd: NEW_DIR });
     await fs.unlink(bundlePath);
 
-    // 5. Install dependencies
-    console.log('Installing dependencies...');
-    await exec('npm install --production --ignore-scripts', { cwd: NEW_DIR });
-
-    // 6. Verify the new version works (basic check)
-    console.log('Verifying new version...');
-    const { stdout } = await exec('node dist/index.js --version || echo "ok"', {
+    // 5. Verify the new version works (test the binary)
+    console.log('Verifying new binary...');
+    const { stdout } = await exec('./vibe-anywhere-agent --version || echo "ok"', {
       cwd: NEW_DIR,
       timeout: 5000,
     });

@@ -98,6 +98,10 @@
 
 - [ ] **Tabbed create template modal** - The create template modal shows everything in one view. Convert to a tabbed/wizard approach like other modals (add repository, create workspace, etc.).
 
+- [ ] **Tech stack management** - Add a dedicated tech stack section in the settings modal for managing available tech stacks. Each tech stack can have a configurable label that becomes the tech stack tab name (currently hardcoded as "Dev Tools" and "AI Assistants").
+
+- [ ] **Custom tech stack creation** - Allow users to create and add custom tech stacks through the settings UI. This enables users to define their own tech stacks with custom installation scripts and configurations.
+
 ## Setup & Installation
 
 - [ ] **Default admin user on migration** - Automatically create a default admin user during database migrations with a randomly generated password. Add a CLI command (e.g., `npm run user:password` or docker exec command) to retrieve or reset the admin password. This ensures fresh installations have immediate access without manual user seeding.
@@ -120,6 +124,10 @@
 - [ ] **Add UI warning for empty CT templates** - When CT templates list is empty after successful Proxmox connection, show a helpful alert in the UI explaining the likely cause (API token privilege separation) with a link to documentation. Currently only logs to console which users won't see.
 
 - [ ] **Validate .env token matches database settings** - When Proxmox is configured in the UI, validate that the fallback .env PROXMOX_TOKEN_ID matches the database settings. Mismatches cause 401 errors during template provisioning when code falls back to .env config. Consider removing .env fallback entirely once Proxmox is configured via UI, or show warning if they don't match.
+
+- [ ] **Image recreate staging detection** - When recreating an image, detect if staging was required during initial creation and prompt user if staging is needed again. Save a flag on image creation indicating whether staging was performed, so the system knows this image requires user interaction during the build process.
+
+- [ ] **Show install logs during image recreation** - During initial image creation, install logs are visible to the user. However, during image recreation, the install logs are not displayed. Add the same log streaming functionality to the recreation process so users can monitor tech stack installation progress.
 
 ## Onboarding
 

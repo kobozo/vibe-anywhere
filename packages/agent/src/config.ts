@@ -2,23 +2,12 @@
  * Agent configuration from environment variables
  */
 
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-// Get version from package.json
+// Get version - hardcoded for SEA binary
+// When building a new version, update this manually
 function getPackageVersion(): string {
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    // Look for package.json in parent directory (dist/../package.json)
-    const packagePath = join(__dirname, '..', 'package.json');
-    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
-    return packageJson.version || '1.0.0';
-  } catch (error) {
-    console.warn('Could not read version from package.json, using default');
-    return '1.0.0';
-  }
+  // For SEA binaries, the version is baked in at build time
+  // This matches the version in packages/agent/package.json
+  return '3.0.0';
 }
 
 function requireEnv(name: string): string {
