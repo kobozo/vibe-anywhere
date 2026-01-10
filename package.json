@@ -12,15 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "tsx src/lib/db/migrate.ts",
-    "docker:build": "docker compose build",
-    "docker:build:prod": "docker compose -f docker-compose.yml build",
-    "docker:up": "docker compose up -d",
-    "docker:up:prod": "docker compose -f docker-compose.yml up -d",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f app",
-    "docker:shell": "docker compose exec app sh",
-    "docker:claude-image": "docker build -t vibe-anywhere/claude-instance:latest -f docker/claude-instance/Dockerfile .",
-    "setup": "npm run docker:up && npm run db:migrate && npm run docker:claude-image"
+    "setup": "npm run db:migrate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
