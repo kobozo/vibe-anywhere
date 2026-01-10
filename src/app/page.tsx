@@ -476,12 +476,12 @@ function Dashboard() {
 
     if (!contextMenu || !workspace) return;
 
-    // Only handle git and docker tab types
-    if (tabType !== 'git' && tabType !== 'docker') return;
+    // Only handle git tab type
+    if (tabType !== 'git') return;
 
     try {
       // Create new static tab via API
-      const tabName = tabType === 'git' ? 'Git' : 'Docker';
+      const tabName = 'Git';
       const response = await fetch(`/api/workspaces/${workspace.id}/tabs`, {
         method: 'POST',
         headers: {
