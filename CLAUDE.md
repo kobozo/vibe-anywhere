@@ -31,6 +31,26 @@ Vibe Anywhere is a web application for persistent AI coding sessions on a Linux 
 - Use `Plan` agents for architectural decisions
 - Run independent tasks in parallel whenever possible
 
+### Development Deployment (Docker)
+The project runs in Docker for development with hot-reloading enabled.
+
+**How it works:**
+- `docker-compose.override.yml` is automatically loaded in dev mode
+- Source code is mounted as a volume (`.:/app:rw`)
+- `tsx watch server.ts` enables hot-reloading on file changes
+- Container name: `vibe-anywhere-dev` (vs `vibe-anywhere` in prod)
+
+**When to restart the app:**
+- After making UI component changes, the app should hot-reload automatically
+- If hot-reload doesn't work or you want a clean restart: `docker compose restart app`
+- After changing dependencies: `docker compose down && npm run docker:up`
+- After changing Dockerfile.dev: `docker compose build && docker compose up -d`
+
+**Viewing the app:**
+- Open browser to `http://localhost:3000`
+- Changes to `.tsx`, `.ts` files should reload automatically
+- Next.js compiles pages on-demand (watch logs for compilation messages)
+
 ### Database Changes
 - NEVER modify the database directly with `db:push`
 - ALWAYS use `npm run db:generate` after changing `src/lib/db/schema.ts`
@@ -126,9 +146,20 @@ cd packages/agent && npm run bundle
 
 ```bash
 # Development
-npm run dev              # Start dev server
-npm run docker:up        # Start PostgreSQL
-npm run docker:build     # Build AI container image
+npm run dev              # Start dev server (local, not Docker)
+npm run docker:up        # Start dev stack (PostgreSQL + app in dev mode)
+npm run docker:build     # Rebuild dev container
+npm run docker:down      # Stop all containers
+npm run docker:logs      # View app container logs
+npm run docker:shell     # Get shell in app container
+
+# Development Hot Reload (Docker)
+# The dev container uses docker-compose.override.yml automatically
+# Source code is mounted as volume for hot-reloading via tsx watch
+docker compose up -d           # Start dev stack (uses override automatically)
+docker compose restart app     # Restart app to reload changes (if hot reload not working)
+docker compose logs -f app     # Follow app logs
+docker ps                      # Check running containers
 
 # Setup
 npm run setup            # Full setup (docker + db + image)
@@ -141,7 +172,8 @@ npx tsx scripts/seed-user.ts [username] [password]  # Create user
 
 # Production
 npm run build            # Build for production
-npm run start            # Start production server
+npm run start            # Start production server (not Docker)
+npm run docker:up:prod   # Start production Docker stack
 ```
 
 ## Environment Variables
