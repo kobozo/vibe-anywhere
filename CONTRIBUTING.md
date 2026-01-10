@@ -7,6 +7,8 @@ Thank you for your interest in contributing to Vibe Anywhere! We welcome contrib
 - [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
 - [Development Workflow](#development-workflow)
+- [Branching Strategy](#branching-strategy)
+- [Branch Protection](#branch-protection)
 - [Coding Standards](#coding-standards)
 - [Commit Guidelines](#commit-guidelines)
 - [Pull Request Process](#pull-request-process)
@@ -116,6 +118,69 @@ git push origin feature/your-feature-name
 ### 5. Submit a Pull Request
 
 Open a PR from your fork's branch to `kobozo/vibe-anywhere:main`
+
+## Branching Strategy
+
+Vibe Anywhere follows **GitHub Flow** - a simple, branch-based workflow that's perfect for open source collaboration.
+
+### Key Points
+
+- `main` branch is always production-ready
+- All development happens in feature branches
+- Pull requests are required for code review
+- Direct commits to `main` are not allowed
+
+### Branch Naming
+
+Use descriptive branch names with the appropriate prefix:
+
+- `feature/session-templates` - New features
+- `fix/terminal-reconnect` - Bug fixes
+- `docs/api-guide` - Documentation updates
+- `refactor/db-layer` - Code refactoring
+- `test/container-service` - Test additions
+
+### Detailed Guide
+
+For the complete branching strategy including hotfix workflows, branch lifecycle, and best practices, see:
+
+**📖 [Branching Strategy Documentation](docs/BRANCHING.md)**
+
+### Release Process
+
+Releases are managed by maintainers. If you're interested in how releases work:
+
+**📖 [Release Process Documentation](docs/RELEASE.md)**
+
+## Branch Protection
+
+The `main` branch is protected to ensure code quality and stability.
+
+### Protection Rules
+
+- **Pull requests required**: You cannot commit directly to `main`
+- **Approval required**: At least 1 maintainer must approve your PR
+- **Stale reviews dismissed**: New commits invalidate previous approvals
+- **No force pushes**: Force push is disabled for everyone
+- **No deletions**: The main branch cannot be deleted
+
+### What This Means for Contributors
+
+1. **Always use feature branches**: Create a branch from `main` for your work
+2. **PRs are mandatory**: All changes must go through pull request review
+3. **Be responsive to feedback**: Address review comments promptly
+4. **Keep PRs updated**: Rebase on main if requested
+
+### Testing Branch Protection
+
+If you try to push directly to `main`, you'll see an error:
+
+```bash
+git push origin main
+# ERROR: Cannot push to protected branch 'main'
+```
+
+This is expected! Create a feature branch and open a PR instead.
 
 ## Coding Standards
 

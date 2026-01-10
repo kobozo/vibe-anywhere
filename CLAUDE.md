@@ -279,6 +279,159 @@ The Proxmox LXC template contains:
 - Containers get DHCP IP on VLAN 2 (192.168.3.x)
 - SSH enabled for rsync sync operations
 
+## Release and Versioning Strategy
+
+### Branching Model
+
+Vibe Anywhere uses **GitHub Flow** - a simple, branch-based workflow:
+- `main` branch is always production-ready and deployable
+- All development happens in feature branches (`feature/*`, `fix/*`, `docs/*`, etc.)
+- Pull requests required for all changes to main
+- Direct commits to main are blocked (branch protection)
+- Releases are tagged from main
+
+**Full details:** See [docs/BRANCHING.md](docs/BRANCHING.md)
+
+### Version Numbering
+
+**Semantic Versioning (semver):** `MAJOR.MINOR.PATCH[-PRERELEASE]`
+
+**Main Application** (`package.json`):
+- Current: `0.1.0`
+- Follows standard semver
+- Incremented with each release
+- Examples: `1.0.0`, `1.1.0-beta.1`, `2.0.0`
+
+**Agent** (`packages/agent/package.json`):
+- Current: `3.0.0`
+- Independent versioning
+- Only bumped when agent code changes
+- Must update `src/lib/services/agent-registry.ts` when changed
+
+**When to Bump Versions:**
+- **MAJOR** (x.0.0): Breaking changes, API changes, major rewrites
+- **MINOR** (0.x.0): New features, backward compatible
+- **PATCH** (0.0.x): Bug fixes, small improvements
+
+### Release Types
+
+**1. Stable Release** (`1.0.0`)
+- Production-ready version
+- Full testing completed
+- Documentation updated
+- Triggered manually via GitHub Actions
+
+**2. Pre-Release** (`1.0.0-beta.1`, `1.0.0-rc.1`)
+- Testing versions before stable
+- Community feedback phase
+- Marked as "pre-release" on GitHub
+- Iterate until stable
+
+**3. Hotfix Release** (`1.0.1`)
+- Emergency fixes for critical production issues
+- Created from release tag
+- Minimal changes only
+- Merged back to main
+
+### Release Workflow
+
+**Manual Process:**
+1. Complete pre-release checklist (testing, docs, linting)
+2. Go to GitHub Actions → Release workflow
+3. Enter version number (e.g., `1.0.0`, `1.0.0-beta.1`)
+4. Workflow builds and creates GitHub release
+5. Verify release and update notes
+6. Test installation from tarball
+
+**Helper Scripts:**
+- `scripts/prepare-release.sh` - Pre-release validation
+- `scripts/version-bump.sh` - Consistent version bumping
+- `scripts/apply-github-settings.sh` - Configure GitHub repo settings
+
+**Full details:** See [docs/RELEASE.md](docs/RELEASE.md)
+
+### Branch Protection Rules
+
+**Main Branch Protection:**
+- Pull requests required (no direct commits)
+- At least 1 approval required
+- Stale reviews dismissed on new commits
+- No force pushes allowed
+- No deletions allowed
+- Rules enforced for administrators
+
+**Applied via:** `scripts/apply-github-settings.sh`
+
+### Hotfix Workflow
+
+When critical bugs found in production:
+
+```bash
+# 1. Create hotfix branch from release tag
+git checkout -b hotfix/v1.0.1 v1.0.0
+
+# 2. Apply fix and test
+# ... make changes ...
+git commit -m "fix: critical issue description"
+
+# 3. Bump version
+npm version patch --no-git-tag-version
+git add package.json
+git commit -m "chore: bump version to 1.0.1"
+
+# 4. Push and trigger release
+git push origin hotfix/v1.0.1
+# Trigger release workflow from GitHub Actions
+
+# 5. Merge back to main
+git checkout main
+git merge hotfix/v1.0.1
+git push origin main
+
+# 6. Clean up
+git branch -d hotfix/v1.0.1
+git push origin --delete hotfix/v1.0.1
+```
+
+### Version Coordination
+
+**Independent Versioning (Recommended):**
+- Main app version reflects application changes
+- Agent version only bumps when agent changes
+- CLI version stays in sync with agent
+- Document version differences in release notes
+
+**Why Independent:**
+- Agent at 3.0.0 is stable, no need to bump unnecessarily
+- More accurate semantic versioning
+- Users understand what changed
+
+**When Agent Changes:**
+1. Update `packages/agent/package.json`
+2. Update `packages/vibe-anywhere-cli/package.json` (same version)
+3. Update `src/lib/services/agent-registry.ts` (`EXPECTED_AGENT_VERSION`)
+4. Rebuild agent: `cd packages/agent && npm run bundle`
+5. Include agent update in main release notes
+
+### Release Checklist Reference
+
+**Pre-Release:**
+- [ ] Code builds successfully
+- [ ] Linting passes
+- [ ] Manual testing completed
+- [ ] Documentation updated
+- [ ] Version numbers decided
+- [ ] Agent version updated if needed
+
+**Post-Release:**
+- [ ] Verify release on GitHub
+- [ ] Test installation script
+- [ ] Verify tarball contents
+- [ ] Close related issues
+- [ ] Announce release
+
+**Full checklist:** See `docs/RELEASE.md` or `.github/ISSUE_TEMPLATE/release_checklist.md`
+
 ## Troubleshooting
 
 ### `.next` Permission Denied During Build

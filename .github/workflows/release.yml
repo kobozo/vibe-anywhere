@@ -82,6 +82,18 @@ jobs:
           cd release
           tar -czvf vibe-anywhere-v${{ inputs.version }}.tar.gz vibe-anywhere
 
+      - name: Detect if pre-release
+        id: check_prerelease
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "Pre-release detected (contains hyphen)"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "Stable release (no hyphen)"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -89,6 +101,8 @@ jobs:
           name: Vibe Anywhere v${{ inputs.version }}
           body: |
             ## Vibe Anywhere v${{ inputs.version }}
+
+            ${{ steps.check_prerelease.outputs.is_prerelease == 'true' && '**⚠️ This is a pre-release version**' || '' }}
 
             ### Installation
 
@@ -99,9 +113,13 @@ jobs:
             ### What's Changed
 
             See the [commit history](https://github.com/${{ github.repository }}/commits/v${{ inputs.version }}) for details.
+
+            ---
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ inputs.version }}...v${{ inputs.version }}
           files: |
             release/vibe-anywhere-v${{ inputs.version }}.tar.gz
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.check_prerelease.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
