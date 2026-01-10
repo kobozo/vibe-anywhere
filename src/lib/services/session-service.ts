@@ -1,18 +1,18 @@
 import { eq, desc, sql } from 'drizzle-orm';
 import { db, sessions, type Session, type NewSession, type SessionStatus, type ContainerStatus } from '@/lib/db';
 import { getGitService, GitService } from './git-service';
-import { getContainerService, ContainerService } from './container-service';
+import { getContainerBackend, type IContainerBackend } from '@/lib/container';
 import { config } from '@/lib/config';
 import type { CreateSessionInput, SessionInfo } from '@/types/session';
 import { v4 as uuidv4 } from 'uuid';
 
 export class SessionService {
   private gitService: GitService;
-  private containerService: ContainerService;
+  private containerService: IContainerBackend;
 
   constructor() {
     this.gitService = getGitService();
-    this.containerService = getContainerService();
+    this.containerService = getContainerBackend();
   }
 
   /**
