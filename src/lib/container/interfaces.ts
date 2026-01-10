@@ -3,15 +3,14 @@ import type { Duplex } from 'stream';
 /**
  * Container backend type
  */
-export type ContainerBackendType = 'docker' | 'proxmox';
+export type ContainerBackendType = 'proxmox';
 
 /**
  * Configuration for creating a container
  */
 export interface ContainerConfig {
-  image?: string;              // Docker image (Docker only)
-  templateId?: number;         // LXC template VMID (Proxmox only)
-  workspacePath?: string;      // DEPRECATED: Host path to mount (Docker only, Proxmox uses git clone)
+  templateId?: number;         // LXC template VMID
+  workspacePath?: string;      // DEPRECATED: No longer used (Proxmox uses git clone)
   env?: Record<string, string>;
   memoryLimit?: string;        // e.g., "2g", "512m"
   cpuLimit?: number;           // CPU cores
@@ -54,7 +53,7 @@ export interface ExecResult {
 
 /**
  * Backend-agnostic container management interface
- * Implemented by DockerBackend and ProxmoxBackend
+ * Implemented by ProxmoxBackend
  */
 export interface IContainerBackend {
   /**
@@ -64,7 +63,7 @@ export interface IContainerBackend {
 
   /**
    * Create a new container for a workspace
-   * @returns Container ID (Docker container ID or Proxmox VMID as string)
+   * @returns Container ID (Proxmox VMID as string)
    */
   createContainer(workspaceId: string, config: ContainerConfig): Promise<string>;
 
@@ -121,18 +120,18 @@ export interface IContainerBackend {
 
   /**
    * @deprecated Use gitCloneInContainer() directly instead
-   * Sync workspace files to container (Proxmox only, no-op for Docker)
+   * Sync workspace files to container
    */
   syncWorkspace?(containerId: string, localPath: string, remotePath?: string, options?: { branchName?: string; remoteUrl?: string }): Promise<void>;
 
   /**
    * @deprecated No longer needed - changes stay in container, user must push to persist
-   * Sync workspace files back from container (Proxmox only, no-op for Docker)
+   * Sync workspace files back from container
    */
   syncWorkspaceBack?(containerId: string, remotePath: string, localPath: string): Promise<void>;
 
   /**
-   * Install tech stacks in a running container (Proxmox only)
+   * Install tech stacks in a running container
    * Called after container starts to install any required tech stacks
    * that are not pre-installed in the template
    * @param containerId - Container ID (VMID as string)
@@ -147,16 +146,6 @@ export interface IContainerBackend {
    * @param envVars - Environment variables to inject
    */
   injectEnvVars?(containerId: string, envVars: Record<string, string>): Promise<void>;
-}
-
-/**
- * Docker-specific configuration
- */
-export interface DockerBackendConfig {
-  socketPath: string;
-  claudeImage: string;
-  memoryLimit: string;
-  cpuLimit: number;
 }
 
 /**
@@ -188,6 +177,5 @@ export interface ProxmoxBackendConfig {
  */
 export interface BackendConfig {
   type: ContainerBackendType;
-  docker?: DockerBackendConfig;
   proxmox?: ProxmoxBackendConfig;
 }
