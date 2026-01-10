@@ -1,0 +1,8 @@
+# Temporary override for SQLite testing
+# Usage: docker compose -f docker-compose.yml -f docker-compose.sqlite-test.yml up app
+services:
+  app:
+    environment:
+      # Override to use SQLite instead of PostgreSQL
+      DATABASE_URL: ""
+    depends_on: []  # Remove all dependencies
