@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  // Database
-  DATABASE_URL: z.string().url(),
+  // Database - empty string uses SQLite default, otherwise must be valid URL
+  DATABASE_URL: z.string().refine(
+    (val) => val === '' || z.string().url().safeParse(val).success,
+    { message: 'DATABASE_URL must be empty (for SQLite) or a valid URL' }
+  ).default(''),
 
   // Server
   PORT: z.string().default('3000').transform(Number),

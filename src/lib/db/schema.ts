@@ -97,7 +97,7 @@ export type GitHooksJson = Record<string, GitHookEntry>;
 
 // Users table
 export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
@@ -107,7 +107,7 @@ export const users = pgTable('users', {
 
 // Git Identities table - named git configurations for commits
 export const gitIdentities = pgTable('git_identities', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
@@ -121,7 +121,7 @@ export const gitIdentities = pgTable('git_identities', {
 
 // Proxmox Templates table - LXC templates with different tech stacks
 export const proxmoxTemplates = pgTable('proxmox_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
@@ -146,7 +146,7 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
 // Repositories table - top-level entity
 // Repositories are cloned directly in containers - no local storage
 export const repositories = pgTable('repositories', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
@@ -179,7 +179,7 @@ export const repositories = pgTable('repositories', {
 // Each workspace has ONE container that all tabs share
 // Repository is cloned directly in container when it starts
 export const workspaces = pgTable('workspaces', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   repositoryId: uuid('repository_id')
     .references(() => repositories.id, { onDelete: 'cascade' })
     .notNull(),
@@ -212,7 +212,7 @@ export const workspaces = pgTable('workspaces', {
 // Tabs table - exec sessions within a workspace container
 // Each tab represents an exec session running a specific command
 export const tabs = pgTable('tabs', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   workspaceId: uuid('workspace_id')
     .references(() => workspaces.id, { onDelete: 'cascade' })
     .notNull(),
@@ -234,7 +234,7 @@ export const tabs = pgTable('tabs', {
 
 // SSH Keys table - per-user and per-repository
 export const sshKeys = pgTable('ssh_keys', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' }),
   repositoryId: uuid('repository_id')
@@ -251,7 +251,7 @@ export const sshKeys = pgTable('ssh_keys', {
 
 // Tab templates - configurable tab types
 export const tabTemplates = pgTable('tab_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
@@ -270,7 +270,7 @@ export const tabTemplates = pgTable('tab_templates', {
 
 // Tab logs (renamed from session_logs)
 export const tabLogs = pgTable('tab_logs', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   tabId: uuid('tab_id')
     .references(() => tabs.id, { onDelete: 'cascade' })
     .notNull(),
@@ -281,7 +281,7 @@ export const tabLogs = pgTable('tab_logs', {
 
 // Port forwarding rules for HAProxy
 export const portForwards = pgTable('port_forwards', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   workspaceId: uuid('workspace_id')
     .references(() => workspaces.id, { onDelete: 'cascade' })
     .notNull(),
@@ -296,7 +296,7 @@ export const portForwards = pgTable('port_forwards', {
 
 // Tab groups - for split view layouts
 export const tabGroups = pgTable('tab_groups', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   workspaceId: uuid('workspace_id')
     .references(() => workspaces.id, { onDelete: 'cascade' })
     .notNull(),
@@ -309,7 +309,7 @@ export const tabGroups = pgTable('tab_groups', {
 
 // Tab group members - panes within a group
 export const tabGroupMembers = pgTable('tab_group_members', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   groupId: uuid('group_id')
     .references(() => tabGroups.id, { onDelete: 'cascade' })
     .notNull(),
@@ -323,7 +323,7 @@ export const tabGroupMembers = pgTable('tab_group_members', {
 
 // Application settings - key-value store for app configuration
 export const appSettings = pgTable('app_settings', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   key: text('key').unique().notNull(),
   value: jsonb('value').$type<unknown>().notNull(),
   description: text('description'),
@@ -335,7 +335,7 @@ export const appSettings = pgTable('app_settings', {
 // Secrets Vault - User-level encrypted environment variables
 // ============================================
 export const secrets = pgTable('secrets', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: uuid('user_id')
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
@@ -352,7 +352,7 @@ export const secrets = pgTable('secrets', {
 
 // Repository-Secret association table (normalized join table)
 export const repositorySecrets = pgTable('repository_secrets', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   repositoryId: uuid('repository_id')
     .references(() => repositories.id, { onDelete: 'cascade' })
     .notNull(),
@@ -371,7 +371,7 @@ export const repositorySecrets = pgTable('repository_secrets', {
 // LEGACY: Sessions table (kept for migration)
 // ============================================
 export const sessions = pgTable('sessions', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
   description: text('description'),
   userId: uuid('user_id')
@@ -394,7 +394,7 @@ export const sessions = pgTable('sessions', {
 });
 
 export const sessionLogs = pgTable('session_logs', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   sessionId: uuid('session_id')
     .references(() => sessions.id, { onDelete: 'cascade' })
     .notNull(),

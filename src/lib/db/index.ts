@@ -49,11 +49,17 @@ if (dbConfig.backend === 'postgresql') {
 // Export the database instance
 export { db };
 
-// Export schema for convenience (re-export from PostgreSQL schema for backward compatibility)
-export * from './schema';
-
 // Export database config
 export { dbConfig };
+
+// Note: Do NOT export schema here to avoid mixing PostgreSQL and SQLite types
+// Import directly from './schema' (PostgreSQL) or './schema.sqlite' (SQLite) as needed
+// Or use the getCurrentSchema() helper below
+
+// Helper to get current schema based on backend
+export function getCurrentSchema() {
+  return dbConfig.backend === 'postgresql' ? pgSchema : sqliteSchema;
+}
 
 // Health check function
 export async function checkDatabaseConnection(): Promise<boolean> {
