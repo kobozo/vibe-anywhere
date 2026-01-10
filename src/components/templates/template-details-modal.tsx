@@ -122,7 +122,7 @@ export function TemplateDetailsModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-background-secondary rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="bg-background-secondary rounded-lg w-full max-w-lg mx-4 min-h-[90vh] max-h-[90vh] overflow-y-auto">
           <div className="p-6">
             {/* Header */}
             <div className="flex items-start justify-between mb-4">

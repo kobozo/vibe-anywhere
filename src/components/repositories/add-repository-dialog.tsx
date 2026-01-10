@@ -311,7 +311,7 @@ export function AddRepositoryDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-secondary rounded-lg w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl min-h-[85vh] max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">

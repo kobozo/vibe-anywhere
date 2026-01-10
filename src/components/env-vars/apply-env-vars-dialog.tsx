@@ -160,7 +160,7 @@ export function ApplyEnvVarsDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-secondary rounded-lg w-full max-w-lg mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg w-full max-w-lg mx-4 min-h-[80vh] max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">
