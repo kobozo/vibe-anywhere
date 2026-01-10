@@ -5,4 +5,6 @@ services:
     environment:
       # Override to use SQLite instead of PostgreSQL
       DATABASE_URL: ""
+      # Use Proxmox backend (Docker backend removed)
+      CONTAINER_BACKEND: "proxmox"
     depends_on: []  # Remove all dependencies
