@@ -6,7 +6,7 @@ const sqlitePath = process.env.DATABASE_URL?.replace('sqlite://', '').replace('f
   || resolve(process.cwd(), 'data', 'app.db');
 
 export default defineConfig({
-  schema: './src/lib/db/schema.ts',
+  schema: './src/lib/db/schema.sqlite.ts',
   out: './drizzle-sqlite',
   dialect: 'sqlite',
   dbCredentials: {

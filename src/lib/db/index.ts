@@ -2,7 +2,8 @@ import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import { drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
 import postgres from 'postgres';
 import Database from 'better-sqlite3';
-import * as schema from './schema';
+import * as pgSchema from './schema';
+import * as sqliteSchema from './schema.sqlite';
 import { getDatabaseConfig } from './config';
 
 // Detect database backend
@@ -25,7 +26,7 @@ if (dbConfig.backend === 'postgresql') {
     connect_timeout: 10, // Connection timeout in seconds
   });
 
-  db = drizzlePostgres(queryClient, { schema });
+  db = drizzlePostgres(queryClient, { schema: pgSchema });
 } else {
   console.log(`Using SQLite backend: ${dbConfig.sqlitePath}`);
 
@@ -42,13 +43,13 @@ if (dbConfig.backend === 'postgresql') {
   queryClient.pragma('mmap_size = 30000000000'); // Memory-mapped I/O
   queryClient.pragma('foreign_keys = ON'); // Enforce foreign keys
 
-  db = drizzleSqlite(queryClient, { schema });
+  db = drizzleSqlite(queryClient, { schema: sqliteSchema });
 }
 
 // Export the database instance
 export { db };
 
-// Export schema for convenience
+// Export schema for convenience (re-export from PostgreSQL schema for backward compatibility)
 export * from './schema';
 
 // Export database config
