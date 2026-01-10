@@ -19,14 +19,10 @@ const envSchema = z.object({
   BASE_REPO_PATH: z.string().optional(),
   WORKTREE_BASE_PATH: z.string().optional(),
 
-  // Container Backend Selection ('docker' or 'proxmox')
-  CONTAINER_BACKEND: z.enum(['docker', 'proxmox']).default('docker'),
+  // Container Backend (Proxmox only)
+  CONTAINER_BACKEND: z.enum(['proxmox']).default('proxmox'),
 
-  // Docker Configuration
-  DOCKER_SOCKET: z.string().default('/var/run/docker.sock'),
-  CLAUDE_IMAGE: z.string().default('vibe-anywhere/claude-instance:latest'),
-
-  // Proxmox Configuration (required if CONTAINER_BACKEND='proxmox')
+  // Proxmox Configuration
   PROXMOX_HOST: z.string().optional(),
   PROXMOX_PORT: z.string().default('8006').transform(Number),
   PROXMOX_TOKEN_ID: z.string().optional(),      // e.g., 'root@pam!vibe-anywhere'
@@ -43,10 +39,6 @@ const envSchema = z.object({
   PROXMOX_TEMPLATE_VMID: z.string().default('150').transform(Number),
   PROXMOX_VMID_MIN: z.string().default('200').transform(Number),
   PROXMOX_VMID_MAX: z.string().default('299').transform(Number),
-
-  // Container resource limits (Docker)
-  CONTAINER_MEMORY_LIMIT: z.string().default('2g'),
-  CONTAINER_CPU_LIMIT: z.string().default('2').transform(Number),
 
   // Session settings
   SESSION_IDLE_TIMEOUT_MINUTES: z.string().default('60').transform(Number),
@@ -123,15 +115,6 @@ export const config = {
     return {
       baseRepoPath: getConfig().BASE_REPO_PATH,
       worktreeBasePath: getConfig().WORKTREE_BASE_PATH || `${homeDir}/.worktrees`,
-    };
-  },
-
-  get docker() {
-    return {
-      socketPath: getConfig().DOCKER_SOCKET,
-      claudeImage: getConfig().CLAUDE_IMAGE,
-      memoryLimit: getConfig().CONTAINER_MEMORY_LIMIT,
-      cpuLimit: getConfig().CONTAINER_CPU_LIMIT,
     };
   },
 
