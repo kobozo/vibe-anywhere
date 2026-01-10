@@ -1,0 +1,55 @@
+# Vibe Anywhere - Development Dockerfile
+# Optimized for hot-reloading and debugging
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install build dependencies for native modules and dev tools
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    linux-headers \
+    git \
+    openssh-client \
+    docker-cli \
+    rsync \
+    && rm -rf /var/cache/apk/*
+
+# The node:22-alpine image already has node user with UID/GID 1000
+# Remove it and create devops user to match host user for seamless file permissions
+RUN deluser --remove-home node && \
+    (delgroup node 2>/dev/null || true) && \
+    addgroup -g 1000 devops && \
+    adduser -u 1000 -G devops -s /bin/sh -D devops && \
+    (addgroup devops docker 2>/dev/null || true)
+
+# Copy package files first for better layer caching
+COPY package.json package-lock.json* ./
+
+# Install all dependencies including dev
+RUN npm ci
+
+# Set ownership for devops user
+RUN chown -R devops:devops /app
+
+# Switch to devops user for development
+USER devops
+
+# Copy source code (will be overridden by volume mount in dev)
+COPY --chown=devops:devops . .
+
+# Set development environment
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+# Expose ports
+# 3000 - Next.js app
+# 9229 - Node.js debugger
+EXPOSE 3000 9229
+
+# Start with tsx watch for hot reloading
+CMD ["npm", "run", "dev"]
