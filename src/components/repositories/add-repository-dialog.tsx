@@ -311,7 +311,7 @@ export function AddRepositoryDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-secondary rounded-lg w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl max-h-[75vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
@@ -377,7 +377,7 @@ export function AddRepositoryDialog({
                             {copied ? 'Copied!' : 'Copy'}
                           </button>
                         </div>
-                        <div className="font-mono text-xs text-foreground break-all bg-gray-900/50 p-2 rounded max-h-20 overflow-y-auto">
+                        <div className="font-mono text-xs text-foreground break-all bg-background/50 p-2 rounded max-h-20 overflow-y-auto">
                           {generatedKey.publicKey}
                         </div>
                         <button

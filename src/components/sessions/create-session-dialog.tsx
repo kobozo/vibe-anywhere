@@ -59,15 +59,17 @@ export function CreateSessionDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-md mx-4 shadow-xl">
-        <div className="p-4 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-white">Create New Session</h3>
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl mx-4 max-h-[75vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">Create New Session</h3>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
                 Session Name *
               </label>
               <input
@@ -76,13 +78,13 @@ export function CreateSessionDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Implement login feature"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary"
                 autoFocus
               />
             </div>
 
             <div>
-              <label htmlFor="repoPath" className="block text-sm font-medium text-gray-300 mb-1">
+              <label htmlFor="repoPath" className="block text-sm font-medium text-foreground mb-1">
                 Repository Path *
               </label>
               <input
@@ -91,15 +93,15 @@ export function CreateSessionDialog({
                 value={repoPath}
                 onChange={(e) => setRepoPath(e.target.value)}
                 placeholder="/home/user/my-project"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary font-mono text-sm"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-foreground-tertiary">
                 Absolute path to the git repository on the server
               </p>
             </div>
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-foreground mb-1">
                 Description (optional)
               </label>
               <textarea
@@ -108,12 +110,12 @@ export function CreateSessionDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe what this session will work on..."
                 rows={3}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary resize-none"
               />
             </div>
 
             <div>
-              <label htmlFor="aiArgs" className="block text-sm font-medium text-gray-300 mb-1">
+              <label htmlFor="aiArgs" className="block text-sm font-medium text-foreground mb-1">
                 AI Arguments (optional)
               </label>
               <input
@@ -122,31 +124,32 @@ export function CreateSessionDialog({
                 value={aiArgs}
                 onChange={(e) => setAiArgs(e.target.value)}
                 placeholder='e.g., -p "Focus on refactoring" --model sonnet'
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary focus:outline-none focus:border-primary font-mono text-sm"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-foreground-tertiary">
                 Leave empty for default. Arguments are passed to the AI command.
               </p>
             </div>
 
             {error && (
-              <div className="text-sm text-red-400 bg-red-400/10 px-3 py-2 rounded">{error}</div>
+              <div className="text-sm text-error bg-error/10 px-3 py-2 rounded border border-error/50">{error}</div>
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-700 flex justify-end gap-3">
+          {/* Footer */}
+          <div className="p-4 border-t border-border flex justify-end gap-3">
             <button
               type="button"
               onClick={handleClose}
               disabled={isLoading}
-              className="px-4 py-2 text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-primary hover:bg-primary-hover rounded text-primary-foreground transition-colors disabled:opacity-50"
             >
               {isLoading ? 'Creating...' : 'Create Session'}
             </button>

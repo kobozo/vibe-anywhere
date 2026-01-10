@@ -144,7 +144,7 @@ export function CreateTabDialog({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-secondary rounded-lg w-full max-w-md">
+      <div className="bg-background-secondary rounded-lg w-full max-w-2xl mx-4 max-h-[75vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">New Tab</h2>
@@ -154,7 +154,7 @@ export function CreateTabDialog({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
           {error && (
             <div className="p-3 bg-error/20 border border-error/50 rounded text-error text-sm">
               {error}

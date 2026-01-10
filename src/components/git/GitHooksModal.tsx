@@ -203,7 +203,7 @@ export function GitHooksModal({ workspaceId, isOpen, onClose }: GitHooksModalPro
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-background-secondary rounded-lg shadow-xl w-full max-w-lg mx-4"
+        className="bg-background-secondary rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[75vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -249,7 +249,7 @@ export function GitHooksModal({ workspaceId, isOpen, onClose }: GitHooksModalPro
         )}
 
         {/* Content */}
-        <div className="p-4 max-h-[60vh] overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div className="text-center py-8 text-foreground-secondary">Loading...</div>
           ) : error ? (
