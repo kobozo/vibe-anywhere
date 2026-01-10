@@ -20,7 +20,6 @@ import { useUIState } from '@/hooks/useUIState';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { GitPanel } from '@/components/git';
-import { DockerPanel } from '@/components/docker';
 import { DashboardPanel } from '@/components/dashboard';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
@@ -1384,10 +1383,6 @@ function Dashboard() {
                     {/* Git panel */}
                     {selectedTab && selectedTab.tabType === 'git' && (
                       <GitPanel workspaceId={selectedWorkspace.id} />
-                    )}
-                    {/* Docker panel */}
-                    {selectedTab && selectedTab.tabType === 'docker' && (
-                      <DockerPanel workspaceId={selectedWorkspace.id} containerIp={selectedWorkspace.containerIp ?? null} />
                     )}
                     {/* Show pending/stopped message for non-running terminal tabs */}
                     {selectedTab && selectedTab.tabType === 'terminal' && selectedTab.status !== 'running' && (

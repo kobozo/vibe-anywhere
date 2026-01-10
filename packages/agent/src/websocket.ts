@@ -29,12 +29,6 @@ export interface AgentEvents {
   onGitCommit: (data: { requestId: string; message: string }) => void;
   onGitDiscard: (data: { requestId: string; files: string[] }) => void;
   onGitConfig: (data: { requestId: string; name: string; email: string }) => void;
-  // Docker events
-  onDockerStatus: (data: { requestId: string }) => void;
-  onDockerLogs: (data: { requestId: string; containerId: string; tail?: number }) => void;
-  onDockerStart: (data: { requestId: string; containerId: string }) => void;
-  onDockerStop: (data: { requestId: string; containerId: string }) => void;
-  onDockerRestart: (data: { requestId: string; containerId: string }) => void;
   // Stats events
   onStatsRequest: (data: { requestId: string }) => void;
 }
@@ -201,27 +195,6 @@ export class AgentWebSocket {
 
     this.socket.on('git:config', (data) => {
       this.events.onGitConfig(data);
-    });
-
-    // Docker events
-    this.socket.on('docker:status', (data) => {
-      this.events.onDockerStatus(data);
-    });
-
-    this.socket.on('docker:logs', (data) => {
-      this.events.onDockerLogs(data);
-    });
-
-    this.socket.on('docker:start', (data) => {
-      this.events.onDockerStart(data);
-    });
-
-    this.socket.on('docker:stop', (data) => {
-      this.events.onDockerStop(data);
-    });
-
-    this.socket.on('docker:restart', (data) => {
-      this.events.onDockerRestart(data);
     });
 
     // Stats events
@@ -486,33 +459,6 @@ export class AgentWebSocket {
     if (!this.socket?.connected) return;
 
     this.socket.emit('git:config:response', { requestId, success, data, error });
-  }
-
-  /**
-   * Send docker status response
-   */
-  sendDockerStatus(requestId: string, success: boolean, data?: unknown, error?: string): void {
-    if (!this.socket?.connected) return;
-
-    this.socket.emit('docker:status:response', { requestId, success, data, error });
-  }
-
-  /**
-   * Send docker logs response
-   */
-  sendDockerLogs(requestId: string, success: boolean, data?: unknown, error?: string): void {
-    if (!this.socket?.connected) return;
-
-    this.socket.emit('docker:logs:response', { requestId, success, data, error });
-  }
-
-  /**
-   * Send docker action response (start/stop/restart)
-   */
-  sendDockerAction(requestId: string, action: string, success: boolean, error?: string): void {
-    if (!this.socket?.connected) return;
-
-    this.socket.emit(`docker:${action}:response`, { requestId, success, error });
   }
 
   /**
