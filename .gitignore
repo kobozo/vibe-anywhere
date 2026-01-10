@@ -18,6 +18,12 @@ dist/
 
 # Database
 drizzle/
+drizzle-postgres/
+drizzle-sqlite/
+data/
+*.db
+*.db-shm
+*.db-wal
 
 # IDE
 .vscode/
