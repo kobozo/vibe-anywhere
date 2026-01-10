@@ -154,7 +154,8 @@ export function CreateTabDialog({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto">
+          <form id="create-tab-form" onSubmit={handleSubmit} className="p-4 space-y-4">
           {error && (
             <div className="p-3 bg-error/20 border border-error/50 rounded text-error text-sm">
               {error}
@@ -232,8 +233,8 @@ export function CreateTabDialog({
               </p>
             </div>
           )}
-
-        </form>
+          </form>
+        </div>
 
         {/* Footer */}
         <div className="p-4 border-t border-border flex justify-end gap-3">
@@ -246,7 +247,8 @@ export function CreateTabDialog({
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
+            type="submit"
+            form="create-tab-form"
             disabled={isLoading || !selectedOption}
             className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 disabled:cursor-not-allowed rounded text-foreground transition-colors"
           >

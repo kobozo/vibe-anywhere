@@ -379,8 +379,8 @@ export function EditRepositoryDialog({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-4">
+        <div className="flex-1 overflow-y-auto">
+          <form id="edit-repo-form" onSubmit={handleSubmit} className="p-4">
             {/* General Tab */}
             {activeTab === 'general' && (
               <div className="space-y-4">
@@ -704,27 +704,28 @@ export function EditRepositoryDialog({
 
             {/* Error */}
             {error && <div className="text-error text-sm mt-4">{error}</div>}
-          </div>
+          </form>
+        </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-border flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-foreground hover:text-foreground-secondary transition-colors"
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded transition-colors disabled:opacity-50"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+        {/* Footer */}
+        <div className="p-4 border-t border-border flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-foreground hover:text-foreground-secondary transition-colors"
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="edit-repo-form"
+            className="px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded transition-colors disabled:opacity-50"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
 
     </div>

@@ -66,8 +66,8 @@ export function CreateSessionDialog({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto">
+          <form id="create-session-form" onSubmit={handleSubmit} className="p-4 space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
                 Session Name *
@@ -134,27 +134,28 @@ export function CreateSessionDialog({
             {error && (
               <div className="text-sm text-error bg-error/10 px-3 py-2 rounded border border-error/50">{error}</div>
             )}
-          </div>
+          </form>
+        </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-border flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isLoading}
-              className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-primary hover:bg-primary-hover rounded text-primary-foreground transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Creating...' : 'Create Session'}
-            </button>
-          </div>
-        </form>
+        {/* Footer */}
+        <div className="p-4 border-t border-border flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="px-4 py-2 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="create-session-form"
+            disabled={isLoading}
+            className="px-4 py-2 bg-primary hover:bg-primary-hover rounded text-primary-foreground transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Creating...' : 'Create Session'}
+          </button>
+        </div>
       </div>
     </div>
   );
