@@ -30,7 +30,7 @@ Perfect for developers who want:
 - **Parallel Workspaces** - Run multiple AI agents simultaneously, each in isolated environments
 - **Git Worktree Integration** - Automatic branch and worktree management per session
 - **Interactive Web Terminal** - Full terminal access via xterm.js with real-time streaming
-- **Flexible Container Backend** - Choose between Docker or Proxmox LXC containers
+- **Proxmox LXC Containers** - Isolated workspace environments using Proxmox
 - **Live Git Diff Viewer** - See code changes in real-time from the web UI
 - **WebSocket Communication** - Low-latency, real-time terminal interaction
 
@@ -45,10 +45,10 @@ curl -fsSL https://raw.githubusercontent.com/kobozo/vibe-anywhere/main/scripts/i
 ```
 
 The installer handles everything:
-- Installs Node.js 22, PostgreSQL 16, and optionally Docker
+- Installs Node.js 22 and PostgreSQL 16
 - Sets up the database and creates an admin user
 - Configures and starts the systemd service
-- Prompts for all necessary configuration
+- Prompts for all necessary configuration (including Proxmox connection)
 
 After installation, access the web UI at `http://your-server:51420`
 
@@ -66,19 +66,16 @@ npm install
 
 # Set up the environment
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your Proxmox configuration
 
-# Start PostgreSQL (using Docker Compose)
-npm run docker:up
+# Set up PostgreSQL (you'll need a running PostgreSQL instance)
+# Update DATABASE_URL in .env
 
 # Initialize the database
-npm run db:push
+npm run db:migrate
 
 # Create an admin user
 npx tsx scripts/seed-user.ts admin your-secure-password
-
-# Build AI container image (for Docker backend)
-npm run docker:build
 
 # Start the development server
 npm run dev
@@ -96,9 +93,8 @@ Open [http://localhost:3000](http://localhost:3000) and log in with your credent
 - **RAM**: 4GB (8GB+ recommended for multiple sessions)
 - **Storage**: 20GB+ (depends on workspace size)
 
-### Container Backend (choose one)
-- **Docker**: 20.10+ (easier setup, portable)
-- **Proxmox VE**: 8.0+ (better performance, more control)
+### Container Backend
+- **Proxmox VE**: 8.0+ (for isolated workspace containers)
 
 ## Configuration
 
@@ -111,8 +107,8 @@ DATABASE_URL=postgresql://sessionhub:password@localhost:5432/sessionhub
 # Authentication
 AUTH_SECRET=your-secure-random-string-here
 
-# Container Backend
-CONTAINER_BACKEND=docker  # or "proxmox"
+# Container Backend (Proxmox)
+CONTAINER_BACKEND=proxmox
 
 # Port (default: 3000 in dev, 51420 in production)
 PORT=3000
@@ -223,14 +219,14 @@ Common storage names: `local`, `local-zfs`, `local-btrfs`
        ▼                      ▼
 ┌─────────────┐      ┌──────────────────────┐
 │ PostgreSQL  │      │  Container Backend   │
-│  (Drizzle)  │      │  • Docker Engine     │
-│             │      │  • Proxmox LXC       │
+│  (Drizzle)  │      │  • Proxmox LXC       │
+│             │      │                      │
 └─────────────┘      └──────────┬───────────┘
                                  │
                                  ▼
                      ┌──────────────────────┐
-                     │  Isolated Containers │
-                     │  • Git Worktrees    │
+                     │  LXC Containers      │
+                     │  • Git Repositories │
                      │  • AI Agent         │
                      │  • Terminal (PTY)   │
                      └──────────────────────┘
@@ -240,9 +236,9 @@ Common storage names: `local`, `local-zfs`, `local-btrfs`
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Node.js, Socket.io, Drizzle ORM
 - **Database**: PostgreSQL 16
-- **Containers**: Docker (dockerode) or Proxmox LXC
+- **Containers**: Proxmox LXC
 - **Terminal**: xterm.js with WebSocket streaming
-- **Git**: simple-git for worktree management
+- **Git**: simple-git for repository management
 
 ## Development
 
@@ -272,7 +268,6 @@ vibe-anywhere/
 │   │   ├── services/   # Business logic layer
 │   │   └── websocket/  # Socket.io server
 │   └── hooks/          # Custom React hooks
-├── docker/             # Docker images
 ├── scripts/            # Setup and utility scripts
 └── packages/
     └── agent/         # Container agent (standalone binary)
