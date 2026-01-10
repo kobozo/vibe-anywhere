@@ -55,23 +55,25 @@ export function ConfirmDialog({
   }[confirmVariant];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60"
-        onClick={onCancel}
-      />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       {/* Dialog */}
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative bg-background-secondary border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+        className="relative bg-background-secondary border border-border rounded-lg shadow-xl w-full max-w-md mx-4 h-[250px] flex flex-col"
       >
-        <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-        <div className="text-foreground mb-6">{message}</div>
+        {/* Header */}
+        <div className="p-4 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        </div>
 
-        <div className="flex justify-end gap-3">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="text-foreground">{message}</div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-border flex justify-end gap-3">
           <button
             onClick={onCancel}
             disabled={isLoading}
