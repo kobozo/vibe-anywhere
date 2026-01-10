@@ -1,46 +1,60 @@
-![Vibe Anywhere Logo](./public/logo.svg)
+<div align="center">
+  <img src="./public/logo.svg" alt="Vibe Anywhere Logo" width="120" height="120">
 
-# Vibe Anywhere
+  # Vibe Anywhere
 
-Your coding sessions, always running. A web application for persistent AI coding sessions on a Linux server.
+  **Your AI coding sessions, always running.**
 
-## Features
+  A self-hosted web platform for persistent AI-assisted development environments on your own infrastructure.
 
-- **Persistent Sessions**: Your AI coding session continues running even when you close your browser
-- **Multiple Parallel Instances**: Run multiple AI coding agents simultaneously
-- **Git Worktree Isolation**: Each session works in its own branch/worktree
-- **Web Terminal**: Interactive terminal interface with xterm.js
-- **Real-time Streaming**: Live output via WebSocket
-- **Git Integration**: View diffs and status for each session
-- **Docker or Proxmox**: Choose your container backend
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](package.json)
 
-## Quick Install
+</div>
 
-Install Vibe Anywhere as a service on Debian/Ubuntu with a single command:
+---
+
+## Overview
+
+Vibe Anywhere gives you a persistent, multi-session AI coding environment that runs on your own Linux server. Each session is isolated in its own container and Git worktree, allowing you to work on multiple features simultaneously without interference. Close your browser, come back later—your sessions are still running.
+
+Perfect for developers who want:
+- 24/7 AI coding assistance without cloud dependency
+- Multiple parallel development streams
+- Complete control over their development environment
+- Seamless Git integration with automatic branch management
+
+## Key Features
+
+- **Persistent Sessions** - AI coding sessions continue running even when you disconnect
+- **Parallel Workspaces** - Run multiple AI agents simultaneously, each in isolated environments
+- **Git Worktree Integration** - Automatic branch and worktree management per session
+- **Interactive Web Terminal** - Full terminal access via xterm.js with real-time streaming
+- **Flexible Container Backend** - Choose between Docker or Proxmox LXC containers
+- **Live Git Diff Viewer** - See code changes in real-time from the web UI
+- **WebSocket Communication** - Low-latency, real-time terminal interaction
+
+## Quick Start
+
+### One-Line Installation
+
+For Debian/Ubuntu systems, install as a systemd service:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kobozo/vibe-anywhere/main/scripts/install.sh | sudo bash
 ```
 
-The installer will:
-- Prompt for all configuration (paths, backend, credentials)
-- Install Node.js 22, PostgreSQL 16, and optionally Docker
-- Set up the database and create an admin user
-- Install and start the systemd service
+The installer handles everything:
+- Installs Node.js 22, PostgreSQL 16, and optionally Docker
+- Sets up the database and creates an admin user
+- Configures and starts the systemd service
+- Prompts for all necessary configuration
 
-After installation, access Vibe Anywhere at `http://your-server:51420`
+After installation, access the web UI at `http://your-server:51420`
 
-## Manual Installation
+### Development Setup
 
-### Prerequisites
-
-- Debian 12+ or Ubuntu 22.04+
-- Node.js 22+
-- PostgreSQL 16+
-- Docker (optional, for Docker container backend)
-- Git
-
-### Steps
+For local development or manual installation:
 
 ```bash
 # Clone the repository
@@ -50,107 +64,238 @@ cd vibe-anywhere
 # Install dependencies
 npm install
 
-# Start PostgreSQL (via Docker)
+# Set up the environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start PostgreSQL (using Docker Compose)
 npm run docker:up
 
-# Push database schema
+# Initialize the database
 npm run db:push
 
-# Build AI container image (if using Docker backend)
-npm run docker:build
-
 # Create an admin user
-npx tsx scripts/seed-user.ts admin yourpassword
+npx tsx scripts/seed-user.ts admin your-secure-password
 
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with your settings
+# Build AI container image (for Docker backend)
+npm run docker:build
 
 # Start the development server
 npm run dev
 ```
 
-Open http://localhost:3000 and log in with your credentials.
+Open [http://localhost:3000](http://localhost:3000) and log in with your credentials.
+
+## System Requirements
+
+### Minimum Requirements
+- **OS**: Debian 12+ or Ubuntu 22.04+
+- **Node.js**: 22.x or higher
+- **PostgreSQL**: 16+
+- **Git**: 2.30+
+- **RAM**: 4GB (8GB+ recommended for multiple sessions)
+- **Storage**: 20GB+ (depends on workspace size)
+
+### Container Backend (choose one)
+- **Docker**: 20.10+ (easier setup, portable)
+- **Proxmox VE**: 8.0+ (better performance, more control)
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure:
+All configuration is managed through environment variables. Copy `.env.example` to `.env` and customize:
 
 ```env
-# Required
+# Database
 DATABASE_URL=postgresql://sessionhub:password@localhost:5432/sessionhub
-AUTH_SECRET=your-secure-random-string
 
-# Git paths (deprecated - repos are now cloned in containers)
-BASE_REPO_PATH=/path/to/your/git/project
-WORKTREE_BASE_PATH=/path/to/worktrees
+# Authentication
+AUTH_SECRET=your-secure-random-string-here
 
-# Container backend
+# Container Backend
 CONTAINER_BACKEND=docker  # or "proxmox"
+
+# Port (default: 3000 in dev, 51420 in production)
+PORT=3000
 ```
 
-See `.env.example` for all available options including Proxmox configuration.
+For Proxmox configuration, additional variables are required:
+```env
+PROXMOX_HOST=your-proxmox-host
+PROXMOX_TOKEN_ID=root@pam!vibe-anywhere
+PROXMOX_TOKEN_SECRET=your-token-secret
+PROXMOX_NODE=pve
+PROXMOX_STORAGE=local
+PROXMOX_TEMPLATE_ID=150
+```
+
+See [Proxmox Setup Guide](#proxmox-setup) for detailed instructions.
+
+## Usage
+
+### Creating and Managing Sessions
+
+1. **Create a Workspace**
+   - Click "New Session" in the dashboard
+   - Enter a name and select configuration options
+   - Choose your tech stack (Node.js, Python, etc.)
+
+2. **Start the Session**
+   - Click "Start" to provision the container
+   - The system creates an isolated Git worktree and container
+   - Status updates in real-time
+
+3. **Attach and Code**
+   - Click "Attach" to open the web terminal
+   - Your AI coding assistant is ready to use
+   - All work is automatically saved
+
+4. **Monitor Changes**
+   - View Git status and diffs from the UI
+   - Track all modifications in real-time
+   - Commit or reset as needed
+
+5. **Stop or Delete**
+   - Stop when pausing work (preserves state)
+   - Delete to clean up container and worktree
 
 ## Proxmox Setup
 
-If using Proxmox as your container backend, you need to create an API token with proper permissions.
+### Creating an API Token
 
-### Creating a Proxmox API Token
+**Critical**: API tokens must have Privilege Separation **disabled** to work correctly.
 
-**⚠️ IMPORTANT**: The API token **MUST** be created with **Privilege Separation DISABLED** to work correctly.
-
-#### Via Proxmox Web UI:
-
-1. Navigate to **Datacenter** → **Permissions** → **API Tokens**
+**Via Web UI:**
+1. Navigate to **Datacenter → Permissions → API Tokens**
 2. Click **Add**
-3. Select user: `root@pam` (or your preferred user)
-4. Enter token ID: `vibe-anywhere` (or your preferred name)
-5. **⚠️ UNCHECK "Privilege Separation"** - This is critical!
-6. Click **Add**
-7. **Copy the token secret** - it's only shown once!
+3. User: `root@pam`, Token ID: `vibe-anywhere`
+4. **UNCHECK "Privilege Separation"** ⚠️
+5. Save the token secret (shown only once)
 
-#### Via Proxmox Shell:
-
+**Via CLI:**
 ```bash
-# Create token without privilege separation (inherits all user permissions)
 pveum user token add root@pam vibe-anywhere --privsep 0
-
-# This will output the token secret - save it!
 ```
 
 ### Why Disable Privilege Separation?
 
-When Privilege Separation is enabled, the API token does NOT inherit the user's permissions. Vibe Anywhere needs these permissions:
-- `Datastore.Audit` - To list and access storage containing CT templates
-- `Datastore.AllocateSpace` - To create containers
-- `VM.Allocate`, `VM.Config.*`, `VM.Console`, `VM.PowerMgmt` - To manage containers
-- `Pool.Audit`, `Sys.Audit`, `Sys.Modify` - For resource management
+Tokens with Privilege Separation inherit no permissions by default. Vibe Anywhere requires:
+- `Datastore.Audit`, `Datastore.AllocateSpace` - Storage access
+- `VM.Allocate`, `VM.Config.*`, `VM.PowerMgmt` - Container management
+- `Sys.Audit`, `Sys.Modify` - System operations
 
-Disabling privilege separation allows the token to inherit all permissions from the root user, avoiding permission issues.
+Disabling privilege separation allows the token to inherit root permissions.
 
-### Required Proxmox Storage Configuration
+### Storage Requirements
 
-Make sure you have a storage configured with CT template support:
-- Storage must have `vztmpl` content type enabled
-- Common storage names: `local`, `local-zfs`, `local-btrfs`
-- Check storage config: `pvesm status` (shows available storages and their content types)
+Ensure your Proxmox storage supports LXC templates:
+```bash
+pvesm status  # Check available storages
+# Look for entries with "vztmpl" content type
+```
+
+Common storage names: `local`, `local-zfs`, `local-btrfs`
 
 ### Troubleshooting
 
-**CT Templates list is empty after configuration:**
-- Check API token privilege separation is disabled: `pveum user token list root@pam`
-- Verify storage has vztmpl content: `pvesm status | grep vztmpl`
-- Check console logs: `docker logs vibe-anywhere-dev` (look for `[CT Templates]` messages)
+**Empty CT Templates list:**
+- Verify privilege separation is disabled: `pveum user token list root@pam`
+- Check storage has `vztmpl` content: `pvesm status | grep vztmpl`
+- Review server logs: `journalctl -u vibe-anywhere -f`
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│           Next.js Frontend                  │
+│  (React 19, TypeScript, Tailwind CSS)      │
+└──────────────┬──────────────────────────────┘
+               │
+               │ HTTP/WebSocket
+               ▼
+┌─────────────────────────────────────────────┐
+│         Node.js Backend                     │
+│  • API Routes (Next.js)                    │
+│  • Socket.io WebSocket Server              │
+│  • Session Management Service              │
+└──────┬──────────────────────┬───────────────┘
+       │                      │
+       │                      │
+       ▼                      ▼
+┌─────────────┐      ┌──────────────────────┐
+│ PostgreSQL  │      │  Container Backend   │
+│  (Drizzle)  │      │  • Docker Engine     │
+│             │      │  • Proxmox LXC       │
+└─────────────┘      └──────────┬───────────┘
+                                 │
+                                 ▼
+                     ┌──────────────────────┐
+                     │  Isolated Containers │
+                     │  • Git Worktrees    │
+                     │  • AI Agent         │
+                     │  • Terminal (PTY)   │
+                     └──────────────────────┘
+```
+
+### Tech Stack
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Node.js, Socket.io, Drizzle ORM
+- **Database**: PostgreSQL 16
+- **Containers**: Docker (dockerode) or Proxmox LXC
+- **Terminal**: xterm.js with WebSocket streaming
+- **Git**: simple-git for worktree management
+
+## Development
+
+### Available Scripts
+
+```bash
+npm run dev          # Start development server (localhost:3000)
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run db:studio    # Open Drizzle Studio (database GUI)
+npm run db:generate  # Generate migration after schema changes
+npm run db:migrate   # Apply database migrations
+```
+
+### Project Structure
+
+```
+vibe-anywhere/
+├── src/
+│   ├── app/              # Next.js App Router pages
+│   │   ├── api/         # REST API endpoints
+│   │   └── page.tsx     # Main dashboard
+│   ├── components/      # React components
+│   ├── lib/
+│   │   ├── db/         # Database schema and client
+│   │   ├── services/   # Business logic layer
+│   │   └── websocket/  # Socket.io server
+│   └── hooks/          # Custom React hooks
+├── docker/             # Docker images
+├── scripts/            # Setup and utility scripts
+└── packages/
+    └── agent/         # Container agent (standalone binary)
+```
+
+### Making Changes
+
+1. **Database Schema**: Edit `src/lib/db/schema.ts`, then run `npm run db:generate`
+2. **API Routes**: Add/modify files in `src/app/api/`
+3. **UI Components**: Update components in `src/components/`
+4. **Services**: Business logic lives in `src/lib/services/`
+
+Detailed development docs: [CLAUDE.md](CLAUDE.md)
 
 ## Service Management
 
-If installed via the install script, Vibe Anywhere runs as a systemd service:
+When installed via the install script:
 
 ```bash
-# Check status
+# Service status
 sudo systemctl status vibe-anywhere
 
-# Start/Stop/Restart
+# Control the service
 sudo systemctl start vibe-anywhere
 sudo systemctl stop vibe-anywhere
 sudo systemctl restart vibe-anywhere
@@ -158,49 +303,50 @@ sudo systemctl restart vibe-anywhere
 # View logs
 sudo journalctl -u vibe-anywhere -f
 
-# View recent logs
+# View logs from last hour
 sudo journalctl -u vibe-anywhere --since "1 hour ago"
 ```
 
-Configuration file: `/opt/vibe-anywhere/.env`
+Configuration: `/opt/vibe-anywhere/.env`
 
-## Usage
+## Contributing
 
-1. **Create a Session**: Click "New Session" and give it a name
-2. **Start the Session**: Click "Start" to launch the container and worktree
-3. **Attach**: Once running, click "Attach" to open the terminal
-4. **Interact**: Use your AI coding assistant as you normally would
-5. **View Changes**: Check Git status/diff in the UI
-6. **Stop/Delete**: Stop the session when done, or delete to clean up
+Contributions are welcome! Here's how to get started:
 
-## Architecture
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and test thoroughly
+4. Commit with clear messages: `git commit -m 'Add amazing feature'`
+5. Push to your fork: `git push origin feature/amazing-feature`
+6. Open a Pull Request
 
-- **Next.js 15** - React 19 frontend with API routes
-- **Socket.io** - Real-time terminal communication
-- **PostgreSQL + Drizzle** - Session persistence
-- **Docker/Proxmox** - Container isolation for Claude instances
-- **Git Worktrees** - Branch isolation for parallel work
-
-See `CLAUDE.md` for detailed documentation.
-
-## Development
-
-```bash
-npm run dev          # Start dev server
-npm run db:studio    # Open Drizzle Studio (DB viewer)
-npm run lint         # Run ESLint
-npm run build        # Build for production
-```
+Please ensure:
+- Code follows existing style conventions
+- All tests pass
+- Commit messages are descriptive
+- PR includes description of changes
 
 ## Creating a Release
 
-Releases are created via GitHub Actions:
+Releases are automated via GitHub Actions:
 
-1. Go to Actions > Release workflow
-2. Click "Run workflow"
-3. Enter the version number (e.g., `1.0.0`)
-4. The workflow builds and publishes the release
+1. Go to **Actions → Release workflow**
+2. Click **Run workflow**
+3. Enter version number (e.g., `1.2.0`)
+4. The workflow builds and publishes automatically
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/kobozo/vibe-anywhere/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kobozo/vibe-anywhere/discussions)
+- **Documentation**: [CLAUDE.md](CLAUDE.md)
+
+---
+
+<div align="center">
+  Made with ❤️ by the Vibe Anywhere community
+</div>
