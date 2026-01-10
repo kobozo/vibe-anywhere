@@ -5,7 +5,7 @@ import { useState } from 'react';
 interface CreateSessionDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, repoPath: string, description?: string, claudeArgs?: string) => Promise<void>;
+  onCreate: (name: string, repoPath: string, description?: string, aiArgs?: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -18,7 +18,7 @@ export function CreateSessionDialog({
   const [name, setName] = useState('');
   const [repoPath, setRepoPath] = useState('');
   const [description, setDescription] = useState('');
-  const [claudeArgs, setClaudeArgs] = useState('');
+  const [aiArgs, setAiArgs] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -38,11 +38,11 @@ export function CreateSessionDialog({
     }
 
     try {
-      await onCreate(name.trim(), repoPath.trim(), description.trim() || undefined, claudeArgs.trim() || undefined);
+      await onCreate(name.trim(), repoPath.trim(), description.trim() || undefined, aiArgs.trim() || undefined);
       setName('');
       setRepoPath('');
       setDescription('');
-      setClaudeArgs('');
+      setAiArgs('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
     }
@@ -52,7 +52,7 @@ export function CreateSessionDialog({
     setName('');
     setRepoPath('');
     setDescription('');
-    setClaudeArgs('');
+    setAiArgs('');
     setError(null);
     onClose();
   };
@@ -113,19 +113,19 @@ export function CreateSessionDialog({
             </div>
 
             <div>
-              <label htmlFor="claudeArgs" className="block text-sm font-medium text-gray-300 mb-1">
-                Claude CLI Arguments (optional)
+              <label htmlFor="aiArgs" className="block text-sm font-medium text-gray-300 mb-1">
+                AI Arguments (optional)
               </label>
               <input
-                id="claudeArgs"
+                id="aiArgs"
                 type="text"
-                value={claudeArgs}
-                onChange={(e) => setClaudeArgs(e.target.value)}
+                value={aiArgs}
+                onChange={(e) => setAiArgs(e.target.value)}
                 placeholder='e.g., -p "Focus on refactoring" --model sonnet'
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Leave empty for default. Arguments are passed to the claude command.
+                Leave empty for default. Arguments are passed to the AI command.
               </p>
             </div>
 

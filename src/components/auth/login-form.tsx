@@ -38,7 +38,7 @@ export function LoginForm() {
             />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Vibe Anywhere</h1>
-          <p className="text-foreground-secondary mt-2">Claude Code Manager</p>
+          <p className="text-foreground-secondary mt-2">Your coding sessions, always running</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-background-secondary rounded-lg p-6 space-y-4">

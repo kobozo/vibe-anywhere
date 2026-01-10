@@ -1,7 +1,7 @@
 # Vibe Anywhere - Project Knowledge Base
 
 ## Project Overview
-Vibe Anywhere is a web application for running persistent Claude Code CLI instances on a Linux server. It enables multiple parallel AI coding sessions, each isolated in its own Git worktree and Docker container.
+Vibe Anywhere is a web application for persistent AI coding sessions on a Linux server. Your coding sessions, always running. It enables multiple parallel AI coding sessions, each isolated in its own Git worktree and container.
 
 ## Tech Stack
 - **Frontend**: Next.js 15, React 19, TypeScript
@@ -105,7 +105,7 @@ cd packages/agent && npm run bundle
 │   │   └── sessions/        # Session management UI
 │   └── hooks/               # React hooks
 ├── docker/                   # Docker-related files
-│   └── claude-instance/     # Claude CLI container image
+│   └── claude-instance/     # AI container image (legacy naming)
 └── server.ts                # Custom Next.js + Socket.io server
 ```
 
@@ -128,7 +128,7 @@ cd packages/agent && npm run bundle
 # Development
 npm run dev              # Start dev server
 npm run docker:up        # Start PostgreSQL
-npm run docker:build     # Build Claude CLI image
+npm run docker:build     # Build AI container image
 
 # Setup
 npm run setup            # Full setup (docker + db + image)

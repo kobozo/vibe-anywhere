@@ -67,7 +67,7 @@ export function CreateTabDialog({
   const { templates, fetchTemplates, isLoading: templatesLoading } = useTabTemplates();
   const [selectedOption, setSelectedOption] = useState<TabOption | null>(null);
   const [tabName, setTabName] = useState('');
-  const [claudeArgs, setClaudeArgs] = useState('');
+  const [aiArgs, setAiArgs] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Filter and combine static tabs with dynamic templates
@@ -97,7 +97,7 @@ export function CreateTabDialog({
       fetchTemplates();
       setSelectedOption(null);
       setTabName('');
-      setClaudeArgs('');
+      setAiArgs('');
       setError(null);
     }
   }, [isOpen, fetchTemplates]);
@@ -127,8 +127,8 @@ export function CreateTabDialog({
       } else {
         // Dynamic template - pass templateId
         let args: string[] | undefined;
-        if (selectedOption.requiredTechStack && claudeArgs.trim()) {
-          args = claudeArgs.split(/\s+/).filter(Boolean);
+        if (selectedOption.requiredTechStack && aiArgs.trim()) {
+          args = aiArgs.split(/\s+/).filter(Boolean);
         }
         await onCreate(tabName || selectedOption.name, selectedOption.id, args);
       }
@@ -222,8 +222,8 @@ export function CreateTabDialog({
               </label>
               <input
                 type="text"
-                value={claudeArgs}
-                onChange={(e) => setClaudeArgs(e.target.value)}
+                value={aiArgs}
+                onChange={(e) => setAiArgs(e.target.value)}
                 placeholder="--print 'Hello' --dangerously-skip-permissions"
                 className="w-full px-3 py-2 bg-background-tertiary border border-border-secondary rounded text-foreground placeholder-foreground-tertiary font-mono text-sm"
               />

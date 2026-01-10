@@ -2,11 +2,11 @@
 
 # Vibe Anywhere
 
-A web application for running persistent Claude Code CLI instances on a Linux server with multiple parallel sessions.
+Your coding sessions, always running. A web application for persistent AI coding sessions on a Linux server.
 
 ## Features
 
-- **Persistent Sessions**: Claude Code continues running even when you close your browser
+- **Persistent Sessions**: Your AI coding session continues running even when you close your browser
 - **Multiple Parallel Instances**: Run multiple AI coding agents simultaneously
 - **Git Worktree Isolation**: Each session works in its own branch/worktree
 - **Web Terminal**: Interactive terminal interface with xterm.js
@@ -56,7 +56,7 @@ npm run docker:up
 # Push database schema
 npm run db:push
 
-# Build Claude CLI Docker image (if using Docker backend)
+# Build AI container image (if using Docker backend)
 npm run docker:build
 
 # Create an admin user
@@ -169,7 +169,7 @@ Configuration file: `/opt/vibe-anywhere/.env`
 1. **Create a Session**: Click "New Session" and give it a name
 2. **Start the Session**: Click "Start" to launch the container and worktree
 3. **Attach**: Once running, click "Attach" to open the terminal
-4. **Interact**: Use Claude Code as you normally would
+4. **Interact**: Use your AI coding assistant as you normally would
 5. **View Changes**: Check Git status/diff in the UI
 6. **Stop/Delete**: Stop the session when done, or delete to clean up
 

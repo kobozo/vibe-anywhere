@@ -136,15 +136,15 @@ systemctl enable ssh
 
 # Configure git globally
 git config --global init.defaultBranch main
-git config --global user.email "claude@vibe-anywhere.local"
-git config --global user.name "Claude Code"
+git config --global user.email "ai@vibe-anywhere.local"
+git config --global user.name "AI Assistant"
 git config --global --add safe.directory /workspace
 git config --global --add safe.directory '*'
 
 # Configure git for kobozo user
 su - kobozo -c "git config --global init.defaultBranch main"
-su - kobozo -c "git config --global user.email 'claude@vibe-anywhere.local'"
-su - kobozo -c "git config --global user.name 'Claude Code'"
+su - kobozo -c "git config --global user.email 'ai@vibe-anywhere.local'"
+su - kobozo -c "git config --global user.name 'AI Assistant'"
 su - kobozo -c "git config --global --add safe.directory /workspace"
 su - kobozo -c "git config --global --add safe.directory '*'"
 
@@ -438,7 +438,7 @@ export class ProxmoxTemplateManager {
 
       const cloneUpid = await this.client.cloneLxc(parentVmid, vmid, {
         hostname,
-        description: name ? `Vibe Anywhere template: ${name}` : 'Vibe Anywhere Claude instance template',
+        description: name ? `Vibe Anywhere template: ${name}` : 'Vibe Anywhere workspace template',
         storage: storageId,
         full: true, // Full clone for templates
       });
@@ -490,7 +490,7 @@ export class ProxmoxTemplateManager {
       const templateTags = buildTemplateTags(techStacks);
       const upid = await this.client.createLxcWithSSHKeys(vmid, osTemplate, {
         hostname,
-        description: name ? `Vibe Anywhere template: ${name}` : 'Vibe Anywhere Claude instance template',
+        description: name ? `Vibe Anywhere template: ${name}` : 'Vibe Anywhere workspace template',
         storage: storageId,
         memory,
         cores,

@@ -1,5 +1,5 @@
 [Unit]
-Description=Vibe Anywhere - Claude Code Session Manager
+Description=Vibe Anywhere - AI Coding Session Manager
 Documentation=https://github.com/kobozo/vibe-anywhere
 After=network.target postgresql.service
 
