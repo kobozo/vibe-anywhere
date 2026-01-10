@@ -52,14 +52,9 @@ export { db };
 // Export database config
 export { dbConfig };
 
-// Note: Do NOT export schema here to avoid mixing PostgreSQL and SQLite types
-// Import directly from './schema' (PostgreSQL) or './schema.sqlite' (SQLite) as needed
-// Or use the getCurrentSchema() helper below
-
-// Helper to get current schema based on backend
-export function getCurrentSchema() {
-  return dbConfig.backend === 'postgresql' ? pgSchema : sqliteSchema;
-}
+// Export schema - now both PostgreSQL and SQLite schemas are compatible
+// because PostgreSQL schema generates UUIDs in JavaScript (not SQL)
+export * from './schema';
 
 // Health check function
 export async function checkDatabaseConnection(): Promise<boolean> {
