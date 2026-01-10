@@ -8,15 +8,28 @@
 
 ## Executive Summary
 
-All UI components in the codebase were audited and found to be **already fully compliant** with the standardization requirements. No code changes were necessary. This document serves as verification and reference for the standardization patterns in use.
+All UI components in the codebase were audited for standardization requirements. Initial audit found components using theme tokens correctly, but **modal heights were inconsistent** (using `max-h-[75vh]` instead of fixed `h-[75vh]`).
+
+**9 modal components were updated** to use fixed height (`h-[75vh]`), ensuring consistent modal sizing across all tabs and content variations.
 
 ---
 
 ## 1. Files Modified
 
-**Total Files Changed**: 0
+**Total Files Changed**: 9
 
-**Reason**: All components already meet or exceed the standardization requirements. The previous refactoring work (commits de68edd, 0a06707, 30540bd, 5eed453) successfully standardized all modal components.
+**Files Updated** (Iteration 2 - Fixed Height):
+1. `src/components/settings/settings-modal.tsx` - Changed to fixed `h-[75vh]`
+2. `src/components/repositories/edit-repository-dialog.tsx` - Changed to fixed `h-[75vh]`
+3. `src/components/workspaces/create-workspace-dialog.tsx` - Changed to fixed `h-[75vh]`
+4. `src/components/templates/template-dialog.tsx` - Changed to fixed `h-[75vh]`
+5. `src/components/repositories/add-repository-dialog.tsx` - Changed to fixed `h-[75vh]`
+6. `src/components/sessions/create-session-dialog.tsx` - Changed to fixed `h-[75vh]`
+7. `src/components/tabs/create-tab-dialog.tsx` - Changed to fixed `h-[75vh]`
+8. `src/components/env-vars/apply-env-vars-dialog.tsx` - Changed to fixed `h-[75vh]`
+9. `src/components/workspaces/env-var-sync-dialog.tsx` - Changed to fixed `h-[75vh]`
+
+**Change**: Replaced `max-h-[75vh]` with `h-[75vh]` to ensure consistent modal height regardless of content.
 
 ---
 
@@ -24,16 +37,16 @@ All UI components in the codebase were audited and found to be **already fully c
 
 | Component | Changes Made | Status |
 |-----------|--------------|--------|
-| Settings Modal | None - Already standardized | ✅ COMPLIANT |
-| Edit Repository Dialog | None - Already standardized | ✅ COMPLIANT |
-| Confirm Dialog | None - Already standardized | ✅ COMPLIANT |
-| Create Workspace Dialog | None - Already standardized | ✅ COMPLIANT |
-| Template Dialog | None - Already standardized | ✅ COMPLIANT |
-| Add Repository Dialog | None - Already standardized | ✅ COMPLIANT |
-| Create Session Dialog | None - Already standardized | ✅ COMPLIANT |
-| Create Tab Dialog | None - Already standardized | ✅ COMPLIANT |
-| Apply Env Vars Dialog | None - Already standardized | ✅ COMPLIANT |
-| Env Var Sync Dialog | None - Already standardized | ✅ COMPLIANT |
+| Settings Modal | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Edit Repository Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Confirm Dialog | No changes - already uses fixed `h-[250px]` | ✅ COMPLIANT |
+| Create Workspace Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Template Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Add Repository Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Create Session Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Create Tab Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Apply Env Vars Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
+| Env Var Sync Dialog | Changed `max-h-[75vh]` → `h-[75vh]` | ✅ FIXED |
 
 **Total Components Audited**: 10
 **Compliant**: 10 (100%)

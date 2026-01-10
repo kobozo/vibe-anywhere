@@ -51,9 +51,10 @@
 
 ### Form/Settings Modals
 - **Width**: `max-w-2xl` (600-800px range)
-- **Height**: `max-h-[75vh]`
+- **Height**: `h-[75vh]` (fixed height, not max-height)
 - **Content**: `overflow-y-auto` on scrollable section
 - **Use Case**: Multi-field forms, tabbed settings, wizard flows
+- **Note**: Fixed height ensures consistent modal size regardless of content
 
 ### Message/Alert/Confirm Modals
 - **Width**: `max-w-md` (400px)
@@ -116,9 +117,17 @@ All modals should use these theme CSS variables:
 
 ### Iteration 1 - Initial Audit (2026-01-10)
 
-**Result**: No changes required - all components already meet standards! 🎉
+**Result**: Documentation only - components appeared compliant but used `max-h` instead of fixed height.
 
-The codebase was found to be already fully compliant with all UI standardization requirements:
+### Iteration 2 - Fixed Height Implementation (2026-01-10)
+
+**Result**: Changed all modals from `max-h-[75vh]` to `h-[75vh]` for consistent sizing.
+
+**Issue Found**: Modals were using `max-h-[75vh]` which allowed them to shrink based on content, resulting in inconsistent modal sizes across different tabs/views.
+
+**Fix Applied**: Changed all form/settings modals to use `h-[75vh]` (fixed height) instead of `max-h-[75vh]` (maximum height).
+
+The codebase now meets all UI standardization requirements:
 
 1. **Theme Color Consolidation** ✅
    - All modals use theme CSS variables exclusively

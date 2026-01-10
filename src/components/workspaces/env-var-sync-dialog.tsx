@@ -67,7 +67,7 @@ export function EnvVarSyncDialog({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative bg-background-secondary border border-border rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[75vh] flex flex-col"
+        className="relative bg-background-secondary border border-border rounded-lg shadow-xl max-w-2xl w-full mx-4 h-[75vh] flex flex-col"
       >
         {/* Header */}
         <div className="p-4 border-b border-border">
