@@ -36,25 +36,26 @@ Perfect for developers who want:
 
 ## Quick Start
 
-### One-Line Installation
+### One-Line Installation (SQLite)
 
-For Debian/Ubuntu systems, install as a systemd service:
+The fastest way to get started with zero configuration:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kobozo/vibe-anywhere/main/scripts/install.sh | sudo bash
 ```
 
 The installer handles everything:
-- Installs Node.js 22 and PostgreSQL 16
+- Installs Node.js 22
+- Uses SQLite (no separate database server needed)
 - Sets up the database and creates an admin user
 - Configures and starts the systemd service
 - Prompts for all necessary configuration (including Proxmox connection)
 
 After installation, access the web UI at `http://your-server:51420`
 
-### Development Setup
+### Development Setup (SQLite - Recommended)
 
-For local development or manual installation:
+For local development with zero-config database:
 
 ```bash
 # Clone the repository
@@ -66,10 +67,39 @@ npm install
 
 # Set up the environment
 cp .env.example .env
+# Leave DATABASE_URL empty or comment it out for SQLite
 # Edit .env with your Proxmox configuration
 
+# Initialize the database (creates ./data/app.db automatically)
+npm run db:migrate
+
+# Create an admin user
+npx tsx scripts/seed-user.ts admin your-secure-password
+
+# Start the development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and log in with your credentials.
+
+### Development Setup (PostgreSQL)
+
+For local development with PostgreSQL (multi-server or high-concurrency):
+
+```bash
+# Clone the repository
+git clone https://github.com/kobozo/vibe-anywhere.git
+cd vibe-anywhere
+
+# Install dependencies
+npm install
+
 # Set up PostgreSQL (you'll need a running PostgreSQL instance)
-# Update DATABASE_URL in .env
+createdb vibeanywhere
+
+# Set up the environment
+cp .env.example .env
+# Edit .env and set DATABASE_URL=postgresql://user:pass@localhost:5432/vibeanywhere
 
 # Initialize the database
 npm run db:migrate
@@ -88,21 +118,130 @@ Open [http://localhost:3000](http://localhost:3000) and log in with your credent
 ### Minimum Requirements
 - **OS**: Debian 12+ or Ubuntu 22.04+
 - **Node.js**: 22.x or higher
-- **PostgreSQL**: 16+
 - **Git**: 2.30+
 - **RAM**: 4GB (8GB+ recommended for multiple sessions)
 - **Storage**: 20GB+ (depends on workspace size)
 
+### Database (Choose One)
+- **SQLite**: Built-in, no separate installation (recommended for single-server)
+- **PostgreSQL**: 16+ (optional, for multi-server or high-concurrency)
+
 ### Container Backend
 - **Proxmox VE**: 8.0+ (for isolated workspace containers)
+
+## Database Options
+
+Vibe Anywhere supports two production-ready database backends. Choose based on your deployment needs:
+
+### SQLite (Default - Recommended for Most Users)
+
+**Perfect for single-server deployments**
+
+**Pros:**
+- ✅ Zero configuration - works out of the box
+- ✅ No separate database server required
+- ✅ Automatic setup and backups
+- ✅ Uses Write-Ahead Logging (WAL) for concurrent reads
+- ✅ Optimized for production use
+- ✅ Simple backups (single file)
+
+**When to use:**
+- Single-server deployments
+- Development and testing
+- Most production use cases
+
+**Configuration:**
+```env
+# Option 1: Leave DATABASE_URL empty (default)
+# Uses ./data/app.db
+
+# Option 2: Specify custom path
+DATABASE_URL=sqlite://./custom/path/app.db
+DATABASE_URL=file:./custom/path/app.db
+DATABASE_URL=./custom/path/app.db
+```
+
+**Backup:**
+```bash
+# Simple file copy
+cp data/app.db data/app.db.backup
+
+# With WAL files
+cp data/app.db* data/backup/
+```
+
+### PostgreSQL (Optional - For Advanced Scaling)
+
+**For multi-server or high-concurrency deployments**
+
+**Pros:**
+- ✅ Better for horizontal scaling
+- ✅ Multi-server support
+- ✅ Advanced replication options
+- ✅ Better for extremely high concurrency
+
+**When to use:**
+- Multi-server load balancing
+- Very high concurrent user count (100+ simultaneous)
+- Complex replication requirements
+
+**Configuration:**
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+```
+
+**Setup:**
+```bash
+# Install PostgreSQL
+sudo apt install postgresql-16
+
+# Create database
+sudo -u postgres createdb vibeanywhere
+
+# Run migrations
+npm run db:migrate
+```
+
+### Feature Comparison
+
+| Feature | SQLite | PostgreSQL |
+|---------|--------|------------|
+| Setup complexity | ⭐ Zero config | ⭐⭐⭐ Requires DB server |
+| Single-server performance | ⭐⭐⭐ Excellent | ⭐⭐⭐ Excellent |
+| Multi-server support | ❌ No | ✅ Yes |
+| Concurrent reads | ⭐⭐⭐ Excellent (WAL) | ⭐⭐⭐ Excellent |
+| Concurrent writes | ⭐⭐ Good | ⭐⭐⭐ Excellent |
+| Backup | ⭐⭐⭐ Simple file copy | ⭐⭐ pg_dump required |
+| Production ready | ✅ Yes | ✅ Yes |
+| Recommended use | Most deployments | High-scale only |
+
+### Migration Commands
+
+Both backends use the same commands:
+
+```bash
+# Generate migrations (after schema changes)
+npm run db:generate
+
+# Apply migrations
+npm run db:migrate
+
+# Create admin user (works with both backends)
+npx tsx scripts/seed-user.ts admin your-password
+```
 
 ## Configuration
 
 All configuration is managed through environment variables. Copy `.env.example` to `.env` and customize:
 
 ```env
-# Database
-DATABASE_URL=postgresql://sessionhub:password@localhost:5432/sessionhub
+# Database (Choose one option)
+# Option 1: SQLite (Default - leave empty or specify path)
+DATABASE_URL=
+# DATABASE_URL=sqlite://./data/app.db
+
+# Option 2: PostgreSQL (for advanced scaling)
+# DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 
 # Authentication
 AUTH_SECRET=your-secure-random-string-here
@@ -218,9 +357,10 @@ Common storage names: `local`, `local-zfs`, `local-btrfs`
        │                      │
        ▼                      ▼
 ┌─────────────┐      ┌──────────────────────┐
-│ PostgreSQL  │      │  Container Backend   │
+│  Database   │      │  Container Backend   │
 │  (Drizzle)  │      │  • Proxmox LXC       │
-│             │      │                      │
+│  • SQLite   │      │                      │
+│  • PG (opt) │      │                      │
 └─────────────┘      └──────────┬───────────┘
                                  │
                                  ▼
@@ -235,7 +375,7 @@ Common storage names: `local`, `local-zfs`, `local-btrfs`
 ### Tech Stack
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Node.js, Socket.io, Drizzle ORM
-- **Database**: PostgreSQL 16
+- **Database**: SQLite (default) or PostgreSQL 16 (optional)
 - **Containers**: Proxmox LXC
 - **Terminal**: xterm.js with WebSocket streaming
 - **Git**: simple-git for repository management
