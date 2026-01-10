@@ -2,7 +2,7 @@ import {
   pgTable,
   uuid,
   text,
-  timestamp,
+  // Note: timestamp removed - using integer with mode:'timestamp' for SQLite compatibility
   boolean,
   jsonb,
   integer,
@@ -101,8 +101,8 @@ export const users = pgTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Git Identities table - named git configurations for commits
@@ -115,8 +115,8 @@ export const gitIdentities = pgTable('git_identities', {
   gitName: text('git_name').notNull(), // Git config user.name
   gitEmail: text('git_email').notNull(), // Git config user.email
   isDefault: boolean('is_default').default(false).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Proxmox Templates table - LXC templates with different tech stacks
@@ -139,8 +139,8 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
   errorMessage: text('error_message'), // Error details if status is 'error'
   stagingContainerIp: text('staging_container_ip'), // IP address when in staging mode
   envVars: jsonb('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Repositories table - top-level entity
@@ -162,7 +162,7 @@ export const repositories = pgTable('repositories', {
   gitHooks: jsonb('git_hooks').$type<GitHooksJson>().default({}), // Git hooks to sync to workspaces
   // Cached branch info from remote (fetched via git ls-remote)
   cachedBranches: jsonb('cached_branches').$type<string[]>().default([]),
-  branchesCachedAt: timestamp('branches_cached_at', { withTimezone: true }),
+  branchesCachedAt: integer('branches_cached_at', { mode: 'timestamp' }),
   // Resource overrides (null = use global defaults from settings)
   resourceMemory: integer('resource_memory'), // Memory in MB
   resourceCpuCores: integer('resource_cpu_cores'), // CPU cores
@@ -171,8 +171,8 @@ export const repositories = pgTable('repositories', {
   gitIdentityId: uuid('git_identity_id'), // FK to gitIdentities (use saved identity)
   gitCustomName: text('git_custom_name'), // Custom git user.name (if not using saved identity)
   gitCustomEmail: text('git_custom_email'), // Custom git user.email (if not using saved identity)
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Workspaces table - branches within a repository
@@ -196,17 +196,17 @@ export const workspaces = pgTable('workspaces', {
   hasUncommittedChanges: boolean('has_uncommitted_changes').default(false).notNull(), // Cached flag for UI warning
   // Agent connection fields (for sidecar agent in containers)
   agentToken: text('agent_token'), // Authentication token for agent
-  agentConnectedAt: timestamp('agent_connected_at', { withTimezone: true }), // When agent connected
-  agentLastHeartbeat: timestamp('agent_last_heartbeat', { withTimezone: true }), // Last heartbeat
+  agentConnectedAt: integer('agent_connected_at', { mode: 'timestamp' }), // When agent connected
+  agentLastHeartbeat: integer('agent_last_heartbeat', { mode: 'timestamp' }), // Last heartbeat
   agentVersion: text('agent_version'), // Agent version string
   // Advanced creation options (nullable = use defaults)
   staticIpAddress: text('static_ip_address'), // CIDR format: 192.168.3.50/24
   staticIpGateway: text('static_ip_gateway'), // Gateway IP: 192.168.3.1
   forcedVmid: integer('forced_vmid'), // Force specific VMID instead of auto-allocation
   overrideTemplateId: uuid('override_template_id').references(() => proxmoxTemplates.id), // Override repository template
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  lastActivityAt: integer('last_activity_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Tabs table - exec sessions within a workspace container
@@ -226,9 +226,9 @@ export const tabs = pgTable('tabs', {
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
   outputBuffer: jsonb('output_buffer').$type<string[]>().default([]),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  lastActivityAt: integer('last_activity_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   autoShutdownMinutes: integer('auto_shutdown_minutes'),
 });
 
@@ -245,8 +245,8 @@ export const sshKeys = pgTable('ssh_keys', {
   keyType: sshKeyTypeEnum('key_type').default('ed25519').notNull(),
   fingerprint: text('fingerprint').notNull(),
   isDefault: boolean('is_default').default(false).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Tab templates - configurable tab types
@@ -264,8 +264,8 @@ export const tabTemplates = pgTable('tab_templates', {
   sortOrder: integer('sort_order').default(0).notNull(),
   isBuiltIn: boolean('is_built_in').default(false).notNull(), // For default templates
   requiredTechStack: text('required_tech_stack'), // Tech stack ID required to show this template (nullable)
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Tab logs (renamed from session_logs)
@@ -274,7 +274,7 @@ export const tabLogs = pgTable('tab_logs', {
   tabId: uuid('tab_id')
     .references(() => tabs.id, { onDelete: 'cascade' })
     .notNull(),
-  timestamp: timestamp('timestamp', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   type: text('type').notNull(), // 'stdout' | 'stderr' | 'system' | 'input'
   content: text('content').notNull(),
 });
@@ -290,8 +290,8 @@ export const portForwards = pgTable('port_forwards', {
   containerPort: integer('container_port').notNull(),
   enabled: boolean('enabled').default(true).notNull(),
   description: text('description'),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Tab groups - for split view layouts
@@ -303,8 +303,8 @@ export const tabGroups = pgTable('tab_groups', {
   name: text('name').notNull(),
   layout: tabGroupLayoutEnum('layout').default('horizontal').notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Tab group members - panes within a group
@@ -318,7 +318,7 @@ export const tabGroupMembers = pgTable('tab_group_members', {
     .notNull(),
   paneIndex: integer('pane_index').default(0).notNull(),
   sizePercent: integer('size_percent').default(50).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Application settings - key-value store for app configuration
@@ -327,8 +327,8 @@ export const appSettings = pgTable('app_settings', {
   key: text('key').unique().notNull(),
   value: jsonb('value').$type<unknown>().notNull(),
   description: text('description'),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // ============================================
@@ -344,8 +344,8 @@ export const secrets = pgTable('secrets', {
   valueEncrypted: text('value_encrypted').notNull(),
   description: text('description'),
   templateWhitelist: jsonb('template_whitelist').$type<string[]>().default([]).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => ({
   userIdIdx: index('secrets_user_id_idx').on(table.userId),
 }));
@@ -360,7 +360,7 @@ export const repositorySecrets = pgTable('repository_secrets', {
     .references(() => secrets.id, { onDelete: 'cascade' })
     .notNull(),
   includeInEnvFile: boolean('include_in_env_file').default(false).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => ({
   uniqueRepoSecret: unique('unique_repo_secret').on(table.repositoryId, table.secretId),
   repoIdIdx: index('repository_secrets_repo_id_idx').on(table.repositoryId),
@@ -387,9 +387,9 @@ export const sessions = pgTable('sessions', {
   claudeCommand: jsonb('claude_command').$type<string[] | null>(),
   outputBuffer: jsonb('output_buffer').$type<string[]>().default([]),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  lastActivityAt: integer('last_activity_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   autoShutdownMinutes: integer('auto_shutdown_minutes'),
 });
 
@@ -398,7 +398,7 @@ export const sessionLogs = pgTable('session_logs', {
   sessionId: uuid('session_id')
     .references(() => sessions.id, { onDelete: 'cascade' })
     .notNull(),
-  timestamp: timestamp('timestamp', { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   type: text('type').notNull(),
   content: text('content').notNull(),
 });
