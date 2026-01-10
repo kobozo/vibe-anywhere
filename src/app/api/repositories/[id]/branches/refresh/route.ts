@@ -112,7 +112,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   return successResponse({
     branches,
     defaultBranch: repository.defaultBranch,
-    cachedAt: cacheInfo.cachedAt?.toISOString() || null,
+    cachedAt: cacheInfo.cachedAt ? new Date(cacheInfo.cachedAt).toISOString() : null,
     isStale: cacheInfo.isStale,
   });
 });

@@ -22,8 +22,8 @@ const envSchema = z.object({
   BASE_REPO_PATH: z.string().optional(),
   WORKTREE_BASE_PATH: z.string().optional(),
 
-  // Container Backend (Proxmox only)
-  CONTAINER_BACKEND: z.enum(['proxmox']).default('proxmox'),
+  // Container Backend (Proxmox only, reserved for future expansion)
+  CONTAINER_BACKEND: z.string().optional().transform(val => val || 'proxmox'),
 
   // Proxmox Configuration
   PROXMOX_HOST: z.string().optional(),

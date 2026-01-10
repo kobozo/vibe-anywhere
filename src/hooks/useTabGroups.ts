@@ -11,7 +11,7 @@ export interface TabGroupMemberInfo {
   tabId: string;
   paneIndex: number;
   sizePercent: number;
-  createdAt: Date;
+  createdAt: number;
   tab: TabInfo;
 }
 
@@ -21,8 +21,8 @@ export interface TabGroupInfo {
   name: string;
   layout: TabGroupLayout;
   sortOrder: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
   members: TabGroupMemberInfo[];
 }
 

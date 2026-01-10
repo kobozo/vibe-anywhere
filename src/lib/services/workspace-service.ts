@@ -171,7 +171,7 @@ export class WorkspaceService {
       .update(workspaces)
       .set({
         status: 'archived',
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -191,7 +191,7 @@ export class WorkspaceService {
       .update(workspaces)
       .set({
         status,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -210,8 +210,8 @@ export class WorkspaceService {
     await db
       .update(workspaces)
       .set({
-        lastActivityAt: new Date(),
-        updatedAt: new Date(),
+        lastActivityAt: Date.now(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId));
   }
@@ -453,7 +453,6 @@ export class WorkspaceService {
       : undefined;
 
     const containerId = await this.containerBackend.createContainer(workspaceId, {
-      image: backendType === 'docker' ? config.docker.claudeImage : undefined,
       templateId: proxmoxTemplateVmid,
       reuseVmid,
       // Pass repository resource overrides (undefined means use global defaults)
@@ -474,7 +473,7 @@ export class WorkspaceService {
         containerId,
         containerStatus: 'creating',
         containerBackend: backendType as ContainerBackend,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId));
 
@@ -555,7 +554,7 @@ export class WorkspaceService {
           const agentToken = proxmoxBackend.generateAgentToken();
           await db
             .update(workspaces)
-            .set({ agentToken, updatedAt: new Date() })
+            .set({ agentToken, updatedAt: Date.now() })
             .where(eq(workspaces.id, workspaceId));
 
           await proxmoxBackend.provisionAgent(containerId, workspaceId, agentToken);
@@ -577,7 +576,7 @@ export class WorkspaceService {
         containerStatus: 'running',
         containerBackend: backendType as ContainerBackend,
         containerIp: containerIp || null,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -601,7 +600,7 @@ export class WorkspaceService {
       .update(workspaces)
       .set({
         containerIp: ip,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId));
   }
@@ -676,7 +675,7 @@ export class WorkspaceService {
         .update(workspaces)
         .set({
           hasUncommittedChanges: status.hasChanges,
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         })
         .where(eq(workspaces.id, workspaceId));
 
@@ -719,7 +718,7 @@ export class WorkspaceService {
         containerStatus: 'none',
         containerIp: null,
         hasUncommittedChanges: false,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -748,7 +747,7 @@ export class WorkspaceService {
       .set({
         containerId,
         containerStatus,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();

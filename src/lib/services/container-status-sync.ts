@@ -158,7 +158,7 @@ class ContainerStatusSyncService {
         containerId: newContainerId,
         containerStatus: newStatus,
         containerIp: newContainerIp,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
         // Clear agent info if container is gone
         ...(newStatus === 'none' ? {
           agentConnectedAt: null,

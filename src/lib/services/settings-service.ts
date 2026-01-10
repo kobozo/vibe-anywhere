@@ -127,7 +127,7 @@ class SettingsService {
         .set({
           value: value as unknown,
           description,
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         })
         .where(eq(appSettings.key, key));
     } else {

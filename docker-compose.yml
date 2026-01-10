@@ -1,10 +1,10 @@
 # Vibe Anywhere - Docker Compose Configuration
-# Production-ready stack with PostgreSQL
+# Production-ready stack with SQLite (default) or PostgreSQL
 #
 # Usage:
-#   Production:  docker compose up -d
-#   Development: docker compose up -d (uses override automatically)
-#   With debug:  docker compose --profile debug up -d
+#   SQLite (default):  docker compose up -d
+#   With PostgreSQL:   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+#   Development:       docker compose up -d (uses override automatically)
 
 services:
   # ==========================================================================
@@ -19,8 +19,8 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      # Database
-      DATABASE_URL: postgresql://vibeanywhere:${POSTGRES_PASSWORD:-vibeanywhere_dev_password}@postgres:5432/vibeanywhere
+      # Database (empty = SQLite at /data/app.db)
+      DATABASE_URL: ${DATABASE_URL:-}
 
       # Server
       NODE_ENV: ${NODE_ENV:-production}
@@ -35,9 +35,6 @@ services:
       # Git/Worktree paths (legacy, now derived from APP_HOME_DIR)
       BASE_REPO_PATH: ${BASE_REPO_PATH:-/repos/base}
       WORKTREE_BASE_PATH: /data/.worktrees
-
-      # Container backend (Proxmox only)
-      CONTAINER_BACKEND: proxmox
 
       # Vibe Anywhere URL (for Proxmox agents to connect back)
       SESSION_HUB_URL: ${SESSION_HUB_URL:-http://localhost:3000}
@@ -55,9 +52,6 @@ services:
 
       # SSH keys for Proxmox (optional)
       - ${HOST_SSH_PATH:-~/.ssh}:/home/vibeanywhere/.ssh:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -67,54 +61,10 @@ services:
     networks:
       - vibe-anywhere-network
 
-  # ==========================================================================
-  # PostgreSQL Database
-  # ==========================================================================
-  postgres:
-    image: postgres:16-alpine
-    container_name: vibe-anywhere-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: vibeanywhere
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vibeanywhere_dev_password}
-      POSTGRES_DB: vibeanywhere
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vibeanywhere -d vibeanywhere"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - vibe-anywhere-network
-
-  # ==========================================================================
-  # pgAdmin (Debug profile only)
-  # ==========================================================================
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: vibe-anywhere-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@vibeanywhere.local
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-    profiles:
-      - debug
-    networks:
-      - vibe-anywhere-network
-
 # ==========================================================================
 # Volumes
 # ==========================================================================
 volumes:
-  postgres_data:
-    name: vibe-anywhere-postgres
   vibe-anywhere-data:
     name: vibe-anywhere-data
 

@@ -316,7 +316,7 @@ export function DashboardPanel({
     }
   };
 
-  const formatDate = (dateStr: string | Date | null) => {
+  const formatDate = (dateStr: string | Date | number | null) => {
     if (!dateStr) return 'Never';
     const date = new Date(dateStr);
     return date.toLocaleString();

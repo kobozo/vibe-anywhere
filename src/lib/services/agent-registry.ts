@@ -86,8 +86,8 @@ class AgentRegistry {
     await db
       .update(workspaces)
       .set({
-        agentConnectedAt: new Date(),
-        agentLastHeartbeat: new Date(),
+        agentConnectedAt: Date.now(),
+        agentLastHeartbeat: Date.now(),
         agentVersion: version,
       })
       .where(eq(workspaces.id, workspaceId));
@@ -211,7 +211,7 @@ class AgentRegistry {
     await db
       .update(workspaces)
       .set({
-        agentLastHeartbeat: new Date(),
+        agentLastHeartbeat: Date.now(),
       })
       .where(eq(workspaces.id, workspaceId));
   }

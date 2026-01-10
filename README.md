@@ -246,9 +246,6 @@ DATABASE_URL=
 # Authentication
 AUTH_SECRET=your-secure-random-string-here
 
-# Container Backend (Proxmox)
-CONTAINER_BACKEND=proxmox
-
 # Port (default: 3000 in dev, 51420 in production)
 PORT=3000
 ```

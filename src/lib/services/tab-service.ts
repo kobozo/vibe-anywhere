@@ -26,9 +26,9 @@ export interface TabInfo {
   sortOrder: number;
   command: string[];
   exitOnClose: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  lastActivityAt: Date;
+  createdAt: number;
+  updatedAt: number;
+  lastActivityAt: number;
 }
 
 export class TabService {
@@ -117,8 +117,8 @@ export class TabService {
       .update(tabs)
       .set({
         status: 'running',
-        updatedAt: new Date(),
-        lastActivityAt: new Date(),
+        updatedAt: Date.now(),
+        lastActivityAt: Date.now(),
       })
       .where(eq(tabs.id, tabId))
       .returning();
@@ -143,7 +143,7 @@ export class TabService {
       .update(tabs)
       .set({
         status: 'stopped',
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(tabs.id, tabId))
       .returning();
@@ -272,7 +272,7 @@ export class TabService {
       .update(tabs)
       .set({
         ...updates,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(tabs.id, tabId))
       .returning();
@@ -368,7 +368,7 @@ export class TabService {
       for (const { id, sortOrder } of updates) {
         await tx
           .update(tabs)
-          .set({ sortOrder, updatedAt: new Date() })
+          .set({ sortOrder, updatedAt: Date.now() })
           .where(eq(tabs.id, id));
       }
     });

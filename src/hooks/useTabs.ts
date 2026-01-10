@@ -15,9 +15,9 @@ export interface TabInfo {
   sortOrder: number;
   command: string[];
   exitOnClose: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  lastActivityAt: Date;
+  createdAt: number;
+  updatedAt: number;
+  lastActivityAt: number;
 }
 
 export function useTabs(workspaceId: string | null) {

@@ -161,7 +161,7 @@ export class TabTemplateService {
             .set({
               icon: defaultTemplate.icon,
               requiredTechStack: defaultTemplate.requiredTechStack,
-              updatedAt: new Date(),
+              updatedAt: Date.now(),
             })
             .where(eq(tabTemplates.id, existing.id));
           updatedIds.add(existing.id);
@@ -262,7 +262,7 @@ export class TabTemplateService {
       .update(tabTemplates)
       .set({
         ...updates,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(tabTemplates.id, templateId))
       .returning();

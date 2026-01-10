@@ -1,0 +1,66 @@
+# PostgreSQL Database Add-on for Vibe Anywhere
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+#
+# This file adds PostgreSQL database support. By default, Vibe Anywhere uses
+# SQLite (zero-config). Use this when you need PostgreSQL for multi-server
+# scaling or prefer PostgreSQL.
+
+services:
+  # Override app to use PostgreSQL
+  app:
+    environment:
+      DATABASE_URL: postgresql://vibeanywhere:${POSTGRES_PASSWORD:-vibeanywhere_dev_password}@postgres:5432/vibeanywhere
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: vibe-anywhere-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vibeanywhere
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vibeanywhere_dev_password}
+      POSTGRES_DB: vibeanywhere
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibeanywhere -d vibeanywhere"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vibe-anywhere-network
+
+  # ==========================================================================
+  # pgAdmin (Debug profile only)
+  # ==========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vibe-anywhere-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@vibeanywhere.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - debug
+    networks:
+      - vibe-anywhere-network
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  postgres_data:
+    name: vibe-anywhere-postgres

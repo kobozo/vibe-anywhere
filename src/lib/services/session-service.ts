@@ -74,7 +74,6 @@ export class SessionService {
 
       // Create container
       containerId = await this.containerService.createContainer(sessionId, {
-        image: config.docker.claudeImage,
         workspacePath: worktree.path,
       });
 
@@ -90,8 +89,8 @@ export class SessionService {
           containerId,
           containerStatus: 'running',
           status: 'running',
-          updatedAt: new Date(),
-          lastActivityAt: new Date(),
+          updatedAt: Date.now(),
+          lastActivityAt: Date.now(),
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -145,7 +144,7 @@ export class SessionService {
         .set({
           containerStatus: 'exited',
           status: 'stopped',
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -219,7 +218,7 @@ export class SessionService {
       .update(sessions)
       .set({
         ...updates,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(sessions.id, sessionId))
       .returning();
