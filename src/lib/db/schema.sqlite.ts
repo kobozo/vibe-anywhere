@@ -6,21 +6,21 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
-import { sql } from 'drizzle-orm';
 
 // Helper to generate UUID-like IDs (SQLite doesn't have native UUID)
 // We'll use TEXT with default value
 const uuid = (name: string) => text(name).primaryKey().$defaultFn(() => crypto.randomUUID());
 const uuidRef = (name: string) => text(name);
 
-// Helper for timestamps
-const timestamp = (name: string) => integer(name, { mode: 'timestamp' });
+// Helper for timestamps (raw Unix milliseconds as integers)
+const timestamp = (name: string) => integer(name);
 
 // Helper for boolean (SQLite stores as INTEGER 0/1)
 const boolean = (name: string) => integer(name, { mode: 'boolean' });
 
-// Helper for JSONB (SQLite stores as TEXT)
-const jsonb = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
+// Helper for JSONB (SQLite stores as TEXT) - manual serialization required
+// Note: No automatic JSON serialization. Application code must JSON.stringify/parse.
+const jsonb = <T>(name: string) => text(name).$type<T>();
 
 // Environment variable entry type for JSONB storage
 export interface EnvVarEntry {
