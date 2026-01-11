@@ -190,7 +190,7 @@ export const workspaces = pgTable('workspaces', {
   // Container fields - one container per workspace
   containerId: text('container_id'),
   containerStatus: containerStatusEnum('container_status').default('none').notNull(),
-  containerBackend: containerBackendEnum('container_backend').default('docker').notNull(),
+  containerBackend: containerBackendEnum('container_backend').default('proxmox').notNull(),
   containerIp: text('container_ip'), // IP address for Proxmox LXC containers
   // Git status tracking
   hasUncommittedChanges: boolean('has_uncommitted_changes').default(false).notNull(), // Cached flag for UI warning

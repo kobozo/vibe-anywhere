@@ -127,7 +127,7 @@ export const workspaces = sqliteTable('workspaces', {
   status: text('status').$type<WorkspaceStatus>().default('pending').notNull(),
   containerId: text('container_id'),
   containerStatus: text('container_status').$type<ContainerStatus>().default('none').notNull(),
-  containerBackend: text('container_backend').$type<ContainerBackend>().default('docker').notNull(),
+  containerBackend: text('container_backend').$type<ContainerBackend>().default('proxmox').notNull(),
   containerIp: text('container_ip'),
   hasUncommittedChanges: boolean('has_uncommitted_changes').default(false).notNull(),
   agentToken: text('agent_token'),
