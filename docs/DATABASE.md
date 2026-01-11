@@ -71,9 +71,22 @@ POSTGRES_PASSWORD=yourpassword
 
 ### SQLite → PostgreSQL
 
-1. Export your SQLite data (if needed):
+1. Export your SQLite data (manual process):
    ```bash
-   docker compose exec app npx tsx -e "/* export script */"
+   # Note: Automated data migration is not currently available.
+   # You will need to manually export and import data if you have existing data.
+   # Recommended: Choose your database backend before production deployment.
+
+   # For SQLite export (run on host with sqlite3 installed):
+   docker compose exec app cat /data/app.db > app.db
+   sqlite3 app.db .dump > backup.sql
+
+   # For PostgreSQL import:
+   # 1. Start PostgreSQL (see step 3 below)
+   # 2. Convert SQLite dump to PostgreSQL-compatible SQL (manual process)
+   # 3. Import: docker compose exec postgres psql -U vibeanywhere -d vibeanywhere < converted_backup.sql
+
+   # Alternative: Use a migration tool like pgloader for automated conversion
    ```
 
 2. Update `.env`:
@@ -91,7 +104,20 @@ POSTGRES_PASSWORD=yourpassword
 
 ### PostgreSQL → SQLite
 
-1. Export your PostgreSQL data (if needed)
+1. Export your PostgreSQL data (manual process):
+   ```bash
+   # Note: Automated data migration is not currently available.
+
+   # For PostgreSQL export:
+   docker compose exec postgres pg_dump -U vibeanywhere vibeanywhere > backup.sql
+
+   # For SQLite import:
+   # 1. Start with SQLite (see step 3 below)
+   # 2. Convert PostgreSQL dump to SQLite-compatible SQL (manual process)
+   # 3. Import: docker compose exec app sqlite3 /data/app.db < converted_backup.sql
+
+   # Alternative: Use a migration tool for automated conversion
+   ```
 
 2. Update `.env`:
    ```bash

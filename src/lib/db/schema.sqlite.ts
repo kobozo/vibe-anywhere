@@ -53,8 +53,8 @@ export const users = sqliteTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Git Identities table
@@ -65,8 +65,8 @@ export const gitIdentities = sqliteTable('git_identities', {
   gitName: text('git_name').notNull(),
   gitEmail: text('git_email').notNull(),
   isDefault: boolean('is_default').default(false).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Proxmox Templates table
@@ -87,8 +87,8 @@ export const proxmoxTemplates = sqliteTable('proxmox_templates', {
   errorMessage: text('error_message'),
   stagingContainerIp: text('staging_container_ip'),
   envVars: jsonb<EnvVarsJson>('env_vars').default({}),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Repositories table
@@ -106,15 +106,15 @@ export const repositories = sqliteTable('repositories', {
   envVars: jsonb<EnvVarsJson>('env_vars').default({}),
   gitHooks: jsonb<GitHooksJson>('git_hooks').default({}),
   cachedBranches: jsonb<string[]>('cached_branches').default([]),
-  branchesCachedAt: timestamp('branches_cached_at'),
+  branchesCachedAt: integer('branches_cached_at'), // Unix timestamp ms
   resourceMemory: integer('resource_memory'),
   resourceCpuCores: integer('resource_cpu_cores'),
   resourceDiskSize: integer('resource_disk_size'),
   gitIdentityId: uuidRef('git_identity_id'),
   gitCustomName: text('git_custom_name'),
   gitCustomEmail: text('git_custom_email'),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Workspaces table
@@ -131,16 +131,16 @@ export const workspaces = sqliteTable('workspaces', {
   containerIp: text('container_ip'),
   hasUncommittedChanges: boolean('has_uncommitted_changes').default(false).notNull(),
   agentToken: text('agent_token'),
-  agentConnectedAt: timestamp('agent_connected_at'),
-  agentLastHeartbeat: timestamp('agent_last_heartbeat'),
+  agentConnectedAt: integer('agent_connected_at'), // Unix timestamp ms
+  agentLastHeartbeat: integer('agent_last_heartbeat'), // Unix timestamp ms
   agentVersion: text('agent_version'),
   staticIpAddress: text('static_ip_address'),
   staticIpGateway: text('static_ip_gateway'),
   forcedVmid: integer('forced_vmid'),
   overrideTemplateId: uuidRef('override_template_id').references(() => proxmoxTemplates.id),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
-  lastActivityAt: timestamp('last_activity_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+  lastActivityAt: integer('last_activity_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Tabs table
@@ -157,9 +157,9 @@ export const tabs = sqliteTable('tabs', {
   exitOnClose: boolean('exit_on_close').default(false).notNull(),
   outputBuffer: jsonb<string[]>('output_buffer').default([]),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
-  lastActivityAt: timestamp('last_activity_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+  lastActivityAt: integer('last_activity_at').notNull().$defaultFn(() => Date.now()),
   autoShutdownMinutes: integer('auto_shutdown_minutes'),
 });
 
@@ -174,8 +174,8 @@ export const sshKeys = sqliteTable('ssh_keys', {
   keyType: text('key_type').$type<SSHKeyType>().default('ed25519').notNull(),
   fingerprint: text('fingerprint').notNull(),
   isDefault: boolean('is_default').default(false).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Tab templates
@@ -191,15 +191,15 @@ export const tabTemplates = sqliteTable('tab_templates', {
   sortOrder: integer('sort_order').default(0).notNull(),
   isBuiltIn: boolean('is_built_in').default(false).notNull(),
   requiredTechStack: text('required_tech_stack'),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Tab logs
 export const tabLogs = sqliteTable('tab_logs', {
   id: uuid('id'),
   tabId: uuidRef('tab_id').references(() => tabs.id, { onDelete: 'cascade' }).notNull(),
-  timestamp: timestamp('timestamp').notNull().$defaultFn(() => new Date()),
+  timestamp: integer('timestamp').notNull().$defaultFn(() => Date.now()),
   type: text('type').notNull(),
   content: text('content').notNull(),
 });
@@ -213,8 +213,8 @@ export const portForwards = sqliteTable('port_forwards', {
   containerPort: integer('container_port').notNull(),
   enabled: boolean('enabled').default(true).notNull(),
   description: text('description'),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Tab groups
@@ -224,8 +224,8 @@ export const tabGroups = sqliteTable('tab_groups', {
   name: text('name').notNull(),
   layout: text('layout').$type<TabGroupLayout>().default('horizontal').notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Tab group members
@@ -235,7 +235,7 @@ export const tabGroupMembers = sqliteTable('tab_group_members', {
   tabId: uuidRef('tab_id').references(() => tabs.id, { onDelete: 'cascade' }).notNull(),
   paneIndex: integer('pane_index').default(0).notNull(),
   sizePercent: integer('size_percent').default(50).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Application settings
@@ -244,8 +244,8 @@ export const appSettings = sqliteTable('app_settings', {
   key: text('key').unique().notNull(),
   value: jsonb<unknown>('value').notNull(),
   description: text('description'),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
 
 // Secrets Vault
@@ -257,8 +257,8 @@ export const secrets = sqliteTable('secrets', {
   valueEncrypted: text('value_encrypted').notNull(),
   description: text('description'),
   templateWhitelist: jsonb<string[]>('template_whitelist').default([]).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 }, (table) => ({
   userIdIdx: index('secrets_user_id_idx').on(table.userId),
 }));
@@ -269,7 +269,7 @@ export const repositorySecrets = sqliteTable('repository_secrets', {
   repositoryId: uuidRef('repository_id').references(() => repositories.id, { onDelete: 'cascade' }).notNull(),
   secretId: uuidRef('secret_id').references(() => secrets.id, { onDelete: 'cascade' }).notNull(),
   includeInEnvFile: boolean('include_in_env_file').default(false).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
 }, (table) => ({
   uniqueRepoSecret: unique('unique_repo_secret').on(table.repositoryId, table.secretId),
   repoIdIdx: index('repository_secrets_repo_id_idx').on(table.repositoryId),
@@ -292,16 +292,16 @@ export const sessions = sqliteTable('sessions', {
   claudeCommand: jsonb<string[] | null>('claude_command'),
   outputBuffer: jsonb<string[]>('output_buffer').default([]),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
-  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
-  lastActivityAt: timestamp('last_activity_at').notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+  lastActivityAt: integer('last_activity_at').notNull().$defaultFn(() => Date.now()),
   autoShutdownMinutes: integer('auto_shutdown_minutes'),
 });
 
 export const sessionLogs = sqliteTable('session_logs', {
   id: uuid('id'),
   sessionId: uuidRef('session_id').references(() => sessions.id, { onDelete: 'cascade' }).notNull(),
-  timestamp: timestamp('timestamp').notNull().$defaultFn(() => new Date()),
+  timestamp: integer('timestamp').notNull().$defaultFn(() => Date.now()),
   type: text('type').notNull(),
   content: text('content').notNull(),
 });

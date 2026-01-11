@@ -5,7 +5,9 @@ export default defineConfig({
   out: './drizzle-postgres',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL || 'postgresql://sessionhub:sessionhub_dev_password@localhost:5432/sessionhub',
+    url: process.env.DATABASE_URL || (() => {
+      throw new Error('DATABASE_URL environment variable is required for PostgreSQL');
+    })(),
   },
   verbose: true,
   strict: true,

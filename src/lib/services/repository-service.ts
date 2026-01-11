@@ -184,7 +184,7 @@ export class RepositoryService {
 
     const updates: Record<string, unknown> = {
       cachedBranches: branches,
-      branchesCachedAt: new Date(),
+      branchesCachedAt: Date.now(),
       updatedAt: Date.now(),
     };
 
