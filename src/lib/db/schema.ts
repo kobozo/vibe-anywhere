@@ -3,8 +3,8 @@ import {
   pgTable,
   uuid,
   text,
-  // Note: timestamp removed - using integer with mode:'timestamp' for SQLite compatibility
-  // Note: jsonb removed - using text with mode:'json' for SQLite compatibility
+  // Note: timestamp replaced with integer (stores Unix ms) - requires manual Date conversion
+  // Note: jsonb replaced with text + $type<>() - requires manual JSON.stringify/parse
   boolean,
   integer,
   pgEnum,
@@ -134,12 +134,12 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
   node: text('node'), // Proxmox node
   storage: text('storage'), // Storage used
   status: templateStatusEnum('status').default('pending').notNull(),
-  techStacks: text('tech_stacks').$type<string[]>().default([]), // New tech stacks added to this template
-  inheritedTechStacks: text('inherited_tech_stacks').$type<string[]>().default([]), // Tech stacks inherited from parent
+  techStacks: text('tech_stacks').$type<string[]>().$defaultFn(() => JSON.stringify([])), // New tech stacks added to this template
+  inheritedTechStacks: text('inherited_tech_stacks').$type<string[]>().$defaultFn(() => JSON.stringify([])), // Tech stacks inherited from parent
   isDefault: boolean('is_default').default(false).notNull(),
   errorMessage: text('error_message'), // Error details if status is 'error'
   stagingContainerIp: text('staging_container_ip'), // IP address when in staging mode
-  envVars: text('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers
+  envVars: text('env_vars').$type<EnvVarsJson>().$defaultFn(() => JSON.stringify({})), // Environment variables for containers
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
 });
@@ -158,11 +158,11 @@ export const repositories = pgTable('repositories', {
   cloneUrl: text('clone_url').notNull(), // Remote URL for git clone
   cloneDepth: integer('clone_depth'), // null = full clone, positive int = shallow clone depth
   defaultBranch: text('default_branch').default('main'),
-  techStack: text('tech_stack').$type<string[]>().default([]), // Tech stack IDs to install on workspaces (override template)
-  envVars: text('env_vars').$type<EnvVarsJson>().default({}), // Environment variables for containers (overrides template)
-  gitHooks: text('git_hooks').$type<GitHooksJson>().default({}), // Git hooks to sync to workspaces
+  techStack: text('tech_stack').$type<string[]>().$defaultFn(() => JSON.stringify([])), // Tech stack IDs to install on workspaces (override template)
+  envVars: text('env_vars').$type<EnvVarsJson>().$defaultFn(() => JSON.stringify({})), // Environment variables for containers (overrides template)
+  gitHooks: text('git_hooks').$type<GitHooksJson>().$defaultFn(() => JSON.stringify({})), // Git hooks to sync to workspaces
   // Cached branch info from remote (fetched via git ls-remote)
-  cachedBranches: text('cached_branches').$type<string[]>().default([]),
+  cachedBranches: text('cached_branches').$type<string[]>().$defaultFn(() => JSON.stringify([])),
   branchesCachedAt: integer('branches_cached_at'), // Unix timestamp ms
   // Resource overrides (null = use global defaults from settings)
   resourceMemory: integer('resource_memory'), // Memory in MB
@@ -223,9 +223,9 @@ export const tabs = pgTable('tabs', {
   icon: text('icon'), // Icon key from template (e.g., 'claude', 'terminal', 'code')
   isPinned: boolean('is_pinned').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
-  command: text('command').$type<string[]>().default(['/bin/bash']), // Command to exec
+  command: text('command').$type<string[]>().$defaultFn(() => JSON.stringify(['/bin/bash'])), // Command to exec
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
-  outputBuffer: text('output_buffer').$type<string[]>().default([]),
+  outputBuffer: text('output_buffer').$type<string[]>().$defaultFn(() => JSON.stringify([])),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
@@ -259,7 +259,7 @@ export const tabTemplates = pgTable('tab_templates', {
   name: text('name').notNull(), // Display name: "Claude", "Terminal", etc.
   icon: text('icon').default('terminal'), // Icon identifier
   command: text('command').notNull(), // Command to run: "claude", "/bin/bash", etc.
-  args: text('args').$type<string[]>().default([]), // Command arguments
+  args: text('args').$type<string[]>().$defaultFn(() => JSON.stringify([])), // Command arguments
   description: text('description'), // Optional description
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
   sortOrder: integer('sort_order').default(0).notNull(),
@@ -344,7 +344,7 @@ export const secrets = pgTable('secrets', {
   envKey: text('env_key').notNull(),
   valueEncrypted: text('value_encrypted').notNull(),
   description: text('description'),
-  templateWhitelist: text('template_whitelist').$type<string[]>().default([]).notNull(),
+  templateWhitelist: text('template_whitelist').$type<string[]>().$defaultFn(() => JSON.stringify([])).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
 }, (table) => ({
@@ -386,7 +386,7 @@ export const sessions = pgTable('sessions', {
   worktreePath: text('worktree_path'),
   baseCommit: text('base_commit'),
   claudeCommand: text('claude_command').$type<string[] | null>(),
-  outputBuffer: text('output_buffer').$type<string[]>().default([]),
+  outputBuffer: text('output_buffer').$type<string[]>().$defaultFn(() => JSON.stringify([])),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
