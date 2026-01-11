@@ -210,7 +210,7 @@ export class TemplateService {
       .update(proxmoxTemplates)
       .set({
         ...updates,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(proxmoxTemplates.id, templateId))
       .returning();
@@ -239,7 +239,7 @@ export class TemplateService {
         storage: storage ?? undefined,
         errorMessage: errorMessage ?? null,
         stagingContainerIp: stagingContainerIp ?? undefined,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(proxmoxTemplates.id, templateId));
   }
@@ -252,7 +252,7 @@ export class TemplateService {
       .update(proxmoxTemplates)
       .set({
         stagingContainerIp: null,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(proxmoxTemplates.id, templateId));
   }
@@ -315,7 +315,7 @@ export class TemplateService {
       .update(repositories)
       .set({
         templateId: replacementTemplateId,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(repositories.templateId, templateId));
 
@@ -325,7 +325,7 @@ export class TemplateService {
       .update(workspaces)
       .set({
         templateId: null,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workspaces.templateId, templateId));
 
@@ -336,7 +336,7 @@ export class TemplateService {
     if (template.isDefault && replacementTemplateId) {
       await db
         .update(proxmoxTemplates)
-        .set({ isDefault: true, updatedAt: new Date() })
+        .set({ isDefault: true, updatedAt: Date.now() })
         .where(eq(proxmoxTemplates.id, replacementTemplateId));
     }
   }
@@ -357,7 +357,7 @@ export class TemplateService {
     // Set new default
     await db
       .update(proxmoxTemplates)
-      .set({ isDefault: true, updatedAt: new Date() })
+      .set({ isDefault: true, updatedAt: Date.now() })
       .where(eq(proxmoxTemplates.id, templateId));
   }
 
@@ -367,7 +367,7 @@ export class TemplateService {
   private async clearDefaultTemplates(userId: string): Promise<void> {
     await db
       .update(proxmoxTemplates)
-      .set({ isDefault: false, updatedAt: new Date() })
+      .set({ isDefault: false, updatedAt: Date.now() })
       .where(eq(proxmoxTemplates.userId, userId));
   }
 

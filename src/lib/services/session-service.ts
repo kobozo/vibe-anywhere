@@ -1,18 +1,18 @@
 import { eq, desc, sql } from 'drizzle-orm';
 import { db, sessions, type Session, type NewSession, type SessionStatus, type ContainerStatus } from '@/lib/db';
 import { getGitService, GitService } from './git-service';
-import { getContainerService, ContainerService } from './container-service';
+import { getContainerBackend, type IContainerBackend } from '@/lib/container';
 import { config } from '@/lib/config';
 import type { CreateSessionInput, SessionInfo } from '@/types/session';
 import { v4 as uuidv4 } from 'uuid';
 
 export class SessionService {
   private gitService: GitService;
-  private containerService: ContainerService;
+  private containerService: IContainerBackend;
 
   constructor() {
     this.gitService = getGitService();
-    this.containerService = getContainerService();
+    this.containerService = getContainerBackend();
   }
 
   /**
@@ -74,7 +74,6 @@ export class SessionService {
 
       // Create container
       containerId = await this.containerService.createContainer(sessionId, {
-        image: config.docker.claudeImage,
         workspacePath: worktree.path,
       });
 
@@ -90,8 +89,8 @@ export class SessionService {
           containerId,
           containerStatus: 'running',
           status: 'running',
-          updatedAt: new Date(),
-          lastActivityAt: new Date(),
+          updatedAt: Date.now(),
+          lastActivityAt: Date.now(),
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -145,7 +144,7 @@ export class SessionService {
         .set({
           containerStatus: 'exited',
           status: 'stopped',
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -219,7 +218,7 @@ export class SessionService {
       .update(sessions)
       .set({
         ...updates,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(sessions.id, sessionId))
       .returning();

@@ -20,9 +20,7 @@ export {
   getContainerBackend,
   getContainerBackendAsync,
   initializeBackend,
-  getBackendType,
   getContainerService, // Backwards compatibility
-  DockerBackend,
   type IContainerBackend,
   type ContainerBackendType,
   type ContainerConfig,

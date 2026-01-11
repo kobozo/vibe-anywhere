@@ -55,7 +55,7 @@ export class GitHooksService {
       .update(repositories)
       .set({
         gitHooks: hooks,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(repositories.id, repositoryId));
   }

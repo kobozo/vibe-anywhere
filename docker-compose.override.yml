@@ -32,9 +32,6 @@ services:
       # Mount .next build cache for faster rebuilds
       - .next-cache:/app/.next
 
-      # Docker socket for container management
-      - /var/run/docker.sock:/var/run/docker.sock:rw
-
       # App data directory (cloned repos, worktrees, SSH keys)
       - ${HOST_DATA_PATH:-vibe-anywhere-data}:/data:rw
 

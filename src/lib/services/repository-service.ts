@@ -142,7 +142,7 @@ export class RepositoryService {
     const shouldInvalidateCache = updates.cloneUrl !== undefined;
     const updateData: Record<string, unknown> = {
       ...updates,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     };
 
     if (shouldInvalidateCache) {
@@ -184,8 +184,8 @@ export class RepositoryService {
 
     const updates: Record<string, unknown> = {
       cachedBranches: branches,
-      branchesCachedAt: new Date(),
-      updatedAt: new Date(),
+      branchesCachedAt: Date.now(),
+      updatedAt: Date.now(),
     };
 
     // Update defaultBranch if:
@@ -214,7 +214,7 @@ export class RepositoryService {
    */
   async getCachedBranches(repoId: string): Promise<{
     branches: string[];
-    cachedAt: Date | null;
+    cachedAt: number | null;
     isStale: boolean;
   }> {
     const repo = await this.getRepository(repoId);
@@ -228,7 +228,7 @@ export class RepositoryService {
     // Determine if cache is stale
     const isStale =
       !branchesCachedAt ||
-      Date.now() - new Date(branchesCachedAt).getTime() > this.CACHE_STALE_MS;
+      Date.now() - branchesCachedAt > this.CACHE_STALE_MS;
 
     return {
       branches: cachedBranches,
@@ -246,7 +246,7 @@ export class RepositoryService {
       .set({
         cachedBranches: [],
         branchesCachedAt: null,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(repositories.id, repoId));
   }

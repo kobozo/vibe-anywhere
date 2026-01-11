@@ -18,7 +18,7 @@ export interface TabGroupMemberInfo {
   tabId: string;
   paneIndex: number;
   sizePercent: number;
-  createdAt: Date;
+  createdAt: number;
   tab: TabInfo;
 }
 
@@ -28,8 +28,8 @@ export interface TabGroupInfo {
   name: string;
   layout: TabGroupLayout;
   sortOrder: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
   members: TabGroupMemberInfo[];
 }
 
@@ -158,7 +158,7 @@ export class TabGroupService {
       .update(tabGroups)
       .set({
         ...input,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(tabGroups.id, groupId))
       .returning();
@@ -206,7 +206,7 @@ export class TabGroupService {
     // Update group timestamp
     await db
       .update(tabGroups)
-      .set({ updatedAt: new Date() })
+      .set({ updatedAt: Date.now() })
       .where(eq(tabGroups.id, groupId));
 
     return this.getGroup(groupId) as Promise<TabGroupInfo>;
@@ -464,7 +464,7 @@ export class TabGroupService {
       for (const { id, sortOrder } of updates) {
         await tx
           .update(tabGroups)
-          .set({ sortOrder, updatedAt: new Date() })
+          .set({ sortOrder, updatedAt: Date.now() })
           .where(eq(tabGroups.id, id));
       }
     });

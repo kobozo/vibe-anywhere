@@ -128,7 +128,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     lastCommit: null, // Commit info not available - would need to query from container
     stats: null, // Stats not available - would need to query from container
     branchesMeta: {
-      cachedAt: cacheInfo.cachedAt?.toISOString() || null,
+      cachedAt: cacheInfo.cachedAt ? new Date(cacheInfo.cachedAt).toISOString() : null,
       isStale: cacheInfo.isStale,
     },
   });

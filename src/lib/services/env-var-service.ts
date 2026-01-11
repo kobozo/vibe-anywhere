@@ -204,7 +204,7 @@ export class EnvVarService {
       .update(repositories)
       .set({
         envVars: processedEnvVars,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(repositories.id, repositoryId));
   }
@@ -219,7 +219,7 @@ export class EnvVarService {
       .update(proxmoxTemplates)
       .set({
         envVars: processedEnvVars,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(proxmoxTemplates.id, templateId));
   }

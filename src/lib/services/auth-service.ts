@@ -56,7 +56,7 @@ export class AuthService {
 
     // Generate new token on each login
     const token = this.generateToken();
-    await db.update(users).set({ token, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.update(users).set({ token, updatedAt: Date.now() }).where(eq(users.id, user.id));
 
     return {
       user: { id: user.id, username: user.username },

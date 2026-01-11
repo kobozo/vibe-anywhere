@@ -228,9 +228,6 @@ download_release() {
 create_env_file() {
     local db_password="$1"
     local auth_secret="$2"
-    local container_backend="$3"
-    local base_repo_path="$4"
-    local worktree_base_path="$5"
 
     log_info "Creating configuration file..."
 
@@ -247,26 +244,7 @@ DATABASE_URL=postgresql://vibeanywhere:${db_password}@localhost:5432/vibeanywher
 
 # Authentication
 AUTH_SECRET=${auth_secret}
-
-# Git Worktrees
-BASE_REPO_PATH=${base_repo_path}
-WORKTREE_BASE_PATH=${worktree_base_path}
-
-# Container Backend
-CONTAINER_BACKEND=${container_backend}
 EOF
-
-    # Add Docker-specific config
-    if [ "$container_backend" = "docker" ]; then
-        cat >> "$INSTALL_DIR/.env" <<EOF
-
-# Docker Backend
-DOCKER_SOCKET=/var/run/docker.sock
-CLAUDE_IMAGE=vibe-anywhere/claude-instance:latest
-CONTAINER_MEMORY_LIMIT=2g
-CONTAINER_CPU_LIMIT=2
-EOF
-    fi
 
     # Set ownership
     chown $SERVICE_USER:$SERVICE_GROUP "$INSTALL_DIR/.env"
@@ -331,16 +309,6 @@ create_admin_user() {
     sudo -u $SERVICE_USER bash -c "cd $INSTALL_DIR && DATABASE_URL='postgresql://vibeanywhere:$db_password@localhost:5432/vibeanywhere' npx tsx scripts/seed-user.ts '$username' '$password'"
 
     log_info "Admin user '$username' created"
-}
-
-build_docker_image() {
-    log_info "Building Claude instance Docker image..."
-
-    cd "$INSTALL_DIR"
-
-    docker build -t vibe-anywhere/claude-instance:latest -f docker/claude-instance/Dockerfile .
-
-    log_info "Docker image built"
 }
 
 install_service() {
@@ -423,32 +391,19 @@ main() {
         INSTALL_DOCKER=false
     fi
 
-    # Container backend
+    # Proxmox configuration (only backend supported)
     echo ""
-    echo "Container backend options:"
-    echo "  1) docker  - Run Claude instances in Docker containers"
-    echo "  2) proxmox - Run Claude instances in Proxmox LXC containers"
+    echo -e "${BLUE}=== Proxmox Configuration ===${NC}"
+    echo "Vibe Anywhere uses Proxmox LXC for workspace isolation."
     echo ""
-    BACKEND=$(prompt "Container backend (docker/proxmox)" "docker")
-
-    # Paths
-    echo ""
-    BASE_REPO_PATH=$(prompt "Base repository path" "/home/$SERVICE_USER/repos")
-    WORKTREE_BASE_PATH=$(prompt "Worktree base path" "/home/$SERVICE_USER/worktrees")
-
-    # Proxmox configuration
-    if [ "$BACKEND" = "proxmox" ]; then
-        echo ""
-        echo -e "${BLUE}=== Proxmox Configuration ===${NC}"
-        PROXMOX_HOST=$(prompt "Proxmox host" "")
-        PROXMOX_PORT=$(prompt "Proxmox port" "8006")
-        PROXMOX_TOKEN_ID=$(prompt "Proxmox API token ID (user@realm!tokenid)" "")
-        PROXMOX_TOKEN_SECRET=$(prompt "Proxmox API token secret" "")
-        PROXMOX_NODE=$(prompt "Proxmox node name" "pve")
-        PROXMOX_TEMPLATE_VMID=$(prompt "Template VMID" "150")
-        PROXMOX_SSH_USER=$(prompt "SSH user for Proxmox" "root")
-        PROXMOX_SSH_KEY_PATH=$(prompt "SSH private key path" "/root/.ssh/id_rsa")
-    fi
+    PROXMOX_HOST=$(prompt "Proxmox host" "")
+    PROXMOX_PORT=$(prompt "Proxmox port" "8006")
+    PROXMOX_TOKEN_ID=$(prompt "Proxmox API token ID (user@realm!tokenid)" "")
+    PROXMOX_TOKEN_SECRET=$(prompt "Proxmox API token secret" "")
+    PROXMOX_NODE=$(prompt "Proxmox node name" "pve")
+    PROXMOX_TEMPLATE_VMID=$(prompt "Template VMID" "150")
+    PROXMOX_SSH_USER=$(prompt "SSH user for Proxmox" "root")
+    PROXMOX_SSH_KEY_PATH=$(prompt "SSH private key path" "/root/.ssh/id_rsa")
 
     # Admin user
     echo ""
@@ -479,10 +434,6 @@ main() {
     # Create service user
     create_user
 
-    # Create directories
-    mkdir -p "$BASE_REPO_PATH" "$WORKTREE_BASE_PATH"
-    chown -R $SERVICE_USER:$SERVICE_GROUP "$BASE_REPO_PATH" "$WORKTREE_BASE_PATH"
-
     # Setup database
     setup_database "$DB_PASSWORD"
 
@@ -493,23 +444,16 @@ main() {
     chown -R $SERVICE_USER:$SERVICE_GROUP "$INSTALL_DIR"
 
     # Create configuration
-    create_env_file "$DB_PASSWORD" "$AUTH_SECRET" "$BACKEND" "$BASE_REPO_PATH" "$WORKTREE_BASE_PATH"
+    create_env_file "$DB_PASSWORD" "$AUTH_SECRET"
 
-    # Add Proxmox config if needed
-    if [ "$BACKEND" = "proxmox" ]; then
-        add_proxmox_config "$PROXMOX_HOST" "$PROXMOX_PORT" "$PROXMOX_TOKEN_ID" "$PROXMOX_TOKEN_SECRET" "$PROXMOX_NODE" "$PROXMOX_TEMPLATE_VMID" "$PROXMOX_SSH_USER" "$PROXMOX_SSH_KEY_PATH"
-    fi
+    # Add Proxmox configuration
+    add_proxmox_config "$PROXMOX_HOST" "$PROXMOX_PORT" "$PROXMOX_TOKEN_ID" "$PROXMOX_TOKEN_SECRET" "$PROXMOX_NODE" "$PROXMOX_TEMPLATE_VMID" "$PROXMOX_SSH_USER" "$PROXMOX_SSH_KEY_PATH"
 
     # Run migrations
     run_migrations "$DB_PASSWORD"
 
     # Create admin user
     create_admin_user "$ADMIN_USERNAME" "$ADMIN_PASSWORD" "$DB_PASSWORD"
-
-    # Build Docker image if Docker is installed
-    if [ "$INSTALL_DOCKER" = true ] && [ "$BACKEND" = "docker" ]; then
-        build_docker_image
-    fi
 
     # Install and start service
     install_service

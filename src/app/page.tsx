@@ -20,7 +20,6 @@ import { useUIState } from '@/hooks/useUIState';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { GitPanel } from '@/components/git';
-import { DockerPanel } from '@/components/docker';
 import { DashboardPanel } from '@/components/dashboard';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
 import { TemplateSection, TemplateDialog, TemplateDetailsModal } from '@/components/templates';
@@ -477,12 +476,12 @@ function Dashboard() {
 
     if (!contextMenu || !workspace) return;
 
-    // Only handle git and docker tab types
-    if (tabType !== 'git' && tabType !== 'docker') return;
+    // Only handle git tab type
+    if (tabType !== 'git') return;
 
     try {
       // Create new static tab via API
-      const tabName = tabType === 'git' ? 'Git' : 'Docker';
+      const tabName = 'Git';
       const response = await fetch(`/api/workspaces/${workspace.id}/tabs`, {
         method: 'POST',
         headers: {
@@ -688,7 +687,7 @@ function Dashboard() {
           ...(update.containerStatus !== undefined && { containerStatus: update.containerStatus }),
           ...(update.containerId !== undefined && { containerId: update.containerId }),
           ...(update.containerIp !== undefined && { containerIp: update.containerIp }),
-          ...(update.agentConnected !== undefined && { agentConnectedAt: update.agentConnected ? new Date() : null }),
+          ...(update.agentConnected !== undefined && { agentConnectedAt: update.agentConnected ? Date.now() : null }),
         };
       });
     }
@@ -1384,10 +1383,6 @@ function Dashboard() {
                     {/* Git panel */}
                     {selectedTab && selectedTab.tabType === 'git' && (
                       <GitPanel workspaceId={selectedWorkspace.id} />
-                    )}
-                    {/* Docker panel */}
-                    {selectedTab && selectedTab.tabType === 'docker' && (
-                      <DockerPanel workspaceId={selectedWorkspace.id} containerIp={selectedWorkspace.containerIp ?? null} />
                     )}
                     {/* Show pending/stopped message for non-running terminal tabs */}
                     {selectedTab && selectedTab.tabType === 'terminal' && selectedTab.status !== 'running' && (

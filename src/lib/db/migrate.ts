@@ -1,24 +1,42 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
+import { drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
+import { migrate as migratePostgres } from 'drizzle-orm/postgres-js/migrator';
+import { migrate as migrateSqlite } from 'drizzle-orm/better-sqlite3/migrator';
 import postgres from 'postgres';
+import Database from 'better-sqlite3';
+import { getDatabaseConfig } from './config';
 
 async function runMigrations() {
-  const connectionString = process.env.DATABASE_URL;
+  const dbConfig = getDatabaseConfig();
 
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required');
+  console.log(`Running migrations for ${dbConfig.backend} backend...`);
+
+  if (dbConfig.backend === 'postgresql') {
+    // PostgreSQL migrations
+    const migrationClient = postgres(dbConfig.connectionString, { max: 1 });
+    const db = drizzlePostgres(migrationClient);
+
+    await migratePostgres(db, { migrationsFolder: './drizzle-postgres' });
+
+    console.log('PostgreSQL migrations complete!');
+
+    await migrationClient.end();
+  } else {
+    // SQLite migrations
+    const migrationClient = new Database(dbConfig.connectionString);
+
+    // Enable WAL mode before migrations
+    migrationClient.pragma('journal_mode = WAL');
+
+    const db = drizzleSqlite(migrationClient);
+
+    migrateSqlite(db, { migrationsFolder: './drizzle-sqlite' });
+
+    console.log('SQLite migrations complete!');
+
+    migrationClient.close();
   }
 
-  console.log('Running migrations...');
-
-  const migrationClient = postgres(connectionString, { max: 1 });
-  const db = drizzle(migrationClient);
-
-  await migrate(db, { migrationsFolder: './drizzle' });
-
-  console.log('Migrations complete!');
-
-  await migrationClient.end();
   process.exit(0);
 }
 

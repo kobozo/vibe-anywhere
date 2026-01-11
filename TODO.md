@@ -108,6 +108,8 @@
 
 ## Proxmox Integration
 
+- [ ] **Require Proxmox configuration at logon** - Detect if Proxmox is not configured. At logon, when Proxmox is not configured, request the configuration first before allowing access to the main application. Without Proxmox configured, the app cannot function (no workspace creation, no containers). Show a dedicated setup screen or wizard to guide users through Proxmox configuration on first login.
+
 - [x] **CT template storage detection issue - SOLVED** - After configuring Proxmox connection, CT templates list returns empty even though connection test succeeds.
 
   **Root cause found**: API tokens with "Privilege Separation" enabled do NOT inherit user permissions. Even root tokens need explicit `Datastore.Audit` and `Datastore.AllocateSpace` permissions to access storage content.

@@ -64,13 +64,16 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/drizzle ./drizzle
+# Copy migration files for both database backends
+COPY --from=builder /app/drizzle-postgres ./drizzle-postgres
+COPY --from=builder /app/drizzle-sqlite ./drizzle-sqlite
 
-# Copy Docker files for claude-instance builds
-COPY --from=builder /app/docker ./docker
+# Docker support removed - this is now Proxmox-only
+# COPY --from=builder /app/docker ./docker
 
 # Create directories for runtime
 RUN mkdir -p /app/logs \

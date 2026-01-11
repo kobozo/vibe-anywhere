@@ -93,7 +93,7 @@ export class GitIdentityService {
       .update(gitIdentities)
       .set({
         ...input,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(gitIdentities.id, identityId))
       .returning();
@@ -122,7 +122,7 @@ export class GitIdentityService {
     // Then set the new default
     await db
       .update(gitIdentities)
-      .set({ isDefault: true, updatedAt: new Date() })
+      .set({ isDefault: true, updatedAt: Date.now() })
       .where(and(eq(gitIdentities.id, identityId), eq(gitIdentities.userId, userId)));
   }
 
@@ -132,7 +132,7 @@ export class GitIdentityService {
   async clearDefaultIdentity(userId: string): Promise<void> {
     await db
       .update(gitIdentities)
-      .set({ isDefault: false, updatedAt: new Date() })
+      .set({ isDefault: false, updatedAt: Date.now() })
       .where(eq(gitIdentities.userId, userId));
   }
 

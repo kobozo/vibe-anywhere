@@ -8,7 +8,7 @@ Vibe Anywhere is a web application for persistent AI coding sessions on a Linux 
 - **Database**: PostgreSQL + Drizzle ORM
 - **Real-time**: Socket.io
 - **Terminal**: xterm.js
-- **Containers**: Docker (Dockerode) or Proxmox LXC
+- **Containers**: Proxmox LXC
 - **Git**: simple-git
 - **Auth**: Simple token-based (bcrypt)
 
@@ -104,8 +104,8 @@ cd packages/agent && npm run bundle
 │   │   ├── terminal/        # xterm.js wrapper
 │   │   └── sessions/        # Session management UI
 │   └── hooks/               # React hooks
-├── docker/                   # Docker-related files
-│   └── claude-instance/     # AI container image (legacy naming)
+├── packages/                 # Standalone packages
+│   └── agent/               # Workspace agent (standalone binary)
 └── server.ts                # Custom Next.js + Socket.io server
 ```
 
@@ -127,11 +127,9 @@ cd packages/agent && npm run bundle
 ```bash
 # Development
 npm run dev              # Start dev server
-npm run docker:up        # Start PostgreSQL
-npm run docker:build     # Build AI container image
 
 # Setup
-npm run setup            # Full setup (docker + db + image)
+npm run setup            # Setup (db migrations)
 
 # Database
 npm run db:generate      # Generate migration after schema changes
@@ -260,7 +258,6 @@ The Proxmox LXC template contains:
 
 **Optional** (can be installed via tech stacks):
 - Node.js 22.x
-- Docker
 - Claude Code CLI
 - GitHub CLI (gh)
 - Python, Rust, Go, etc.
@@ -271,7 +268,7 @@ The Proxmox LXC template contains:
 | Username | `kobozo` |
 | Password | `VibeAnywhere2024!` |
 | Sudo | NOPASSWD (passwordless) |
-| Groups | sudo, docker |
+| Groups | sudo |
 | Home | `/home/kobozo` |
 | Workspace | `/workspace` (owned by kobozo) |
 
@@ -439,15 +436,12 @@ If you see permission errors like `EACCES: permission denied, open '/home/devops
 
 **Fix:**
 ```bash
-# Restart the dev Docker container to reset permissions
-docker restart vibe-anywhere-dev
-
-# Or if you have sudo access:
+# If you have sudo access:
 sudo rm -rf .next
 npm run build
 ```
 
-**Prevention**: The dev container runs as `devops` user. If you ever run `npm run dev` or `npm run build` as root, it will create files owned by root.
+**Prevention**: If you run `npm run dev` or `npm run build` as root, it will create files owned by root.
 
 ---
 *Last updated: 2026-01-09*

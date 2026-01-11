@@ -1,4 +1,4 @@
-import { getContainerBackendAsync, getBackendType, type ContainerStream } from '@/lib/container';
+import { getContainerBackendAsync, type ContainerStream } from '@/lib/container';
 import { getTabService } from './tab-service';
 import { getWorkspaceService } from './workspace-service';
 import { getAgentRegistry } from './agent-registry';

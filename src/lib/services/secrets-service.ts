@@ -31,8 +31,8 @@ export interface SecretInfo {
   valueMasked: string;
   description: string | null;
   templateWhitelist: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface RepositorySecretAssignment {
@@ -81,7 +81,7 @@ export class SecretsService {
     updates: Partial<SecretInput>
   ): Promise<Secret> {
     const updateData: Partial<NewSecret> = {
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     };
 
     if (updates.name !== undefined) {

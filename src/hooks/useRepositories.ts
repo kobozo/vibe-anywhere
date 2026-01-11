@@ -159,7 +159,7 @@ export function useWorkspaces(repositoryId: string | null) {
       if (update.containerStatus !== undefined) updated.containerStatus = update.containerStatus;
       if (update.containerIp !== undefined) updated.containerIp = update.containerIp;
       if (update.agentConnected !== undefined) {
-        updated.agentConnectedAt = update.agentConnected ? new Date() : null;
+        updated.agentConnectedAt = update.agentConnected ? Date.now() : null;
       }
       if (update.agentVersion !== undefined) updated.agentVersion = update.agentVersion;
 
