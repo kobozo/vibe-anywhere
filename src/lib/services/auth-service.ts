@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 const SALT_ROUNDS = 12;
 
 export interface AuthResult {
-  user: Pick<User, 'id' | 'username'>;
+  user: Pick<User, 'id' | 'username' | 'createdAt' | 'updatedAt'>;
   token: string;
 }
 
@@ -35,7 +35,12 @@ export class AuthService {
       .returning();
 
     return {
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
       token,
     };
   }
@@ -56,10 +61,16 @@ export class AuthService {
 
     // Generate new token on each login
     const token = this.generateToken();
-    await db.update(users).set({ token, updatedAt: Date.now() }).where(eq(users.id, user.id));
+    const updatedAt = Date.now();
+    await db.update(users).set({ token, updatedAt }).where(eq(users.id, user.id));
 
     return {
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        updatedAt,
+      },
       token,
     };
   }
@@ -95,6 +106,39 @@ export class AuthService {
   async getUserById(userId: string): Promise<User | null> {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     return user || null;
+  }
+
+  /**
+   * Change user password
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    // Verify user exists
+    const user = await this.getUserById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Verify current password
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // Update database
+    await db
+      .update(users)
+      .set({
+        passwordHash: newPasswordHash,
+        updatedAt: Date.now(),
+      })
+      .where(eq(users.id, userId));
   }
 
   /**

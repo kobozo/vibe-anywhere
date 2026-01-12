@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, createContext, useContext } from 'rea
 interface User {
   id: string;
   username: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 interface AuthState {
@@ -17,6 +19,11 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ) => Promise<{ message: string }>;
 }
 
 const AUTH_STORAGE_KEY = 'vibe-anywhere-auth';
@@ -103,10 +110,37 @@ export function useAuthState(): AuthContextValue {
     });
   }, []);
 
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+      if (!state.token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${state.token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || 'Password change failed');
+      }
+
+      const { data } = await response.json();
+      return data;
+    },
+    [state.token]
+  );
+
   return {
     ...state,
     login,
     logout,
+    changePassword,
   };
 }
 
