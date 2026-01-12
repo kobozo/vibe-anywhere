@@ -131,13 +131,75 @@ export class WorkspaceService {
 
   /**
    * List workspaces for a repository
+   * Includes workspaces owned by user (via repository) and workspaces shared with user
+   *
+   * @param repositoryId - Repository ID to filter workspaces
+   * @param userId - User ID to check ownership and shares
+   * @param role - User role (optional, for admin visibility)
+   * @returns Array of workspaces with share metadata
    */
-  async listWorkspaces(repositoryId: string): Promise<Workspace[]> {
-    return db
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.repositoryId, repositoryId))
+  async listWorkspaces(
+    repositoryId: string,
+    userId?: string,
+    role?: string
+  ): Promise<Array<Workspace & {
+    isShared?: boolean;
+    sharedBy?: string;
+    permissions?: string[]
+  }>> {
+    // If no userId provided, use legacy behavior (all workspaces for repository)
+    if (!userId) {
+      return db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.repositoryId, repositoryId))
+        .orderBy(desc(workspaces.lastActivityAt));
+    }
+
+    // Get repository to check ownership
+    const repo = await this.repositoryService.getRepository(repositoryId);
+    if (!repo) {
+      return [];
+    }
+
+    const isOwner = repo.userId === userId;
+
+    // If user owns the repository, return all workspaces (without share metadata)
+    if (isOwner) {
+      const ownedWorkspaces = await db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.repositoryId, repositoryId))
+        .orderBy(desc(workspaces.lastActivityAt));
+
+      return ownedWorkspaces.map(ws => ({ ...ws, isShared: false }));
+    }
+
+    // User doesn't own the repository - return only shared workspaces
+    const sharedWorkspaces = await db
+      .select({
+        workspace: workspaces,
+        share: workspaceShares,
+        owner: users,
+      })
+      .from(workspaceShares)
+      .innerJoin(workspaces, eq(workspaceShares.workspaceId, workspaces.id))
+      .innerJoin(users, eq(workspaceShares.sharedByUserId, users.id))
+      .where(
+        and(
+          eq(workspaces.repositoryId, repositoryId),
+          eq(workspaceShares.sharedWithUserId, userId)
+        )
+      )
       .orderBy(desc(workspaces.lastActivityAt));
+
+    // Map to workspace with share metadata
+    return sharedWorkspaces.map(({ workspace, share, owner }) => ({
+      ...workspace,
+      isShared: true,
+      sharedBy: owner.username,
+      permissions: share.permissions,
+    }));
   }
 
   /**
