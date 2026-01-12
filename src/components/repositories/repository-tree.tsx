@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
+import { useAuth } from '@/hooks/useAuth';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SidebarContextMenu } from './sidebar-context-menu';
+import { WorkspaceShareModal } from '@/components/workspace/workspace-share-modal';
 
 type SortOption = 'name-asc' | 'name-desc' | 'updated-desc' | 'updated-asc' | 'created-desc' | 'created-asc';
 
@@ -59,6 +61,7 @@ export function RepositoryTree({
   onSortOptionChange,
 }: RepositoryTreeProps) {
 
+  const { user, role } = useAuth();
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set(initialExpandedRepos || []));
   const [isInitialized, setIsInitialized] = useState(false);
   const [workspacesByRepo, setWorkspacesByRepo] = useState<Record<string, Workspace[]>>({});
@@ -68,6 +71,7 @@ export function RepositoryTree({
   const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
   const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
+  const [workspaceToShare, setWorkspaceToShare] = useState<Workspace | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     repository?: Repository;
@@ -538,6 +542,10 @@ export function RepositoryTree({
     }
   };
 
+  const handleShareWorkspaceClick = (workspace: Workspace) => {
+    setWorkspaceToShare(workspace);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-border">
@@ -822,8 +830,27 @@ export function RepositoryTree({
               handleReloadEnvVars(contextMenu.workspace);
             }
           }}
+          onShareWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleShareWorkspaceClick(contextMenu.workspace);
+            }
+          }}
           isRedeploying={contextMenu.workspace ? redeployingWorkspaces.has(contextMenu.workspace.id) : false}
           isDestroying={contextMenu.workspace ? destroyingWorkspaces.has(contextMenu.workspace.id) : false}
+          isOwner={contextMenu.workspace ? (() => {
+            const repo = repositories.find(r => r.id === contextMenu.workspace?.repositoryId);
+            return repo?.userId === user?.id;
+          })() : false}
+          isAdmin={role === 'admin'}
+        />
+      )}
+
+      {/* Workspace Share Modal */}
+      {workspaceToShare && (
+        <WorkspaceShareModal
+          isOpen={!!workspaceToShare}
+          onClose={() => setWorkspaceToShare(null)}
+          workspace={workspaceToShare}
         />
       )}
     </div>

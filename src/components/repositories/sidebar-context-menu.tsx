@@ -20,9 +20,13 @@ interface SidebarContextMenuProps {
   onDestroyWorkspace?: () => void;
   onDeleteWorkspace?: () => void;
   onReloadEnvVars?: () => void;
+  onShareWorkspace?: () => void;
   // Loading states
   isRedeploying?: boolean;
   isDestroying?: boolean;
+  // Permission checks
+  isOwner?: boolean;
+  isAdmin?: boolean;
 }
 
 export function SidebarContextMenu({
@@ -40,8 +44,11 @@ export function SidebarContextMenu({
   onDestroyWorkspace,
   onDeleteWorkspace,
   onReloadEnvVars,
+  onShareWorkspace,
   isRedeploying,
   isDestroying,
+  isOwner,
+  isAdmin,
 }: SidebarContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -198,6 +205,22 @@ export function SidebarContextMenu({
             >
               <span className="w-4 text-center">🔄</span>
               Reload Env Vars
+            </button>
+          )}
+
+          <div className="h-px bg-border my-1" />
+
+          {/* Share Workspace - only show if owner or admin */}
+          {(isOwner || isAdmin) && (
+            <button
+              onClick={() => {
+                onClose();
+                onShareWorkspace?.();
+              }}
+              className={menuItemClass}
+            >
+              <span className="w-4 text-center">👥</span>
+              Share Workspace
             </button>
           )}
 
