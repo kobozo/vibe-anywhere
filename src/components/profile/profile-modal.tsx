@@ -8,6 +8,40 @@ interface ProfileModalProps {
   onClose: () => void;
 }
 
+// Password strength calculation
+function calculatePasswordStrength(password: string): {
+  score: number;
+  label: string;
+  color: string;
+} {
+  if (!password) return { score: 0, label: '', color: '' };
+
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+
+  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+  const colors = ['', 'text-error', 'text-warning', 'text-primary', 'text-success'];
+
+  return {
+    score,
+    label: labels[score],
+    color: colors[score],
+  };
+}
+
+// Password validation criteria
+function getPasswordCriteria(password: string) {
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+  };
+}
+
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const { user, changePassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
@@ -32,6 +66,12 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   }, [isOpen]);
 
   if (!isOpen || !user) return null;
+
+  // Compute validation state
+  const criteria = getPasswordCriteria(newPassword);
+  const isPasswordValid = criteria.length && criteria.uppercase && criteria.lowercase && criteria.number;
+  const isConfirmValid = newPassword === confirmPassword && confirmPassword.length > 0;
+  const isFormValid = currentPassword.length > 0 && isPasswordValid && isConfirmValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,6 +250,39 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     )}
                   </button>
                 </div>
+
+                {/* Password Strength Indicator */}
+                {newPassword && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-foreground-secondary">Strength:</span>
+                      <span className={`text-xs font-medium ${calculatePasswordStrength(newPassword).color}`}>
+                        {calculatePasswordStrength(newPassword).label}
+                      </span>
+                    </div>
+                    <div className="text-xs space-y-0.5">
+                      {Object.entries({
+                        'At least 8 characters': getPasswordCriteria(newPassword).length,
+                        'Contains uppercase letter (A-Z)': getPasswordCriteria(newPassword).uppercase,
+                        'Contains lowercase letter (a-z)': getPasswordCriteria(newPassword).lowercase,
+                        'Contains number (0-9)': getPasswordCriteria(newPassword).number,
+                      }).map(([label, met]) => (
+                        <div key={label} className="flex items-center gap-1">
+                          {met ? (
+                            <svg className="w-3 h-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-foreground-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                          <span className={met ? 'text-foreground' : 'text-foreground-secondary'}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Confirm New Password */}
@@ -245,6 +318,27 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     )}
                   </button>
                 </div>
+
+                {/* Password Match Validation */}
+                {confirmPassword && (
+                  <div className="mt-1">
+                    {newPassword === confirmPassword ? (
+                      <div className="flex items-center gap-1 text-xs text-success">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Passwords match</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-xs text-error">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Passwords do not match</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Form Buttons */}
@@ -259,8 +353,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading}
-                  className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  disabled={isLoading || !isFormValid}
+                  className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Changing Password...' : 'Change Password'}
                 </button>
