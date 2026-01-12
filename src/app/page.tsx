@@ -20,6 +20,7 @@ import { useUIState } from '@/hooks/useUIState';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { ProfileModal } from '@/components/profile/profile-modal';
+import { ForcePasswordChangeModal } from '@/components/auth/force-password-change-modal';
 import { GitPanel } from '@/components/git';
 import { DashboardPanel } from '@/components/dashboard';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
@@ -46,7 +47,7 @@ const Terminal = dynamic(
 );
 
 function Dashboard() {
-  const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, user, forcePasswordChange } = useAuth();
   const {
     repositories,
     isLoading: reposLoading,
@@ -1473,6 +1474,9 @@ function Dashboard() {
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
       />
+
+      {/* Force Password Change Modal */}
+      <ForcePasswordChangeModal isOpen={forcePasswordChange} />
 
       {/* Edit Repository Dialog */}
       <EditRepositoryDialog
