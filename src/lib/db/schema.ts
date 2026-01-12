@@ -82,6 +82,14 @@ export const templateStatusEnum = pgEnum('template_status', [
   'error',
 ]);
 
+export const userRoleEnum = pgEnum('user_role', [
+  'admin',
+  'user-admin',
+  'developer',
+  'template-admin',
+  'security-admin',
+]);
+
 // Environment variable entry type for JSONB storage
 export interface EnvVarEntry {
   value: string;      // Plain text or encrypted string
@@ -102,6 +110,7 @@ export const users = pgTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
+  role: userRoleEnum('role').default('developer').notNull(),
   forcePasswordChange: boolean('force_password_change').default(false).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
@@ -587,6 +596,7 @@ export const sessionLogsRelations = relations(sessionLogs, ({ one }) => ({
 // Users
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type UserRole = (typeof userRoleEnum.enumValues)[number];
 
 // Repositories
 export type Repository = typeof repositories.$inferSelect;

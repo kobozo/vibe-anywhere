@@ -46,6 +46,7 @@ export type TabType = 'terminal' | 'git' | 'docker' | 'dashboard';
 export type PortForwardProtocol = 'http' | 'tcp';
 export type TabGroupLayout = 'horizontal' | 'vertical' | 'left-stack' | 'right-stack' | 'grid-2x2';
 export type TemplateStatus = 'pending' | 'provisioning' | 'staging' | 'ready' | 'error';
+export type UserRole = 'admin' | 'user-admin' | 'developer' | 'template-admin' | 'security-admin';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -53,6 +54,7 @@ export const users = sqliteTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
+  role: text('role').$type<UserRole>().default('developer').notNull(),
   forcePasswordChange: boolean('force_password_change').default(false).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
