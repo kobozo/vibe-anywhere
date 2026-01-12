@@ -102,6 +102,7 @@ export const users = pgTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
+  forcePasswordChange: boolean('force_password_change').default(false).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
 });

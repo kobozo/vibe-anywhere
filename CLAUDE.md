@@ -3,6 +3,15 @@
 ## Project Overview
 Vibe Anywhere is a web application for persistent AI coding sessions on a Linux server. Your coding sessions, always running. It enables multiple parallel AI coding sessions, each isolated in its own Git worktree and container.
 
+### Security Features
+
+#### Forced Password Change
+- Default admin user (`admin` / `vibe-anywhere`) must change password on first login
+- Password requirements: 8+ characters, uppercase, lowercase, number
+- Modal blocks all UI interaction until password is changed
+- Password change clears `forcePasswordChange` flag in database and localStorage
+- Implemented in: Auth service, auth hook, force password change modal
+
 ## Tech Stack
 - **Frontend**: Next.js 15, React 19, TypeScript
 - **Database**: PostgreSQL + Drizzle ORM
@@ -141,6 +150,16 @@ npx tsx scripts/seed-user.ts [username] [password]  # Create user
 npm run build            # Build for production
 npm run start            # Start production server
 ```
+
+### Default Credentials
+
+**Initial Admin User** (created via database migration):
+- Username: `admin`
+- Password: `vibe-anywhere`
+- Token: *(generated per-install / stored in DB; rotate if exposed)*
+- **⚠️ IMPORTANT:** You will be forced to change this password on first login
+
+Users created via `seed-user.ts` script do not require forced password change.
 
 ## Environment Variables
 

@@ -6,7 +6,11 @@ import postgres from 'postgres';
 import Database from 'better-sqlite3';
 import { getDatabaseConfig } from './config';
 
-async function runMigrations() {
+/**
+ * Run database migrations for the configured backend.
+ * This function can be called from server startup or as a standalone script.
+ */
+export async function runMigrations() {
   const dbConfig = getDatabaseConfig();
 
   console.log(`Running migrations for ${dbConfig.backend} backend...`);
@@ -36,11 +40,18 @@ async function runMigrations() {
 
     migrationClient.close();
   }
-
-  process.exit(0);
 }
 
-runMigrations().catch((err) => {
-  console.error('Migration failed:', err);
-  process.exit(1);
-});
+// When run as a standalone script (ES module detection)
+const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+if (isMainModule) {
+  runMigrations()
+    .then(() => {
+      console.log('Migrations completed successfully');
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error('Migration failed:', err);
+      process.exit(1);
+    });
+}

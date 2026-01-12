@@ -9,6 +9,7 @@ const SALT_ROUNDS = 12;
 export interface AuthResult {
   user: Pick<User, 'id' | 'username' | 'createdAt' | 'updatedAt'>;
   token: string;
+  forcePasswordChange: boolean;
 }
 
 export class AuthService {
@@ -42,6 +43,7 @@ export class AuthService {
         updatedAt: user.updatedAt,
       },
       token,
+      forcePasswordChange: Boolean(user.forcePasswordChange),
     };
   }
 
@@ -72,6 +74,7 @@ export class AuthService {
         updatedAt,
       },
       token,
+      forcePasswordChange: Boolean(user.forcePasswordChange),
     };
   }
 
@@ -136,6 +139,7 @@ export class AuthService {
       .update(users)
       .set({
         passwordHash: newPasswordHash,
+        forcePasswordChange: 0,  // SQLite uses 0/1 for boolean
         updatedAt: Date.now(),
       })
       .where(eq(users.id, userId));
