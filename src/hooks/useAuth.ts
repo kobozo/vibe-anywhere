@@ -53,7 +53,7 @@ export function useAuthState(): AuthContextValue {
           setState({
             user,
             token,
-            forcePasswordChange: forcePasswordChange || false,
+            forcePasswordChange: Boolean(forcePasswordChange),
             isLoading: false,
             isAuthenticated: true,
           });
@@ -89,15 +89,18 @@ export function useAuthState(): AuthContextValue {
     const { data } = await response.json();
     const { user, token, forcePasswordChange } = data;
 
+    // Ensure forcePasswordChange is a boolean
+    const forcePasswordChangeBool = Boolean(forcePasswordChange);
+
     // Store in localStorage
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user, token, forcePasswordChange }));
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user, token, forcePasswordChange: forcePasswordChangeBool }));
     // Also store token separately for direct access by API calls
     localStorage.setItem('auth_token', token);
 
     setState({
       user,
       token,
-      forcePasswordChange,
+      forcePasswordChange: forcePasswordChangeBool,
       isLoading: false,
       isAuthenticated: true,
     });

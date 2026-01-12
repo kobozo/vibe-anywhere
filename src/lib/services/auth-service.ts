@@ -43,7 +43,7 @@ export class AuthService {
         updatedAt: user.updatedAt,
       },
       token,
-      forcePasswordChange: user.forcePasswordChange,
+      forcePasswordChange: Boolean(user.forcePasswordChange),
     };
   }
 
@@ -74,7 +74,7 @@ export class AuthService {
         updatedAt,
       },
       token,
-      forcePasswordChange: user.forcePasswordChange,
+      forcePasswordChange: Boolean(user.forcePasswordChange),
     };
   }
 
@@ -139,7 +139,7 @@ export class AuthService {
       .update(users)
       .set({
         passwordHash: newPasswordHash,
-        forcePasswordChange: false,
+        forcePasswordChange: 0,  // SQLite uses 0/1 for boolean
         updatedAt: Date.now(),
       })
       .where(eq(users.id, userId));
