@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 const SALT_ROUNDS = 12;
 
 export interface AuthResult {
-  user: Pick<User, 'id' | 'username' | 'createdAt' | 'updatedAt'>;
+  user: Pick<User, 'id' | 'username' | 'role' | 'createdAt' | 'updatedAt'>;
   token: string;
   forcePasswordChange: boolean;
 }
@@ -39,6 +39,7 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -70,6 +71,7 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
         updatedAt,
       },
