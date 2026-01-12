@@ -147,13 +147,17 @@ export function useAuthState(): AuthContextValue {
       }));
 
       // Update localStorage
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-          ...parsed,
-          forcePasswordChange: false,
-        }));
+      try {
+        const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          localStorage.setItem(
+            AUTH_STORAGE_KEY,
+            JSON.stringify({ ...parsed, forcePasswordChange: false })
+          );
+        }
+      } catch {
+        // Best-effort only; in-memory state already updated.
       }
 
       return data;

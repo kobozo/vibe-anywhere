@@ -53,6 +53,8 @@ The installer handles everything:
 
 After installation, access the web UI at `http://your-server:51420`
 
+**Security Note:** The default admin credentials are `admin` / `vibe-anywhere`. You will be forced to change this password on first login for security.
+
 ### Development Setup (SQLite - Recommended)
 
 For local development with zero-config database:

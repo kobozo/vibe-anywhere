@@ -5,7 +5,7 @@ Vibe Anywhere is a web application for persistent AI coding sessions on a Linux 
 
 ### Security Features
 
-**Forced Password Change**
+#### Forced Password Change
 - Default admin user (`admin` / `vibe-anywhere`) must change password on first login
 - Password requirements: 8+ characters, uppercase, lowercase, number
 - Modal blocks all UI interaction until password is changed
@@ -156,7 +156,7 @@ npm run start            # Start production server
 **Initial Admin User** (created via database migration):
 - Username: `admin`
 - Password: `vibe-anywhere`
-- Token: `sh_550e8400e29b41d4a716446655440000550e8400e29b41d4a716446655440000`
+- Token: *(generated per-install / stored in DB; rotate if exposed)*
 - **⚠️ IMPORTANT:** You will be forced to change this password on first login
 
 Users created via `seed-user.ts` script do not require forced password change.
