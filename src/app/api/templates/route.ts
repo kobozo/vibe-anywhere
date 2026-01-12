@@ -22,19 +22,26 @@ const createTemplateSchema = z.object({
 });
 
 /**
- * GET /api/templates - List all templates for the authenticated user
+ * GET /api/templates - List templates based on user role
+ * - admin/template-admin: See all templates
+ * - other roles: See only their own templates
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
   const user = await requireAuth(request);
   const templateService = getTemplateService();
 
-  const templates = await templateService.listTemplates(user.id);
+  // Pass user ID and role to service for proper filtering
+  const templates = await templateService.listTemplates(user.id, user.role);
 
   return successResponse({ templates });
 });
 
 /**
  * POST /api/templates - Create a new template record (pre-provisioning)
+ * - admin: Can create templates
+ * - template-admin: Can create templates
+ * - developers: Can create personal templates
+ * - other roles: Can create personal templates
  */
 export const POST = withErrorHandling(async (request: NextRequest) => {
   const user = await requireAuth(request);
@@ -46,6 +53,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   }
 
   const templateService = getTemplateService();
+  // All authenticated users can create templates (personal templates)
   const template = await templateService.createTemplate(user.id, {
     name: result.data.name,
     description: result.data.description,
