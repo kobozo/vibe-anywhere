@@ -53,6 +53,7 @@ export const users = sqliteTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
+  forcePasswordChange: boolean('force_password_change').default(false).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
