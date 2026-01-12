@@ -5,11 +5,13 @@ import { requireAuth, successResponse, withErrorHandling } from '@/lib/api-utils
 /**
  * GET /api/secrets
  * List user's secrets (with masked values)
+ * Admin and security-admin can see all secrets (masked)
+ * Other roles only see their own secrets
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
   const user = await requireAuth(request);
   const secretsService = getSecretsService();
-  const secrets = await secretsService.listUserSecrets(user.id);
+  const secrets = await secretsService.listUserSecrets(user.id, user.role);
   return successResponse({ secrets });
 });
 

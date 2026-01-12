@@ -74,11 +74,14 @@ export class SecretsService {
 
   /**
    * Update a secret
+   * If role is admin or security-admin, can update any secret
+   * Otherwise can only update own secrets
    */
   async updateSecret(
     secretId: string,
     userId: string,
-    updates: Partial<SecretInput>
+    updates: Partial<SecretInput>,
+    role?: string
   ): Promise<Secret> {
     const updateData: Partial<NewSecret> = {
       updatedAt: Date.now(),
@@ -109,11 +112,11 @@ export class SecretsService {
       updateData.templateWhitelist = updates.templateWhitelist;
     }
 
-    const [secret] = await db
-      .update(secrets)
-      .set(updateData)
-      .where(and(eq(secrets.id, secretId), eq(secrets.userId, userId)))
-      .returning();
+    const isAdminOrSecurityAdmin = role === 'admin' || role === 'security-admin';
+
+    const [secret] = isAdminOrSecurityAdmin
+      ? await db.update(secrets).set(updateData).where(eq(secrets.id, secretId)).returning()
+      : await db.update(secrets).set(updateData).where(and(eq(secrets.id, secretId), eq(secrets.userId, userId))).returning();
 
     if (!secret) {
       throw new Error('Secret not found or access denied');
@@ -124,21 +127,30 @@ export class SecretsService {
 
   /**
    * Delete a secret
+   * If role is admin or security-admin, can delete any secret
+   * Otherwise can only delete own secrets
    */
-  async deleteSecret(secretId: string, userId: string): Promise<void> {
-    await db
-      .delete(secrets)
-      .where(and(eq(secrets.id, secretId), eq(secrets.userId, userId)));
+  async deleteSecret(secretId: string, userId: string, role?: string): Promise<void> {
+    const isAdminOrSecurityAdmin = role === 'admin' || role === 'security-admin';
+
+    if (isAdminOrSecurityAdmin) {
+      await db.delete(secrets).where(eq(secrets.id, secretId));
+    } else {
+      await db.delete(secrets).where(and(eq(secrets.id, secretId), eq(secrets.userId, userId)));
+    }
   }
 
   /**
    * Get a single secret (with masked value)
+   * If role is admin or security-admin, can view any secret
+   * Otherwise can only view own secrets
    */
-  async getSecret(secretId: string, userId: string): Promise<SecretInfo | null> {
-    const [secret] = await db
-      .select()
-      .from(secrets)
-      .where(and(eq(secrets.id, secretId), eq(secrets.userId, userId)));
+  async getSecret(secretId: string, userId: string, role?: string): Promise<SecretInfo | null> {
+    const isAdminOrSecurityAdmin = role === 'admin' || role === 'security-admin';
+
+    const [secret] = isAdminOrSecurityAdmin
+      ? await db.select().from(secrets).where(eq(secrets.id, secretId))
+      : await db.select().from(secrets).where(and(eq(secrets.id, secretId), eq(secrets.userId, userId)));
 
     if (!secret) {
       return null;
@@ -158,13 +170,16 @@ export class SecretsService {
 
   /**
    * List user secrets (with masked values)
+   * If role is provided and is admin or security-admin, returns all secrets
+   * Otherwise returns only user's secrets
    */
-  async listUserSecrets(userId: string): Promise<SecretInfo[]> {
-    const userSecrets = await db
-      .select()
-      .from(secrets)
-      .where(eq(secrets.userId, userId))
-      .orderBy(secrets.createdAt);
+  async listUserSecrets(userId: string, role?: string): Promise<SecretInfo[]> {
+    // Admin and security-admin can see all secrets
+    const isAdminOrSecurityAdmin = role === 'admin' || role === 'security-admin';
+
+    const userSecrets = isAdminOrSecurityAdmin
+      ? await db.select().from(secrets).orderBy(secrets.createdAt)
+      : await db.select().from(secrets).where(eq(secrets.userId, userId)).orderBy(secrets.createdAt);
 
     return userSecrets.map((s) => ({
       id: s.id,
