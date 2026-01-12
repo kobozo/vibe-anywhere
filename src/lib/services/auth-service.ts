@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 const SALT_ROUNDS = 12;
 
 export interface AuthResult {
-  user: Pick<User, 'id' | 'username'>;
+  user: Pick<User, 'id' | 'username' | 'createdAt' | 'updatedAt'>;
   token: string;
 }
 
@@ -35,7 +35,12 @@ export class AuthService {
       .returning();
 
     return {
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
       token,
     };
   }
@@ -59,7 +64,12 @@ export class AuthService {
     await db.update(users).set({ token, updatedAt: Date.now() }).where(eq(users.id, user.id));
 
     return {
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
       token,
     };
   }
