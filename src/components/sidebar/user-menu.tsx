@@ -4,14 +4,29 @@ import { useState, useRef, useEffect } from 'react';
 
 interface UserMenuProps {
   username: string;
+  role: string;
   onProfile: () => void;
   onSettings: () => void;
   onLogout: () => void;
 }
 
-export function UserMenu({ username, onProfile, onSettings, onLogout }: UserMenuProps) {
+export function UserMenu({ username, role, onProfile, onSettings, onLogout }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Get role display name and color
+  const getRoleDisplay = (roleValue: string) => {
+    const roleMap: Record<string, { label: string; color: string }> = {
+      'admin': { label: 'Admin', color: 'text-red-500 bg-red-500/10' },
+      'developer': { label: 'Developer', color: 'text-blue-500 bg-blue-500/10' },
+      'template-admin': { label: 'Template-Admin', color: 'text-purple-500 bg-purple-500/10' },
+      'security-admin': { label: 'Security-Admin', color: 'text-orange-500 bg-orange-500/10' },
+      'user-admin': { label: 'User-Admin', color: 'text-yellow-500 bg-yellow-500/10' },
+    };
+    return roleMap[roleValue] || { label: roleValue, color: 'text-gray-500 bg-gray-500/10' };
+  };
+
+  const roleDisplay = getRoleDisplay(role);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -50,8 +65,13 @@ export function UserMenu({ username, onProfile, onSettings, onLogout }: UserMenu
         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-medium">
           {username.charAt(0).toUpperCase()}
         </div>
-        {/* Username */}
-        <span className="flex-1 text-sm text-foreground truncate text-left">{username}</span>
+        {/* Username and Role */}
+        <div className="flex-1 flex flex-col gap-1 text-left">
+          <span className="text-sm text-foreground truncate">{username}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-md inline-block w-fit ${roleDisplay.color}`}>
+            Role: {roleDisplay.label}
+          </span>
+        </div>
         {/* Chevron */}
         <svg
           className={`w-4 h-4 text-foreground-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`}
