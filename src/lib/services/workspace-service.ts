@@ -145,7 +145,9 @@ export class WorkspaceService {
   ): Promise<Array<Workspace & {
     isShared?: boolean;
     sharedBy?: string;
-    permissions?: string[]
+    permissions?: string[];
+    shareCount?: number;
+    sharedWithUsernames?: string[];
   }>> {
     // If no userId provided, use legacy behavior (all workspaces for repository)
     if (!userId) {
@@ -164,7 +166,7 @@ export class WorkspaceService {
 
     const isOwner = repo.userId === userId;
 
-    // If user owns the repository, return all workspaces (without share metadata)
+    // If user owns the repository, return all workspaces with share counts
     if (isOwner) {
       const ownedWorkspaces = await db
         .select()
@@ -172,7 +174,32 @@ export class WorkspaceService {
         .where(eq(workspaces.repositoryId, repositoryId))
         .orderBy(desc(workspaces.lastActivityAt));
 
-      return ownedWorkspaces.map(ws => ({ ...ws, isShared: false }));
+      // Fetch share information for each owned workspace
+      const workspacesWithShares = await Promise.all(
+        ownedWorkspaces.map(async (ws) => {
+          // Get all shares for this workspace
+          const shares = await db
+            .select({
+              share: workspaceShares,
+              user: users,
+            })
+            .from(workspaceShares)
+            .innerJoin(users, eq(workspaceShares.sharedWithUserId, users.id))
+            .where(eq(workspaceShares.workspaceId, ws.id));
+
+          const shareCount = shares.length;
+          const sharedWithUsernames = shares.map(({ user }) => user.username);
+
+          return {
+            ...ws,
+            isShared: false,
+            shareCount,
+            sharedWithUsernames,
+          };
+        })
+      );
+
+      return workspacesWithShares;
     }
 
     // User doesn't own the repository - return only shared workspaces

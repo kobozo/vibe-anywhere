@@ -709,22 +709,56 @@ export function RepositoryTree({
                   <div className="text-foreground-tertiary text-xs py-2 pl-4">Loading...</div>
                 ) : (
                   <>
-                    {(workspacesByRepo[repo.id] || []).map((workspace) => (
-                      <div
-                        key={workspace.id}
-                        onClick={() => onSelectWorkspace(workspace, repo)}
-                        onContextMenu={(e) => handleWorkspaceContextMenu(e, workspace)}
-                        className={`flex items-center gap-2 px-2 py-1.5 ml-2 rounded cursor-pointer group relative
-                          hover:bg-background-tertiary/50
-                          ${selectedWorkspaceId === workspace.id ? 'bg-primary/20 text-primary' : 'text-foreground'}`}
-                      >
-                        <span className="text-sm" title={`Container: ${workspace.containerStatus || 'unknown'}`}>
-                          {getContainerStatusIcon(workspace)}
-                        </span>
-                        <span className="flex-1 text-sm truncate">{workspace.name}</span>
-                        <span className="text-xs text-foreground-tertiary">{workspace.branchName}</span>
-                      </div>
-                    ))}
+                    {(workspacesByRepo[repo.id] || []).map((workspace) => {
+                      // Type assertion to access share metadata
+                      const ws = workspace as typeof workspace & {
+                        isShared?: boolean;
+                        sharedBy?: string;
+                        shareCount?: number;
+                        sharedWithUsernames?: string[];
+                      };
+
+                      return (
+                        <div
+                          key={workspace.id}
+                          onClick={() => onSelectWorkspace(workspace, repo)}
+                          onContextMenu={(e) => handleWorkspaceContextMenu(e, workspace)}
+                          className={`px-2 py-1.5 ml-2 rounded cursor-pointer group relative
+                            hover:bg-background-tertiary/50
+                            ${selectedWorkspaceId === workspace.id ? 'bg-primary/20 text-primary' : 'text-foreground'}`}
+                        >
+                          {/* Main workspace info row */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm" title={`Container: ${workspace.containerStatus || 'unknown'}`}>
+                              {getContainerStatusIcon(workspace)}
+                            </span>
+                            <span className="flex-1 text-sm truncate">{workspace.name}</span>
+                            <span className="text-xs text-foreground-tertiary">{workspace.branchName}</span>
+                          </div>
+
+                          {/* Share badges */}
+                          {ws.isShared && ws.sharedBy && (
+                            <div className="ml-6 mt-1">
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs">
+                                <span>👤</span>
+                                <span>Shared by {ws.sharedBy}</span>
+                              </div>
+                            </div>
+                          )}
+                          {!ws.isShared && ws.shareCount !== undefined && ws.shareCount > 0 && (
+                            <div className="ml-6 mt-1">
+                              <div
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-400 rounded text-xs cursor-help"
+                                title={ws.sharedWithUsernames?.join(', ') || ''}
+                              >
+                                <span>👥</span>
+                                <span>Shared with {ws.shareCount} user{ws.shareCount !== 1 ? 's' : ''}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     <button
                       onClick={() => onAddWorkspace(repo.id)}
                       className="flex items-center gap-2 px-2 py-1.5 ml-2 text-foreground-tertiary hover:text-foreground text-sm"
