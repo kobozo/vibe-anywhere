@@ -279,6 +279,19 @@ export const repositorySecrets = sqliteTable('repository_secrets', {
   secretIdIdx: index('repository_secrets_secret_id_idx').on(table.secretId),
 }));
 
+// Workspace sharing - for tmux session collaboration
+export const workspaceShares = sqliteTable('workspace_shares', {
+  id: uuid('id'),
+  workspaceId: uuidRef('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  sharedWithUserId: uuidRef('shared_with_user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  sharedByUserId: uuidRef('shared_by_user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  permissions: jsonb<string[]>('permissions').default(['view', 'execute']).notNull(),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+}, (table) => ({
+  uniqueWorkspaceShare: unique('unique_workspace_share').on(table.workspaceId, table.sharedWithUserId),
+}));
+
 // LEGACY: Sessions table
 export const sessions = sqliteTable('sessions', {
   id: uuid('id'),
@@ -317,6 +330,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   proxmoxTemplates: many(proxmoxTemplates),
   gitIdentities: many(gitIdentities),
   secrets: many(secrets),
+  workspaceSharesSharedWith: many(workspaceShares, { relationName: 'sharedWithUser' }),
+  workspaceSharesSharedBy: many(workspaceShares, { relationName: 'sharedByUser' }),
   sessions: many(sessions),
 }));
 
@@ -391,6 +406,7 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   tabs: many(tabs),
   portForwards: many(portForwards),
   tabGroups: many(tabGroups),
+  workspaceShares: many(workspaceShares),
 }));
 
 export const portForwardsRelations = relations(portForwards, ({ one }) => ({
@@ -465,6 +481,23 @@ export const repositorySecretsRelations = relations(repositorySecrets, ({ one })
   }),
 }));
 
+export const workspaceSharesRelations = relations(workspaceShares, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [workspaceShares.workspaceId],
+    references: [workspaces.id],
+  }),
+  sharedWithUser: one(users, {
+    fields: [workspaceShares.sharedWithUserId],
+    references: [users.id],
+    relationName: 'sharedWithUser',
+  }),
+  sharedByUser: one(users, {
+    fields: [workspaceShares.sharedByUserId],
+    references: [users.id],
+    relationName: 'sharedByUser',
+  }),
+}));
+
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   user: one(users, {
     fields: [sessions.userId],
@@ -515,3 +548,5 @@ export type Secret = typeof secrets.$inferSelect;
 export type NewSecret = typeof secrets.$inferInsert;
 export type RepositorySecret = typeof repositorySecrets.$inferSelect;
 export type NewRepositorySecret = typeof repositorySecrets.$inferInsert;
+export type WorkspaceShare = typeof workspaceShares.$inferSelect;
+export type NewWorkspaceShare = typeof workspaceShares.$inferInsert;
