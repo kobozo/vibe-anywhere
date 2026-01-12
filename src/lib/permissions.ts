@@ -50,6 +50,11 @@ export function isAdmin(user: User): boolean {
  * - Deleting users
  * - Resetting passwords
  *
+ * NOTE: User-admin role prepared for future user management UI.
+ *       Currently, the role exists in the permission system but
+ *       no UI features are implemented yet. Future PRD will define
+ *       the specific user management capabilities.
+ *
  * @param user - The user to check
  * @returns true if the user is an admin or user-admin
  */
@@ -93,15 +98,19 @@ export function canManageSecrets(user: User): boolean {
 /**
  * Checks if a user can create new repositories
  *
- * Developers, template-admins, security-admins, and admins can create repositories.
- * User-admins are restricted to user management only.
+ * All roles including user-admin can create repositories.
+ * User-admins have the same repository creation capabilities as developers.
+ *
+ * NOTE: User-admin role is prepared for future user management features.
+ *       They can create repositories like developers, but cannot manage
+ *       templates or secrets unless explicitly assigned those roles.
  *
  * @param user - The user to check
  * @returns true if the user can create repositories
  */
 export function canCreateRepositories(user: User): boolean {
-  // All roles except user-admin can create repositories
-  return user.role !== 'user-admin';
+  // All roles can create repositories (including user-admin)
+  return true;
 }
 
 /**
