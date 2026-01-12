@@ -106,16 +106,19 @@ export function SidebarContextMenu({
       {/* Repository Context Menu */}
       {repository && (
         <>
-          <button
-            onClick={() => {
-              onClose();
-              onEditRepository?.();
-            }}
-            className={menuItemClass}
-          >
-            <span className="w-4 text-center">✎</span>
-            Edit Repository
-          </button>
+          {/* Edit - only show if owner or admin */}
+          {(isOwner || isAdmin) && (
+            <button
+              onClick={() => {
+                onClose();
+                onEditRepository?.();
+              }}
+              className={menuItemClass}
+            >
+              <span className="w-4 text-center">✎</span>
+              Edit Repository
+            </button>
+          )}
 
           <button
             onClick={() => {
@@ -128,18 +131,23 @@ export function SidebarContextMenu({
             New Workspace
           </button>
 
-          <div className="h-px bg-border my-1" />
+          {/* Delete - only show if owner or admin */}
+          {(isOwner || isAdmin) && (
+            <>
+              <div className="h-px bg-border my-1" />
 
-          <button
-            onClick={() => {
-              onClose();
-              onDeleteRepository?.();
-            }}
-            className={`${menuItemClass} text-error`}
-          >
-            <span className="w-4 text-center">×</span>
-            Delete Repository
-          </button>
+              <button
+                onClick={() => {
+                  onClose();
+                  onDeleteRepository?.();
+                }}
+                className={`${menuItemClass} text-error`}
+              >
+                <span className="w-4 text-center">×</span>
+                Delete Repository
+              </button>
+            </>
+          )}
         </>
       )}
 

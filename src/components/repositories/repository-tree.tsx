@@ -651,60 +651,78 @@ export function RepositoryTree({
           </div>
         )}
 
-        {filteredAndSortedRepos.map((repo) => (
-          <div key={repo.id} className="mb-1">
-            {/* Repository header */}
-            <div
-              onClick={() => {
-                // Select repository to show dashboard
-                onSelectWorkspace(null, repo);
-              }}
-              onContextMenu={(e) => handleRepoContextMenu(e, repo)}
-              className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
-                hover:bg-background-tertiary/50 ${
-                  selectedRepositoryId === repo.id && !selectedWorkspaceId
-                    ? 'bg-primary/20 ring-1 ring-primary/30'
-                    : expandedRepos.has(repo.id)
-                    ? 'bg-background-tertiary/30'
-                    : ''
-                }`}
-            >
-              <span
-                className="text-foreground-secondary text-xs w-4 hover:text-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRepo(repo.id);
-                }}
-              >
-                {expandedRepos.has(repo.id) ? '▾' : '▸'}
-              </span>
-              <span className={`flex-1 text-sm truncate ${
-                selectedRepositoryId === repo.id && !selectedWorkspaceId
-                  ? 'text-primary'
-                  : 'text-foreground'
-              }`}>{repo.name}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditRepository(repo);
-                }}
-                className="text-foreground-secondary hover:text-primary px-1 transition-colors"
-                title="Edit repository"
-              >
-                ✎
-              </button>
-              <button
-                onClick={(e) => handleDeleteRepoClick(e, repo)}
-                className="text-foreground-secondary hover:text-error px-1 transition-colors"
-                title="Delete repository"
-              >
-                ×
-              </button>
-            </div>
+        {filteredAndSortedRepos.map((repo) => {
+          // Type assertion to access owner metadata
+          const repoWithOwner = repo as typeof repo & { ownerUsername?: string };
+          const isOwnedByCurrentUser = repo.userId === user?.id;
+          const canEdit = isOwnedByCurrentUser || role === 'admin';
+          const canDelete = isOwnedByCurrentUser || role === 'admin';
 
-            {/* Workspaces */}
-            {expandedRepos.has(repo.id) && (
-              <div className="ml-4 border-l border-border">
+          return (
+            <div key={repo.id} className="mb-1">
+              {/* Repository header */}
+              <div
+                onClick={() => {
+                  // Select repository to show dashboard
+                  onSelectWorkspace(null, repo);
+                }}
+                onContextMenu={(e) => handleRepoContextMenu(e, repo)}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
+                  hover:bg-background-tertiary/50 ${
+                    selectedRepositoryId === repo.id && !selectedWorkspaceId
+                      ? 'bg-primary/20 ring-1 ring-primary/30'
+                      : expandedRepos.has(repo.id)
+                      ? 'bg-background-tertiary/30'
+                      : ''
+                  }`}
+              >
+                <span
+                  className="text-foreground-secondary text-xs w-4 hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleRepo(repo.id);
+                  }}
+                >
+                  {expandedRepos.has(repo.id) ? '▾' : '▸'}
+                </span>
+                <div className={`flex-1 text-sm truncate ${
+                  selectedRepositoryId === repo.id && !selectedWorkspaceId
+                    ? 'text-primary'
+                    : 'text-foreground'
+                }`}>
+                  <span>{repo.name}</span>
+                  {!isOwnedByCurrentUser && repoWithOwner.ownerUsername && (
+                    <span className="text-xs text-foreground-tertiary ml-2">
+                      (Owner: {repoWithOwner.ownerUsername})
+                    </span>
+                  )}
+                </div>
+                {canEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditRepository(repo);
+                    }}
+                    className="text-foreground-secondary hover:text-primary px-1 transition-colors"
+                    title="Edit repository"
+                  >
+                    ✎
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={(e) => handleDeleteRepoClick(e, repo)}
+                    className="text-foreground-secondary hover:text-error px-1 transition-colors"
+                    title="Delete repository"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Workspaces */}
+              {expandedRepos.has(repo.id) && (
+                <div className="ml-4 border-l border-border">
                 {loadingRepos.has(repo.id) ? (
                   <div className="text-foreground-tertiary text-xs py-2 pl-4">Loading...</div>
                 ) : (
@@ -768,10 +786,11 @@ export function RepositoryTree({
                     </button>
                   </>
                 )}
-              </div>
-            )}
-          </div>
-        ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Delete Repository Confirmation */}
@@ -871,10 +890,16 @@ export function RepositoryTree({
           }}
           isRedeploying={contextMenu.workspace ? redeployingWorkspaces.has(contextMenu.workspace.id) : false}
           isDestroying={contextMenu.workspace ? destroyingWorkspaces.has(contextMenu.workspace.id) : false}
-          isOwner={contextMenu.workspace ? (() => {
-            const repo = repositories.find(r => r.id === contextMenu.workspace?.repositoryId);
-            return repo?.userId === user?.id;
-          })() : false}
+          isOwner={
+            contextMenu.repository
+              ? contextMenu.repository.userId === user?.id
+              : contextMenu.workspace
+              ? (() => {
+                  const repo = repositories.find(r => r.id === contextMenu.workspace?.repositoryId);
+                  return repo?.userId === user?.id;
+                })()
+              : false
+          }
           isAdmin={role === 'admin'}
         />
       )}

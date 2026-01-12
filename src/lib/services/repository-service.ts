@@ -1,6 +1,6 @@
 import { eq, asc, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { repositories, type Repository } from '@/lib/db/schema';
+import { repositories, users, type Repository } from '@/lib/db/schema';
 
 /**
  * Input for creating a repository (metadata-only, no local cloning)
@@ -92,17 +92,28 @@ export class RepositoryService {
    * List repositories for a user
    * - If role is 'admin' or 'template-admin', returns ALL repositories (no userId filter)
    * - Otherwise, returns only repositories where userId matches
+   * - Returns repositories with owner username for display purposes
    */
-  async listRepositories(userId: string, role?: string): Promise<Repository[]> {
-    // Admin and template-admin roles see all repositories
+  async listRepositories(userId: string, role?: string): Promise<Array<Repository & { ownerUsername?: string }>> {
+    // Admin and template-admin roles see all repositories with owner information
     if (role === 'admin' || role === 'template-admin') {
-      return db
-        .select()
+      const results = await db
+        .select({
+          repository: repositories,
+          owner: users,
+        })
         .from(repositories)
+        .innerJoin(users, eq(repositories.userId, users.id))
         .orderBy(asc(sql`lower(${repositories.name})`));
+
+      return results.map(({ repository, owner }) => ({
+        ...repository,
+        ownerUsername: owner.username,
+      }));
     }
 
     // Other roles (developer, user-admin, security-admin) only see their own repositories
+    // No need to include owner info since they own all their repos
     return db
       .select()
       .from(repositories)
