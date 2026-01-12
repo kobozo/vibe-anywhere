@@ -919,6 +919,87 @@ export class WorkspaceService {
   }
 
   /**
+   * Check if user has permission to access a workspace
+   * @param workspaceId - Workspace ID to check
+   * @param userId - User ID to check
+   * @param requiredPermission - Permission required: 'view', 'execute', or 'modify'
+   * @returns Object with { hasPermission: boolean, isOwner: boolean, isAdmin: boolean, share?: WorkspaceShare }
+   */
+  async checkWorkspacePermission(
+    workspaceId: string,
+    userId: string,
+    requiredPermission: 'view' | 'execute' | 'modify'
+  ): Promise<{
+    hasPermission: boolean;
+    isOwner: boolean;
+    isAdmin: boolean;
+    share?: WorkspaceShare;
+  }> {
+    // Get workspace
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    // Get repository to check ownership
+    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+    if (!repo) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    // Get user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    const isOwner = repo.userId === userId;
+    const isAdmin = user.role === 'admin';
+
+    // Owner or admin always has permission
+    if (isOwner || isAdmin) {
+      return { hasPermission: true, isOwner, isAdmin };
+    }
+
+    // Check if workspace is shared with user
+    const [share] = await db
+      .select()
+      .from(workspaceShares)
+      .where(
+        and(
+          eq(workspaceShares.workspaceId, workspaceId),
+          eq(workspaceShares.sharedWithUserId, userId)
+        )
+      );
+
+    if (!share) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    // Check if share has required permission
+    const permissions = share.permissions as string[];
+    let hasRequiredPermission = false;
+
+    if (requiredPermission === 'view') {
+      // View requires 'view' permission
+      hasRequiredPermission = permissions.includes('view');
+    } else if (requiredPermission === 'execute') {
+      // Execute requires 'execute' permission
+      hasRequiredPermission = permissions.includes('execute');
+    } else if (requiredPermission === 'modify') {
+      // Modify is only allowed for owner or admin (never via share)
+      hasRequiredPermission = false;
+    }
+
+    return {
+      hasPermission: hasRequiredPermission,
+      isOwner: false,
+      isAdmin: false,
+      share,
+    };
+  }
+
+  /**
    * Share a workspace with another user
    * @throws {NotFoundError} if workspace or user doesn't exist
    * @throws {AuthError} if requesting user doesn't own the workspace
