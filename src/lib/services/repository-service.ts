@@ -90,8 +90,19 @@ export class RepositoryService {
 
   /**
    * List repositories for a user
+   * - If role is 'admin' or 'template-admin', returns ALL repositories (no userId filter)
+   * - Otherwise, returns only repositories where userId matches
    */
-  async listRepositories(userId: string): Promise<Repository[]> {
+  async listRepositories(userId: string, role?: string): Promise<Repository[]> {
+    // Admin and template-admin roles see all repositories
+    if (role === 'admin' || role === 'template-admin') {
+      return db
+        .select()
+        .from(repositories)
+        .orderBy(asc(sql`lower(${repositories.name})`));
+    }
+
+    // Other roles (developer, user-admin, security-admin) only see their own repositories
     return db
       .select()
       .from(repositories)

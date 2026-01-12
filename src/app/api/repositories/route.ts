@@ -34,12 +34,14 @@ const createRepoSchema = z.object({
 
 /**
  * GET /api/repositories - List all repositories for the authenticated user
+ * - Admin and template-admin users see all repositories
+ * - Other users see only their own repositories
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
   const user = await requireAuth(request);
   const repoService = getRepositoryService();
 
-  const repositories = await repoService.listRepositories(user.id);
+  const repositories = await repoService.listRepositories(user.id, user.role);
 
   return successResponse({ repositories });
 });
