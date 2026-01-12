@@ -19,6 +19,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useUIState } from '@/hooks/useUIState';
 import { LoginForm } from '@/components/auth/login-form';
 import { SettingsModal } from '@/components/settings/settings-modal';
+import { ProfileModal } from '@/components/profile/profile-modal';
 import { GitPanel } from '@/components/git';
 import { DashboardPanel } from '@/components/dashboard';
 import { RepositoryDashboard } from '@/components/repositories/repository-dashboard';
@@ -100,6 +101,7 @@ function Dashboard() {
   const [isAddRepoOpen, setIsAddRepoOpen] = useState(false);
   const [isAddWorkspaceOpen, setIsAddWorkspaceOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [workspaceRepoId, setWorkspaceRepoId] = useState<string | null>(null);
   const [preselectedBranch, setPreselectedBranch] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -1256,6 +1258,7 @@ function Dashboard() {
           />
           <UserMenu
             username={user?.username || ''}
+            onProfile={() => setIsProfileOpen(true)}
             onSettings={() => setIsSettingsOpen(true)}
             onLogout={logout}
           />
@@ -1464,6 +1467,11 @@ function Dashboard() {
           fetchWhisperSettings();
         }}
         onVoiceSettingsChange={fetchWhisperSettings}
+      />
+
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
       />
 
       {/* Edit Repository Dialog */}

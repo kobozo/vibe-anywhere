@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 
 interface UserMenuProps {
   username: string;
+  onProfile: () => void;
   onSettings: () => void;
   onLogout: () => void;
 }
 
-export function UserMenu({ username, onSettings, onLogout }: UserMenuProps) {
+export function UserMenu({ username, onProfile, onSettings, onLogout }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +66,19 @@ export function UserMenu({ username, onSettings, onLogout }: UserMenuProps) {
       {/* Dropdown menu */}
       {isOpen && (
         <div className="absolute bottom-full left-0 right-0 mb-1 mx-2 bg-background border border-border rounded-md shadow-lg z-50 py-1">
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              onProfile();
+            }}
+            className={menuItemClass}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Profile
+          </button>
+
           <button
             onClick={() => {
               setIsOpen(false);
