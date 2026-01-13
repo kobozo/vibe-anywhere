@@ -10,7 +10,7 @@ import {
 } from '@/lib/api-utils';
 import { canManageUsers } from '@/lib/permissions';
 import { getAuthService, getAuditLogService } from '@/lib/services';
-import { userRoleEnum } from '@/lib/db/schema';
+import { userRoleEnum, type UserRole } from '@/lib/db/schema';
 
 // Get valid roles from the enum
 const validRoles = userRoleEnum.enumValues;
@@ -76,7 +76,7 @@ export const PATCH = withErrorHandling(
 
     // Change role using authService
     try {
-      const updatedUser = await authService.updateUserRole(id, role);
+      const updatedUser = await authService.updateUserRole(id, role as UserRole);
 
       // Log to audit
       const auditLogService = getAuditLogService();
