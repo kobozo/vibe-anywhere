@@ -58,3 +58,6 @@ next-env.d.ts
 docker-compose.local.yml
 .next-cache
 .chief-wiggum
+
+# Generated JS files from tsx transformation
+src/**/*.js
