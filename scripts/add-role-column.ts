@@ -15,7 +15,7 @@ try {
 
   // Verify the column was added
   const columns = db.prepare("PRAGMA table_info(users)").all();
-  const roleColumn = columns.find((col: any) => col.name === 'role');
+  const roleColumn = columns.find((col: any) => col.name === 'role') as any;
 
   if (roleColumn) {
     console.log('✓ Verified: role column exists in users table');

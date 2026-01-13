@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { UserRole } from '@/lib/db/schema';
+import { CreateUserDialog } from './create-user-dialog';
 
 /**
  * User Management Tab
@@ -27,6 +28,7 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Fetch users on mount
   useEffect(() => {
@@ -161,6 +163,12 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
         <p className="text-sm text-foreground-secondary">
           Manage user accounts, roles, and permissions.
         </p>
+        <button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="px-3 py-1.5 text-sm bg-primary hover:bg-primary-hover text-foreground rounded transition-colors"
+        >
+          Create User
+        </button>
       </div>
 
       {/* User Table */}
@@ -229,6 +237,13 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
           </tbody>
         </table>
       </div>
+
+      {/* Create User Dialog */}
+      <CreateUserDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }
