@@ -193,7 +193,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-secondary rounded-lg w-full max-w-2xl min-h-[80vh] max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg w-full w-[75vw] max-w-[75vw] min-h-[80vh] max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Settings</h2>
@@ -202,83 +202,111 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('theme')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'theme'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Theme
-          </button>
-          <button
-            onClick={() => setActiveTab('templates')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'templates'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Tab Templates
-          </button>
-          {canManageUsers && (
+        {/* Main Content Wrapper */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Tabs Sidebar */}
+          <div className="flex flex-col border-r border-border min-w-[200px] bg-background-tertiary/30 overflow-y-auto">
+            {/* General Section */}
+            <div className="px-4 pt-4 pb-2 text-xs font-semibold text-foreground-tertiary uppercase tracking-wider">
+              General
+            </div>
             <button
-              onClick={() => setActiveTab('users')}
-              className={`px-4 py-2 text-sm font-medium transition-colors
-                ${activeTab === 'users'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-foreground-secondary hover:text-foreground'}`}
+              onClick={() => setActiveTab('theme')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'theme'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
             >
-              Users {userCount > 0 && `(${userCount})`}
+              Theme
             </button>
-          )}
-          <button
-            onClick={() => setActiveTab('ssh-keys')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'ssh-keys'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            SSH Keys
-          </button>
-          <button
-            onClick={() => setActiveTab('git-identities')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'git-identities'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Git Identities
-          </button>
-          <button
-            onClick={() => setActiveTab('secrets')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'secrets'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Secrets
-          </button>
-          <button
-            onClick={() => setActiveTab('proxmox')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'proxmox'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Proxmox
-          </button>
-          <button
-            onClick={() => setActiveTab('voice')}
-            className={`px-4 py-2 text-sm font-medium transition-colors
-              ${activeTab === 'voice'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Voice
-          </button>
-        </div>
+            <button
+              onClick={() => setActiveTab('voice')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'voice'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              Voice
+            </button>
+
+            {/* Development Section */}
+            <div className="px-4 pt-4 pb-2 text-xs font-semibold text-foreground-tertiary uppercase tracking-wider">
+              Development
+            </div>
+            <button
+              onClick={() => setActiveTab('templates')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'templates'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              Tab Templates
+            </button>
+            <button
+              onClick={() => setActiveTab('secrets')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'secrets'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              Secrets
+            </button>
+
+            {/* Git Section */}
+            <div className="px-4 pt-4 pb-2 text-xs font-semibold text-foreground-tertiary uppercase tracking-wider">
+              Git
+            </div>
+            <button
+              onClick={() => setActiveTab('ssh-keys')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'ssh-keys'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              SSH Keys
+            </button>
+            <button
+              onClick={() => setActiveTab('git-identities')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'git-identities'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              Git Identities
+            </button>
+
+            {/* Infrastructure Section */}
+            <div className="px-4 pt-4 pb-2 text-xs font-semibold text-foreground-tertiary uppercase tracking-wider">
+              Infrastructure
+            </div>
+            <button
+              onClick={() => setActiveTab('proxmox')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'proxmox'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              Proxmox
+            </button>
+
+            {/* Administration Section */}
+            {canManageUsers && (
+              <>
+                <div className="px-4 pt-4 pb-2 text-xs font-semibold text-foreground-tertiary uppercase tracking-wider">
+                  Administration
+                </div>
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                    ${activeTab === 'users'
+                      ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                      : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+                >
+                  Users {userCount > 0 && `(${userCount})`}
+                </button>
+              </>
+            )}
+          </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
@@ -735,6 +763,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
 
           {/* Voice (Whisper) */}
           {activeTab === 'voice' && <VoiceSettings onSettingsChange={onVoiceSettingsChange} />}
+        </div>
         </div>
 
         {/* Footer */}
