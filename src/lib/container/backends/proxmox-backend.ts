@@ -810,6 +810,67 @@ ENVEOF
   }
 
   /**
+   * Protect DNS resolution in LXC containers from Proxmox host DNS override
+   * Creates /etc/.pve-ignore.resolv.conf to prevent Proxmox from overriding resolv.conf
+   * Configures reliable DNS servers (Google DNS + Cloudflare)
+   */
+  async protectDNSResolution(containerId: string): Promise<void> {
+    const client = await this.getClient();
+    const vmid = parseInt(containerId, 10);
+
+    // Get container IP from cache or wait for it
+    let ip = this.containerIps.get(containerId);
+    if (!ip) {
+      ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
+      this.containerIps.set(containerId, ip);
+    }
+
+    console.log(`Protecting DNS resolution in container ${vmid}`);
+
+    try {
+      // Create .pve-ignore.resolv.conf to prevent Proxmox from overriding DNS
+      // Configure resolv.conf with Google DNS (8.8.8.8) and Cloudflare (1.1.1.1)
+      await execSSHCommand(
+        { host: ip, username: 'root' },
+        ['bash', '-c', `
+          # Prevent Proxmox from overriding DNS in LXC containers
+          touch /etc/.pve-ignore.resolv.conf
+
+          # Configure reliable DNS servers
+          cat > /etc/resolv.conf << 'DNSEOF'
+# DNS configuration protected from Proxmox override
+# Configured by Vibe Anywhere to prevent MagicDNS conflicts
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+DNSEOF
+
+          # Make immutable to prevent accidental changes
+          chattr +i /etc/resolv.conf
+
+          echo "DNS resolution protected successfully"
+        `],
+        { workingDir: '/' }
+      );
+
+      // Verify DNS resolution works
+      const dnsTestResult = await execSSHCommand(
+        { host: ip, username: 'root' },
+        ['bash', '-c', 'nslookup google.com 8.8.8.8 >/dev/null 2>&1 && echo "OK" || echo "FAIL"'],
+        { workingDir: '/' }
+      );
+
+      if (dnsTestResult.stdout.trim() === 'OK') {
+        console.log(`DNS resolution verified in container ${vmid}`);
+      } else {
+        console.warn(`DNS resolution test failed in container ${vmid}, but protection was applied`);
+      }
+    } catch (error) {
+      console.warn(`Failed to protect DNS resolution in container ${vmid}:`, error);
+      // Don't fail container startup, just log the warning
+    }
+  }
+
+  /**
    * Install tech stacks in a running container
    * Used to install required tech stacks that aren't pre-installed in the template
    */

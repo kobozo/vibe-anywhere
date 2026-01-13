@@ -199,24 +199,70 @@ Claude will automatically detect and use the CDP proxy shim to control your loca
 ### DNS Resolution Issues (Proxmox + MagicDNS)
 **Symptom**: Container can't resolve external domains (e.g., `ping google.com` fails)
 
-**Cause**: Tailscale MagicDNS on Proxmox host overrides LXC container DNS settings.
+**Cause**: When Tailscale is installed on the Proxmox host with MagicDNS enabled (the default), Proxmox automatically overrides LXC container DNS settings, breaking internet connectivity inside containers.
 
-**Solution 1 (Recommended)**: Disable MagicDNS on Proxmox host
+**How Vibe Anywhere Handles This**:
+Vibe Anywhere **automatically protects DNS resolution** during container startup by:
+1. Creating `/etc/.pve-ignore.resolv.conf` to prevent Proxmox DNS override
+2. Configuring reliable DNS servers (Google DNS 8.8.8.8 + Cloudflare 1.1.1.1)
+3. Making `/etc/resolv.conf` immutable to prevent accidental changes
+4. Verifying DNS resolution works by testing `nslookup google.com`
+
+You should see this in the container startup logs:
+```
+Protecting DNS resolution in container <vmid>
+DNS resolution verified in container <vmid>
+```
+
+**Manual Verification**:
 ```bash
-# On Proxmox host
+# Inside container
+cat /etc/resolv.conf
+# Should show:
+# nameserver 8.8.8.8
+# nameserver 1.1.1.1
+
+# Test DNS resolution
+ping -c 1 google.com
+nslookup github.com
+```
+
+**If DNS Still Fails** (rare edge cases):
+
+**Option 1**: Disable MagicDNS on Proxmox host (affects all LXC containers)
+```bash
+# On Proxmox host (requires Tailscale installed)
 sudo tailscale set --accept-dns=false
 ```
 
-**Solution 2**: Prevent Proxmox from overriding DNS in containers
+**Option 2**: Manually reconfigure DNS in container
 ```bash
 # Inside container
+# Remove immutable flag if set
+sudo chattr -i /etc/resolv.conf
+
+# Reconfigure DNS
 sudo touch /etc/.pve-ignore.resolv.conf
+echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+
+# Make immutable again
+sudo chattr +i /etc/resolv.conf
 ```
 
-Then manually configure `/etc/resolv.conf`:
+**Option 3**: Use different DNS servers
 ```bash
-echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+# Inside container
+sudo chattr -i /etc/resolv.conf
+echo -e "nameserver 1.1.1.1\nnameserver 9.9.9.9" | sudo tee /etc/resolv.conf
+sudo chattr +i /etc/resolv.conf
 ```
+
+**Why This Happens**:
+- Proxmox uses `pct` (Proxmox Container Toolkit) to manage LXC containers
+- By default, Proxmox syncs the host's `/etc/resolv.conf` to all LXC containers
+- When Tailscale MagicDNS is enabled on the host, it configures `100.100.100.100` as the DNS server
+- This MagicDNS server only resolves Tailnet devices, not external domains
+- The `.pve-ignore.resolv.conf` file tells Proxmox to skip DNS sync for that container
 
 ### Connection Timeout
 **Symptom**: CDP proxy times out when connecting to Chrome

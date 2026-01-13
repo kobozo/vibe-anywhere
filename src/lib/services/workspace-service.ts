@@ -647,6 +647,21 @@ export class WorkspaceService {
         // Don't fail the container startup, just log the error
       }
 
+      // Protect DNS resolution from Proxmox host DNS override (MagicDNS compatibility)
+      try {
+        const proxmoxBackend = this.containerBackend as {
+          protectDNSResolution?: (containerId: string) => Promise<void>;
+        };
+
+        if (proxmoxBackend.protectDNSResolution) {
+          await proxmoxBackend.protectDNSResolution(containerId);
+          console.log(`DNS resolution protected in container ${containerId}`);
+        }
+      } catch (error) {
+        console.error('Failed to protect DNS resolution:', error);
+        // Don't fail the container startup, just log the error
+      }
+
       // Emit starting agent progress
       this.emitProgress(workspaceId, 'starting_agent');
 
