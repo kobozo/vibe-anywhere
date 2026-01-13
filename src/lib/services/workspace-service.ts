@@ -13,7 +13,7 @@ import { buildWorkspaceTags } from '@/lib/container/proxmox/tags';
 import { config } from '@/lib/config';
 import { startupProgressStore } from './startup-progress-store';
 import type { StartupStep } from '@/lib/types/startup-progress';
-import { NotFoundError, AuthError } from '@/lib/api-utils';
+import { NotFoundError, AuthError } from '@/lib/errors';
 
 export interface CreateWorkspaceInput {
   name: string;
