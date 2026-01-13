@@ -11,7 +11,6 @@
     "bundle": "npm run bundle:binary && mkdir -p bundle-temp && cp dist/cdp-shim bundle-temp/ && cp package.json bundle-temp/ && tar -czf cdp-shim.tar.gz -C bundle-temp . && rm -rf bundle-temp"
   },
   "dependencies": {
-    "chrome-remote-interface": "^0.33.2",
     "ws": "^8.18.0"
   },
   "devDependencies": {
