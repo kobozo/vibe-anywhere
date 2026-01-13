@@ -617,6 +617,11 @@ export class WorkspaceService {
           }
         }
 
+        // Add CHROME_PATH environment variable to point to CDP proxy shim
+        // This allows Claude CLI and other tools to use the fake chromium binary
+        // that proxies CDP commands to local Chrome over Tailscale
+        mergedEnvVars.CHROME_PATH = '/usr/local/bin/chromium';
+
         // Only inject if there are env vars to inject
         if (Object.keys(mergedEnvVars).length > 0) {
           const proxmoxBackend = this.containerBackend as {

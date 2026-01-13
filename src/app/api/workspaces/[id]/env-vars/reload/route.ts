@@ -52,6 +52,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       workspace.templateId
     );
 
+    // Add CHROME_PATH environment variable to point to CDP proxy shim
+    mergedEnvVars.CHROME_PATH = '/usr/local/bin/chromium';
+
     // NEW: Push to agent via WebSocket (v1.8.4+)
     const { pushEnvVarsToAgent } = await import('@/lib/websocket/server');
 

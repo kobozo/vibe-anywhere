@@ -827,6 +827,9 @@ function setupAgentNamespace(io: SocketServer): void {
           workspace.templateId
         );
 
+        // Add CHROME_PATH environment variable to point to CDP proxy shim
+        mergedEnvVars.CHROME_PATH = '/usr/local/bin/chromium';
+
         socket.emit('env:response', { envVars: mergedEnvVars });
       } catch (error) {
         console.error('env:request handler error:', error);

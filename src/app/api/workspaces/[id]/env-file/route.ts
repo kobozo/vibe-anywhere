@@ -131,6 +131,9 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
       workspace.templateId ?? undefined
     );
 
+    // Add CHROME_PATH environment variable to point to CDP proxy shim
+    mergedEnvVars.CHROME_PATH = '/usr/local/bin/chromium';
+
     if (Object.keys(mergedEnvVars).length === 0) {
       return successResponse({
         success: false,
