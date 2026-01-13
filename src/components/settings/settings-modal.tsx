@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useTabTemplates, TabTemplate } from '@/hooks/useTabTemplates';
 import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
 import { useSecrets, type Secret } from '@/hooks/useSecrets';
+import { useAuth } from '@/hooks/useAuth';
 import { ProxmoxSettings } from './proxmox-settings';
 import { VoiceSettings } from './voice-settings';
 import { ThemeSettings } from './theme-settings';
 import { GitIdentityList } from '@/components/git-identity/git-identity-list';
+import { UserManagementTab } from './users/user-management-tab';
 import { getTemplateIcon } from '@/components/icons/ai-icons';
 import { MATERIAL_ICONS, getMaterialIcon } from '@/components/icons/material-icons';
 import { getStacksByCategory, type TechStack } from '@/lib/container/proxmox/tech-stacks';
@@ -18,13 +20,17 @@ interface SettingsModalProps {
   onVoiceSettingsChange?: () => void;
 }
 
-type SettingsTab = 'theme' | 'templates' | 'ssh-keys' | 'git-identities' | 'secrets' | 'proxmox' | 'voice';
+type SettingsTab = 'theme' | 'templates' | 'users' | 'ssh-keys' | 'git-identities' | 'secrets' | 'proxmox' | 'voice';
 
 // Get AI assistant tech stacks for the dropdown
 const AI_TECH_STACKS: TechStack[] = getStacksByCategory('ai-assistant');
 
 export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('theme');
+  const { role } = useAuth();
+
+  // Check if user can manage users (admin or user-admin)
+  const canManageUsers = role === 'admin' || role === 'user-admin';
 
   // Tab Templates
   const { templates, fetchTemplates, createTemplate, deleteTemplate, isLoading: templatesLoading } = useTabTemplates();
@@ -215,6 +221,17 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
           >
             Tab Templates
           </button>
+          {canManageUsers && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-4 py-2 text-sm font-medium transition-colors
+                ${activeTab === 'users'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-foreground-secondary hover:text-foreground'}`}
+            >
+              Users
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('ssh-keys')}
             className={`px-4 py-2 text-sm font-medium transition-colors
@@ -433,6 +450,9 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
               )}
             </div>
           )}
+
+          {/* Users */}
+          {activeTab === 'users' && <UserManagementTab />}
 
           {/* SSH Keys */}
           {activeTab === 'ssh-keys' && (
