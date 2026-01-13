@@ -2,6 +2,7 @@
 export { GitService, getGitService } from './git-service';
 export { SessionService, getSessionService } from './session-service';
 export { AuthService, getAuthService, type AuthResult } from './auth-service';
+export { AuditLogService, getAuditLogService } from './audit-log-service';
 
 // New v2 services
 export { RepositoryService, getRepositoryService } from './repository-service';
