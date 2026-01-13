@@ -8,6 +8,7 @@ import { DeleteUserDialog } from './delete-user-dialog';
 import { ChangeRoleDialog } from './change-role-dialog';
 import { ResetPasswordDialog } from './reset-password-dialog';
 import { AuditLogPanel } from './audit-log-panel';
+import { UserActionsMenu } from './user-actions-menu';
 
 /**
  * User Management Tab
@@ -41,6 +42,7 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
   const [isAuditLogPanelOpen, setIsAuditLogPanelOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [resourceCount, setResourceCount] = useState({ repositories: 0, workspaces: 0 });
+  const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
 
   // Fetch users on mount
   useEffect(() => {
@@ -288,31 +290,31 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
                 </td>
                 <td className="py-3 px-3 text-foreground-secondary">{getStatus(user)}</td>
                 <td className="py-3 px-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="relative inline-block">
                     <button
-                      onClick={() => handleEdit(user)}
-                      className="text-primary hover:text-primary-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
+                      onClick={() =>
+                        setOpenMenuUserId(openMenuUserId === user.id ? null : user.id)
+                      }
+                      className="p-1.5 rounded transition-colors text-foreground-secondary hover:text-foreground hover:bg-background-tertiary"
+                      title="Actions"
                     >
-                      Edit
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="5" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="12" cy="19" r="2" />
+                      </svg>
                     </button>
-                    <button
-                      onClick={() => handleChangeRole(user)}
-                      className="text-primary hover:text-primary-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
-                    >
-                      Change Role
-                    </button>
-                    <button
-                      onClick={() => handleResetPassword(user)}
-                      className="text-warning hover:text-warning-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
-                    >
-                      Reset Password
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user)}
-                      className="text-error hover:text-error-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
-                    >
-                      Delete
-                    </button>
+
+                    {openMenuUserId === user.id && (
+                      <UserActionsMenu
+                        user={user}
+                        onEdit={() => handleEdit(user)}
+                        onChangeRole={() => handleChangeRole(user)}
+                        onResetPassword={() => handleResetPassword(user)}
+                        onDelete={() => handleDelete(user)}
+                        onClose={() => setOpenMenuUserId(null)}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>
