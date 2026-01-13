@@ -58,7 +58,11 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch('/api/users', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch users');
       }
@@ -130,7 +134,11 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
     setSelectedUser(user);
     // Fetch resource count for the user
     try {
-      const response = await fetch(`/api/users/${user.id}/resources`);
+      const response = await fetch(`/api/users/${user.id}/resources`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setResourceCount({

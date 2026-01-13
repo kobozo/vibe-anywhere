@@ -48,7 +48,11 @@ export function AuditLogPanel({ isOpen, onClose }: AuditLogPanelProps) {
         params.set('action', filter);
       }
 
-      const response = await fetch(`/api/audit-log?${params.toString()}`);
+      const response = await fetch(`/api/audit-log?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch audit logs');
       }

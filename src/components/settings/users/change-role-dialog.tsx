@@ -86,7 +86,10 @@ export function ChangeRoleDialog({ isOpen, onClose, onSuccess, user }: ChangeRol
     try {
       const response = await fetch(`/api/users/${user.id}/role`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
         body: JSON.stringify({ role: selectedRole }),
       });
 

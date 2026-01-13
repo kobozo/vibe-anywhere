@@ -112,7 +112,10 @@ export function ResetPasswordDialog({ isOpen, onClose, onSuccess, user }: ResetP
 
       const response = await fetch(`/api/users/${user.id}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
         body: JSON.stringify(body),
       });
 
