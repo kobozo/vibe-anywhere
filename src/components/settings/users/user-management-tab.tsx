@@ -5,6 +5,8 @@ import type { UserRole } from '@/lib/db/schema';
 import { CreateUserDialog } from './create-user-dialog';
 import { EditUserDialog } from './edit-user-dialog';
 import { DeleteUserDialog } from './delete-user-dialog';
+import { ChangeRoleDialog } from './change-role-dialog';
+import { ResetPasswordDialog } from './reset-password-dialog';
 
 /**
  * User Management Tab
@@ -33,6 +35,8 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isChangeRoleDialogOpen, setIsChangeRoleDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [resourceCount, setResourceCount] = useState({ repositories: 0, workspaces: 0 });
 
@@ -110,9 +114,14 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
     setIsEditDialogOpen(true);
   };
 
+  const handleChangeRole = (user: User) => {
+    setSelectedUser(user);
+    setIsChangeRoleDialogOpen(true);
+  };
+
   const handleResetPassword = (user: User) => {
-    // TODO: Implement reset password functionality
-    console.log('Reset password for user:', user);
+    setSelectedUser(user);
+    setIsResetPasswordDialogOpen(true);
   };
 
   const handleDelete = async (user: User) => {
@@ -242,6 +251,12 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
                       Edit
                     </button>
                     <button
+                      onClick={() => handleChangeRole(user)}
+                      className="text-primary hover:text-primary-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
+                    >
+                      Change Role
+                    </button>
+                    <button
                       onClick={() => handleResetPassword(user)}
                       className="text-warning hover:text-warning-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
                     >
@@ -283,6 +298,22 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
         onSuccess={fetchUsers}
         user={selectedUser}
         resourceCount={resourceCount}
+      />
+
+      {/* Change Role Dialog */}
+      <ChangeRoleDialog
+        isOpen={isChangeRoleDialogOpen}
+        onClose={() => setIsChangeRoleDialogOpen(false)}
+        onSuccess={fetchUsers}
+        user={selectedUser}
+      />
+
+      {/* Reset Password Dialog */}
+      <ResetPasswordDialog
+        isOpen={isResetPasswordDialogOpen}
+        onClose={() => setIsResetPasswordDialogOpen(false)}
+        onSuccess={fetchUsers}
+        user={selectedUser}
       />
     </div>
   );

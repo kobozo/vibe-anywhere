@@ -331,6 +331,38 @@ export class AuthService {
   }
 
   /**
+   * Update user role
+   */
+  async updateUserRole(userId: string, newRole: UserRole): Promise<Omit<User, 'passwordHash' | 'token'>> {
+    const user = await this.getUserById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        role: newRole,
+        updatedAt: Date.now(),
+      })
+      .where(eq(users.id, userId))
+      .returning({
+        id: users.id,
+        username: users.username,
+        role: users.role,
+        status: users.status,
+        forcePasswordChange: users.forcePasswordChange,
+        deactivatedAt: users.deactivatedAt,
+        deactivatedBy: users.deactivatedBy,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      });
+
+    return updatedUser;
+  }
+
+  /**
    * Delete user (hard delete, checks for owned resources first)
    */
   async deleteUser(userId: string): Promise<void> {
