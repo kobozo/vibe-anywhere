@@ -48,6 +48,7 @@ export type TabGroupLayout = 'horizontal' | 'vertical' | 'left-stack' | 'right-s
 export type TemplateStatus = 'pending' | 'provisioning' | 'staging' | 'ready' | 'error';
 export type UserRole = 'admin' | 'user-admin' | 'developer' | 'template-admin' | 'security-admin';
 export type UserStatus = 'active' | 'inactive';
+export type UserAuditAction = 'user_created' | 'user_edited' | 'role_changed' | 'password_reset' | 'user_deleted' | 'user_deactivated';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -62,6 +63,19 @@ export const users = sqliteTable('users', {
   deactivatedBy: uuidRef('deactivated_by'), // References users.id (relation defined below)
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+});
+
+// User Audit Log table - tracks all user management actions
+export const userAuditLog = sqliteTable('user_audit_log', {
+  id: uuid('id'),
+  action: text('action').$type<UserAuditAction>().notNull(),
+  performedBy: uuidRef('performed_by'), // References users.id (nullable - set null on delete)
+  targetUserId: uuidRef('target_user_id'), // References users.id (nullable - set null on delete)
+  targetUsername: text('target_username').notNull(), // Store username for historical reference
+  details: text('details'), // Additional details as text/JSON
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  timestamp: integer('timestamp').notNull().$defaultFn(() => Date.now()),
 });
 
 // Git Identities table
@@ -341,7 +355,22 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [users.id],
     relationName: 'userDeactivation',
   }),
+  auditLogsPerformed: many(userAuditLog, { relationName: 'performedByUser' }),
+  auditLogsTargeted: many(userAuditLog, { relationName: 'targetUser' }),
   sessions: many(sessions),
+}));
+
+export const userAuditLogRelations = relations(userAuditLog, ({ one }) => ({
+  performedByUser: one(users, {
+    fields: [userAuditLog.performedBy],
+    references: [users.id],
+    relationName: 'performedByUser',
+  }),
+  targetUser: one(users, {
+    fields: [userAuditLog.targetUserId],
+    references: [users.id],
+    relationName: 'targetUser',
+  }),
 }));
 
 export const tabTemplatesRelations = relations(tabTemplates, ({ one }) => ({
@@ -525,6 +554,8 @@ export const sessionLogsRelations = relations(sessionLogs, ({ one }) => ({
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type UserAuditLog = typeof userAuditLog.$inferSelect;
+export type NewUserAuditLog = typeof userAuditLog.$inferInsert;
 export type Repository = typeof repositories.$inferSelect;
 export type NewRepository = typeof repositories.$inferInsert;
 export type Workspace = typeof workspaces.$inferSelect;

@@ -78,6 +78,13 @@
       "when": 1768308560756,
       "tag": "0010_short_loa",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1768308959413,
+      "tag": "0011_fixed_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

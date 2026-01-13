@@ -95,6 +95,15 @@ export const userStatusEnum = pgEnum('user_status', [
   'inactive',
 ]);
 
+export const userAuditActionEnum = pgEnum('user_audit_action', [
+  'user_created',
+  'user_edited',
+  'role_changed',
+  'password_reset',
+  'user_deleted',
+  'user_deactivated',
+]);
+
 // Environment variable entry type for JSONB storage
 export interface EnvVarEntry {
   value: string;      // Plain text or encrypted string
@@ -122,6 +131,19 @@ export const users = pgTable('users', {
   deactivatedBy: uuid('deactivated_by'), // References users.id (relation defined below)
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
+});
+
+// User Audit Log table - tracks all user management actions
+export const userAuditLog = pgTable('user_audit_log', {
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  action: userAuditActionEnum('action').notNull(),
+  performedBy: uuid('performed_by'), // References users.id (nullable - set null on delete)
+  targetUserId: uuid('target_user_id'), // References users.id (nullable - set null on delete)
+  targetUsername: text('target_username').notNull(), // Store username for historical reference
+  details: text('details'), // Additional details as text/JSON
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  timestamp: integer('timestamp').$defaultFn(() => Date.now()).notNull(),
 });
 
 // Git Identities table - named git configurations for commits
@@ -459,7 +481,22 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [users.id],
     relationName: 'userDeactivation',
   }),
+  auditLogsPerformed: many(userAuditLog, { relationName: 'performedByUser' }),
+  auditLogsTargeted: many(userAuditLog, { relationName: 'targetUser' }),
   sessions: many(sessions), // Legacy
+}));
+
+export const userAuditLogRelations = relations(userAuditLog, ({ one }) => ({
+  performedByUser: one(users, {
+    fields: [userAuditLog.performedBy],
+    references: [users.id],
+    relationName: 'performedByUser',
+  }),
+  targetUser: one(users, {
+    fields: [userAuditLog.targetUserId],
+    references: [users.id],
+    relationName: 'targetUser',
+  }),
 }));
 
 export const tabTemplatesRelations = relations(tabTemplates, ({ one }) => ({
@@ -650,6 +687,11 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type UserStatus = (typeof userStatusEnum.enumValues)[number];
+
+// User Audit Log
+export type UserAuditLog = typeof userAuditLog.$inferSelect;
+export type NewUserAuditLog = typeof userAuditLog.$inferInsert;
+export type UserAuditAction = (typeof userAuditActionEnum.enumValues)[number];
 
 // Repositories
 export type Repository = typeof repositories.$inferSelect;
