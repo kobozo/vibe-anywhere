@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import type { UserRole } from '@/lib/db/schema';
 import { CreateUserDialog } from './create-user-dialog';
+import { EditUserDialog } from './edit-user-dialog';
+import { DeleteUserDialog } from './delete-user-dialog';
 
 /**
  * User Management Tab
@@ -29,6 +31,10 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [resourceCount, setResourceCount] = useState({ repositories: 0, workspaces: 0 });
 
   // Fetch users on mount
   useEffect(() => {
@@ -100,8 +106,8 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
   };
 
   const handleEdit = (user: User) => {
-    // TODO: Implement edit functionality
-    console.log('Edit user:', user);
+    setSelectedUser(user);
+    setIsEditDialogOpen(true);
   };
 
   const handleResetPassword = (user: User) => {
@@ -109,9 +115,26 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
     console.log('Reset password for user:', user);
   };
 
-  const handleDelete = (user: User) => {
-    // TODO: Implement delete functionality
-    console.log('Delete user:', user);
+  const handleDelete = async (user: User) => {
+    setSelectedUser(user);
+    // Fetch resource count for the user
+    try {
+      const response = await fetch(`/api/users/${user.id}/resources`);
+      if (response.ok) {
+        const data = await response.json();
+        setResourceCount({
+          repositories: data.repositories || 0,
+          workspaces: data.workspaces || 0,
+        });
+      } else {
+        // If fetch fails, assume no resources
+        setResourceCount({ repositories: 0, workspaces: 0 });
+      }
+    } catch (err) {
+      console.error('Failed to fetch resource count:', err);
+      setResourceCount({ repositories: 0, workspaces: 0 });
+    }
+    setIsDeleteDialogOpen(true);
   };
 
   if (isLoading) {
@@ -243,6 +266,23 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
         onSuccess={fetchUsers}
+      />
+
+      {/* Edit User Dialog */}
+      <EditUserDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSuccess={fetchUsers}
+        user={selectedUser}
+      />
+
+      {/* Delete User Dialog */}
+      <DeleteUserDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onSuccess={fetchUsers}
+        user={selectedUser}
+        resourceCount={resourceCount}
       />
     </div>
   );
