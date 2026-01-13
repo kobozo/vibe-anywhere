@@ -90,6 +90,11 @@ export const userRoleEnum = pgEnum('user_role', [
   'security-admin',
 ]);
 
+export const userStatusEnum = pgEnum('user_status', [
+  'active',
+  'inactive',
+]);
+
 // Environment variable entry type for JSONB storage
 export interface EnvVarEntry {
   value: string;      // Plain text or encrypted string
@@ -111,7 +116,10 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
   role: userRoleEnum('role').default('developer').notNull(),
+  status: userStatusEnum('status').default('active').notNull(),
   forcePasswordChange: boolean('force_password_change').default(false).notNull(),
+  deactivatedAt: integer('deactivated_at'),
+  deactivatedBy: uuid('deactivated_by'), // References users.id (relation defined below)
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
 });
@@ -437,7 +445,7 @@ export const sessionLogs = pgTable('session_logs', {
 // Relations
 // ============================================
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   repositories: many(repositories),
   sshKeys: many(sshKeys),
   tabTemplates: many(tabTemplates),
@@ -446,6 +454,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   secrets: many(secrets),
   workspaceSharesSharedWith: many(workspaceShares, { relationName: 'sharedWithUser' }),
   workspaceSharesSharedBy: many(workspaceShares, { relationName: 'sharedByUser' }),
+  deactivatedByUser: one(users, {
+    fields: [users.deactivatedBy],
+    references: [users.id],
+    relationName: 'userDeactivation',
+  }),
   sessions: many(sessions), // Legacy
 }));
 
@@ -636,6 +649,7 @@ export const sessionLogsRelations = relations(sessionLogs, ({ one }) => ({
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
+export type UserStatus = (typeof userStatusEnum.enumValues)[number];
 
 // Repositories
 export type Repository = typeof repositories.$inferSelect;

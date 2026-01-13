@@ -47,6 +47,7 @@ export type PortForwardProtocol = 'http' | 'tcp';
 export type TabGroupLayout = 'horizontal' | 'vertical' | 'left-stack' | 'right-stack' | 'grid-2x2';
 export type TemplateStatus = 'pending' | 'provisioning' | 'staging' | 'ready' | 'error';
 export type UserRole = 'admin' | 'user-admin' | 'developer' | 'template-admin' | 'security-admin';
+export type UserStatus = 'active' | 'inactive';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -55,7 +56,10 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
   role: text('role').$type<UserRole>().default('developer').notNull(),
+  status: text('status').$type<UserStatus>().default('active').notNull(),
   forcePasswordChange: boolean('force_password_change').default(false).notNull(),
+  deactivatedAt: integer('deactivated_at'),
+  deactivatedBy: uuidRef('deactivated_by'), // References users.id (relation defined below)
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
@@ -323,7 +327,7 @@ export const sessionLogs = sqliteTable('session_logs', {
 });
 
 // Relations (same as PostgreSQL schema)
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   repositories: many(repositories),
   sshKeys: many(sshKeys),
   tabTemplates: many(tabTemplates),
@@ -332,6 +336,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   secrets: many(secrets),
   workspaceSharesSharedWith: many(workspaceShares, { relationName: 'sharedWithUser' }),
   workspaceSharesSharedBy: many(workspaceShares, { relationName: 'sharedByUser' }),
+  deactivatedByUser: one(users, {
+    fields: [users.deactivatedBy],
+    references: [users.id],
+    relationName: 'userDeactivation',
+  }),
   sessions: many(sessions),
 }));
 

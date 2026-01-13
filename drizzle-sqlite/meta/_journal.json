@@ -64,6 +64,20 @@
       "when": 1768296000000,
       "tag": "0008_ensure_admin_force_password_change",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1768308486218,
+      "tag": "0009_rare_hercules",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1768308560756,
+      "tag": "0010_short_loa",
+      "breakpoints": true
     }
   ]
 }
