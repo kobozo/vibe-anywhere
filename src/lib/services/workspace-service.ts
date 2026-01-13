@@ -6,6 +6,7 @@ import { getSSHKeyService } from './ssh-key-service';
 import { getTemplateService } from './template-service';
 import { getEnvVarService } from './env-var-service';
 import { getGitHooksService } from './git-hooks-service';
+import { getTailscaleService } from './tailscale-service';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { gitCloneInContainer, getGitStatusInContainer, isRepoClonedInContainer, type GitStatusResult } from '@/lib/container/proxmox/ssh-stream';
@@ -599,6 +600,22 @@ export class WorkspaceService {
           workspace.repositoryId,
           workspace.templateId || repo.templateId
         );
+
+        // Generate ephemeral Tailscale auth key and add to env vars
+        const tailscaleService = getTailscaleService();
+        if (tailscaleService.isConfigured()) {
+          try {
+            const authKey = await tailscaleService.generateEphemeralAuthKey([
+              `workspace:${workspaceId}`,
+              `repository:${repo.name}`,
+            ]);
+            mergedEnvVars.TAILSCALE_AUTHKEY = authKey.key;
+            console.log(`Generated ephemeral Tailscale auth key for workspace ${workspaceId} (expires: ${authKey.expiresAt.toISOString()})`);
+          } catch (error) {
+            console.warn('Failed to generate Tailscale auth key:', error);
+            // Don't fail container startup if Tailscale isn't configured
+          }
+        }
 
         // Only inject if there are env vars to inject
         if (Object.keys(mergedEnvVars).length > 0) {

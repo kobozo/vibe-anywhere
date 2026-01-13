@@ -15,6 +15,7 @@ export { getTabStreamManager } from './tab-stream-manager';
 export { AgentRegistry, getAgentRegistry } from './agent-registry';
 export { ContainerStatusSyncService, getContainerStatusSyncService } from './container-status-sync';
 export { EnvVarSyncService, getEnvVarSyncService } from './env-var-sync-service';
+export { TailscaleService, getTailscaleService } from './tailscale-service';
 
 // Container backend (abstraction layer)
 export {
