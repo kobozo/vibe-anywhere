@@ -14,6 +14,7 @@ interface AgentInfo {
   connectedAt: string | null;
   lastHeartbeat: string | null;
   tabCount: number;
+  tailscaleConnected: boolean | null;
 }
 
 interface TemplateInfo {
@@ -474,6 +475,22 @@ export function DashboardPanel({
                     <div className="flex justify-between">
                       <span className="text-foreground-secondary">Tabs:</span>
                       <span className="text-foreground">{agentInfo.tabCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground-secondary">Tailscale:</span>
+                      <span className={`font-medium ${
+                        agentInfo.tailscaleConnected === true ? 'text-success' :
+                        agentInfo.tailscaleConnected === false ? 'text-error' :
+                        'text-foreground-secondary'
+                      }`} title={
+                        agentInfo.tailscaleConnected === true ? 'Connected to Tailscale network' :
+                        agentInfo.tailscaleConnected === false ? 'Tailscale disconnected - Chrome browser control unavailable' :
+                        'Tailscale status unknown'
+                      }>
+                        {agentInfo.tailscaleConnected === true ? 'Connected' :
+                         agentInfo.tailscaleConnected === false ? 'Disconnected' :
+                         'Unknown'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-foreground-secondary">Heartbeat:</span>

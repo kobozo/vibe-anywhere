@@ -632,9 +632,9 @@ function setupAgentNamespace(io: SocketServer): void {
     });
 
     // Handle agent heartbeat
-    socket.on('agent:heartbeat', async (data: { workspaceId: string; tabs: Array<{ tabId: string; status: string }>; metrics?: unknown }) => {
+    socket.on('agent:heartbeat', async (data: { workspaceId: string; tabs: Array<{ tabId: string; status: string }>; tailscaleConnected?: boolean; metrics?: unknown }) => {
       if (socket.workspaceId && socket.workspaceId === data.workspaceId) {
-        await agentRegistry.heartbeat(data.workspaceId, data.tabs);
+        await agentRegistry.heartbeat(data.workspaceId, data.tabs, data.tailscaleConnected);
       }
     });
 

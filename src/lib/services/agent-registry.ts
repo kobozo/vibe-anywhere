@@ -26,6 +26,7 @@ interface ConnectedAgent {
   connectedAt: Date;
   lastHeartbeat: Date;
   tabs: Map<string, TabState>;
+  tailscaleConnected: boolean | null;
 }
 
 // Expected agent version (agents older than this will be asked to update)
@@ -77,6 +78,7 @@ class AgentRegistry {
       connectedAt: new Date(),
       lastHeartbeat: new Date(),
       tabs: new Map(),
+      tailscaleConnected: null,
     };
 
     this.agents.set(workspaceId, agent);
@@ -192,12 +194,18 @@ class AgentRegistry {
    */
   async heartbeat(
     workspaceId: string,
-    tabs: Array<{ tabId: string; status: string }>
+    tabs: Array<{ tabId: string; status: string }>,
+    tailscaleConnected?: boolean
   ): Promise<void> {
     const agent = this.agents.get(workspaceId);
     if (!agent) return;
 
     agent.lastHeartbeat = new Date();
+
+    // Update Tailscale connection status if provided
+    if (tailscaleConnected !== undefined) {
+      agent.tailscaleConnected = tailscaleConnected;
+    }
 
     // Update tab states
     for (const tab of tabs) {

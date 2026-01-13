@@ -322,12 +322,13 @@ export class AgentWebSocket {
   /**
    * Send heartbeat with current state
    */
-  sendHeartbeat(tabs?: Array<{ tabId: string; status: string }>): void {
+  sendHeartbeat(tabs?: Array<{ tabId: string; status: string }>, tailscaleConnected?: boolean): void {
     if (!this.socket?.connected) return;
 
     this.socket.emit('agent:heartbeat', {
       workspaceId: this.config.workspaceId,
       tabs: tabs || [],
+      tailscaleConnected,
       metrics: {
         uptime: process.uptime(),
         memoryUsage: process.memoryUsage().heapUsed,

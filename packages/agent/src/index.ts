@@ -14,6 +14,10 @@ import { AgentIpcServer } from './ipc-server.js';
 import { CliInstaller } from './cli-installer.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // Directory for clipboard-pasted files (images, etc.)
 // Use workspace directory so Claude Code can access the files
@@ -412,17 +416,35 @@ try {
   // Continue - CLI is optional
 }
 
+/**
+ * Check if Tailscale is connected
+ * Returns true if tailscale is running and online, false otherwise
+ */
+async function checkTailscaleStatus(): Promise<boolean> {
+  try {
+    // Run: tailscale status --json | jq '.Self.Online'
+    const { stdout } = await execAsync('tailscale status --json 2>/dev/null');
+    const status = JSON.parse(stdout);
+    return status?.Self?.Online === true;
+  } catch {
+    // Tailscale not installed, not running, or not connected
+    return false;
+  }
+}
+
 // Start connection
 wsClient.connect();
 
-// Heartbeat with tab status
-setInterval(() => {
+// Heartbeat with tab status and Tailscale connection status
+setInterval(async () => {
   const windows = tmuxManager.getWindowStatus();
+  const tailscaleConnected = await checkTailscaleStatus();
   wsClient.sendHeartbeat(
     windows.map(w => ({
       tabId: w.tabId,
       status: w.isEnded ? 'stopped' : 'running',
-    }))
+    })),
+    tailscaleConnected
   );
 }, config.heartbeatInterval);
 
