@@ -1,5 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import type { UserRole } from '@/lib/db/schema';
+
 /**
  * User Management Tab
  *
@@ -7,7 +10,151 @@
  * Displays list of all users with their roles, status, and actions.
  */
 
-export function UserManagementTab() {
+interface User {
+  id: string;
+  username: string;
+  role: UserRole;
+  forcePasswordChange: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface UserManagementTabProps {
+  onUserCountChange?: (count: number) => void;
+}
+
+export function UserManagementTab({ onUserCountChange }: UserManagementTabProps) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch users on mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Notify parent of user count changes
+  useEffect(() => {
+    if (onUserCountChange) {
+      onUserCountChange(users.length);
+    }
+  }, [users.length, onUserCountChange]);
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/users');
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      const data = await response.json();
+      setUsers(data.users || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRoleBadgeColor = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-red-500/20 text-red-400';
+      case 'user-admin':
+        return 'bg-orange-500/20 text-orange-400';
+      case 'developer':
+        return 'bg-blue-500/20 text-blue-400';
+      case 'template-admin':
+        return 'bg-purple-500/20 text-purple-400';
+      case 'security-admin':
+        return 'bg-yellow-500/20 text-yellow-400';
+      default:
+        return 'bg-gray-500/20 text-gray-400';
+    }
+  };
+
+  const formatRoleName = (role: UserRole) => {
+    const roleMap: Record<UserRole, string> = {
+      admin: 'Admin',
+      'user-admin': 'User Admin',
+      developer: 'Developer',
+      'template-admin': 'Template Admin',
+      'security-admin': 'Security Admin',
+    };
+    return roleMap[role] || role;
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const getStatus = (user: User) => {
+    return user.forcePasswordChange ? 'Password Change Required' : 'Active';
+  };
+
+  const handleEdit = (user: User) => {
+    // TODO: Implement edit functionality
+    console.log('Edit user:', user);
+  };
+
+  const handleResetPassword = (user: User) => {
+    // TODO: Implement reset password functionality
+    console.log('Reset password for user:', user);
+  };
+
+  const handleDelete = (user: User) => {
+    // TODO: Implement delete functionality
+    console.log('Delete user:', user);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-foreground-secondary">
+            Manage user accounts, roles, and permissions.
+          </p>
+        </div>
+        <div className="text-foreground-tertiary text-sm py-8 text-center">
+          Loading users...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-foreground-secondary">
+            Manage user accounts, roles, and permissions.
+          </p>
+        </div>
+        <div className="text-error text-sm py-8 text-center">{error}</div>
+      </div>
+    );
+  }
+
+  if (users.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-foreground-secondary">
+            Manage user accounts, roles, and permissions.
+          </p>
+        </div>
+        <div className="text-foreground-tertiary text-sm py-8 text-center">
+          No users found.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -16,9 +163,71 @@ export function UserManagementTab() {
         </p>
       </div>
 
-      {/* Placeholder - will be implemented in US-002 */}
-      <div className="text-foreground-tertiary text-sm py-4">
-        User management interface will be implemented here.
+      {/* User Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-3 px-3 font-medium text-foreground-secondary">
+                Username
+              </th>
+              <th className="text-left py-3 px-3 font-medium text-foreground-secondary">
+                Role
+              </th>
+              <th className="text-left py-3 px-3 font-medium text-foreground-secondary">
+                Created Date
+              </th>
+              <th className="text-left py-3 px-3 font-medium text-foreground-secondary">
+                Status
+              </th>
+              <th className="text-right py-3 px-3 font-medium text-foreground-secondary">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id} className="border-b border-border hover:bg-background-tertiary">
+                <td className="py-3 px-3 text-foreground">{user.username}</td>
+                <td className="py-3 px-3">
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(
+                      user.role
+                    )}`}
+                  >
+                    {formatRoleName(user.role)}
+                  </span>
+                </td>
+                <td className="py-3 px-3 text-foreground-secondary">
+                  {formatDate(user.createdAt)}
+                </td>
+                <td className="py-3 px-3 text-foreground-secondary">{getStatus(user)}</td>
+                <td className="py-3 px-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleEdit(user)}
+                      className="text-primary hover:text-primary-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleResetPassword(user)}
+                      className="text-warning hover:text-warning-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
+                    >
+                      Reset Password
+                    </button>
+                    <button
+                      onClick={() => handleDelete(user)}
+                      className="text-error hover:text-error-hover text-xs px-2 py-1 rounded hover:bg-background-tertiary transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

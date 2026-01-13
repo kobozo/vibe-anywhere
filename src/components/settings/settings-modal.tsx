@@ -28,6 +28,7 @@ const AI_TECH_STACKS: TechStack[] = getStacksByCategory('ai-assistant');
 export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('theme');
   const { role } = useAuth();
+  const [userCount, setUserCount] = useState<number>(0);
 
   // Check if user can manage users (admin or user-admin)
   const canManageUsers = role === 'admin' || role === 'user-admin';
@@ -229,7 +230,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-foreground-secondary hover:text-foreground'}`}
             >
-              Users
+              Users {userCount > 0 && `(${userCount})`}
             </button>
           )}
           <button
@@ -452,7 +453,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
           )}
 
           {/* Users */}
-          {activeTab === 'users' && <UserManagementTab />}
+          {activeTab === 'users' && <UserManagementTab onUserCountChange={setUserCount} />}
 
           {/* SSH Keys */}
           {activeTab === 'ssh-keys' && (
