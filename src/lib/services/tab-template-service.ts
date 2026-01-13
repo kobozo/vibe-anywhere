@@ -175,6 +175,7 @@ export class TabTemplateService {
       const templateData = missingTemplates.map((t) => ({
         ...t,
         userId,
+        args: JSON.stringify(t.args) as any,
       }));
       created = await db.insert(tabTemplates).values(templateData).returning();
     }
@@ -189,6 +190,7 @@ export class TabTemplateService {
     const templateData = DEFAULT_TEMPLATES.map((t) => ({
       ...t,
       userId,
+      args: JSON.stringify(t.args) as any,
     }));
 
     return db.insert(tabTemplates).values(templateData).returning();
@@ -231,7 +233,7 @@ export class TabTemplateService {
         name: input.name,
         icon: input.icon || 'terminal',
         command: input.command,
-        args: input.args || [],
+        args: JSON.stringify(input.args || []) as any,
         description: input.description,
         exitOnClose: input.exitOnClose ?? true, // Default to true for new templates
         sortOrder: maxSortOrder + 1,
