@@ -82,6 +82,14 @@ export const templateStatusEnum = pgEnum('template_status', [
   'error',
 ]);
 
+export const userRoleEnum = pgEnum('user_role', [
+  'admin',
+  'user-admin',
+  'developer',
+  'template-admin',
+  'security-admin',
+]);
+
 // Environment variable entry type for JSONB storage
 export interface EnvVarEntry {
   value: string;      // Plain text or encrypted string
@@ -102,6 +110,7 @@ export const users = pgTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
+  role: userRoleEnum('role').default('developer').notNull(),
   forcePasswordChange: boolean('force_password_change').default(false).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
@@ -135,12 +144,12 @@ export const proxmoxTemplates = pgTable('proxmox_templates', {
   node: text('node'), // Proxmox node
   storage: text('storage'), // Storage used
   status: templateStatusEnum('status').default('pending').notNull(),
-  techStacks: text('tech_stacks').$type<string[]>().$defaultFn(() => JSON.stringify([])), // New tech stacks added to this template
-  inheritedTechStacks: text('inherited_tech_stacks').$type<string[]>().$defaultFn(() => JSON.stringify([])), // Tech stacks inherited from parent
+  techStacks: text('tech_stacks').$type<string[]>().default('[]'), // New tech stacks added to this template
+  inheritedTechStacks: text('inherited_tech_stacks').$type<string[]>().default('[]'), // Tech stacks inherited from parent
   isDefault: boolean('is_default').default(false).notNull(),
   errorMessage: text('error_message'), // Error details if status is 'error'
   stagingContainerIp: text('staging_container_ip'), // IP address when in staging mode
-  envVars: text('env_vars').$type<EnvVarsJson>().$defaultFn(() => JSON.stringify({})), // Environment variables for containers
+  envVars: text('env_vars').$type<EnvVarsJson>().default('{}'), // Environment variables for containers
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
 });
@@ -159,11 +168,11 @@ export const repositories = pgTable('repositories', {
   cloneUrl: text('clone_url').notNull(), // Remote URL for git clone
   cloneDepth: integer('clone_depth'), // null = full clone, positive int = shallow clone depth
   defaultBranch: text('default_branch').default('main'),
-  techStack: text('tech_stack').$type<string[]>().$defaultFn(() => JSON.stringify([])), // Tech stack IDs to install on workspaces (override template)
-  envVars: text('env_vars').$type<EnvVarsJson>().$defaultFn(() => JSON.stringify({})), // Environment variables for containers (overrides template)
-  gitHooks: text('git_hooks').$type<GitHooksJson>().$defaultFn(() => JSON.stringify({})), // Git hooks to sync to workspaces
+  techStack: text('tech_stack').$type<string[]>().default('[]'), // Tech stack IDs to install on workspaces (override template)
+  envVars: text('env_vars').$type<EnvVarsJson>().default('{}'), // Environment variables for containers (overrides template)
+  gitHooks: text('git_hooks').$type<GitHooksJson>().default('{}'), // Git hooks to sync to workspaces
   // Cached branch info from remote (fetched via git ls-remote)
-  cachedBranches: text('cached_branches').$type<string[]>().$defaultFn(() => JSON.stringify([])),
+  cachedBranches: text('cached_branches').$type<string[]>().default('[]'),
   branchesCachedAt: integer('branches_cached_at'), // Unix timestamp ms
   // Resource overrides (null = use global defaults from settings)
   resourceMemory: integer('resource_memory'), // Memory in MB
@@ -224,9 +233,9 @@ export const tabs = pgTable('tabs', {
   icon: text('icon'), // Icon key from template (e.g., 'claude', 'terminal', 'code')
   isPinned: boolean('is_pinned').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
-  command: text('command').$type<string[]>().$defaultFn(() => JSON.stringify(['/bin/bash'])), // Command to exec
+  command: text('command').$type<string[]>().default('["/bin/bash"]'), // Command to exec
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
-  outputBuffer: text('output_buffer').$type<string[]>().$defaultFn(() => JSON.stringify([])),
+  outputBuffer: text('output_buffer').$type<string[]>().default('[]'),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
@@ -260,7 +269,7 @@ export const tabTemplates = pgTable('tab_templates', {
   name: text('name').notNull(), // Display name: "Claude", "Terminal", etc.
   icon: text('icon').default('terminal'), // Icon identifier
   command: text('command').notNull(), // Command to run: "claude", "/bin/bash", etc.
-  args: text('args').$type<string[]>().$defaultFn(() => JSON.stringify([])), // Command arguments
+  args: text('args').$type<string[]>().default('[]'), // Command arguments
   description: text('description'), // Optional description
   exitOnClose: boolean('exit_on_close').default(false).notNull(), // Append && exit to command
   sortOrder: integer('sort_order').default(0).notNull(),
@@ -345,7 +354,7 @@ export const secrets = pgTable('secrets', {
   envKey: text('env_key').notNull(),
   valueEncrypted: text('value_encrypted').notNull(),
   description: text('description'),
-  templateWhitelist: text('template_whitelist').$type<string[]>().$defaultFn(() => JSON.stringify([])).notNull(),
+  templateWhitelist: text('template_whitelist').$type<string[]>().default('[]').notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
 }, (table) => ({
@@ -369,6 +378,25 @@ export const repositorySecrets = pgTable('repository_secrets', {
   secretIdIdx: index('repository_secrets_secret_id_idx').on(table.secretId),
 }));
 
+// Workspace sharing - for tmux session collaboration
+export const workspaceShares = pgTable('workspace_shares', {
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workspaceId: uuid('workspace_id')
+    .references(() => workspaces.id, { onDelete: 'cascade' })
+    .notNull(),
+  sharedWithUserId: uuid('shared_with_user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  sharedByUserId: uuid('shared_by_user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  permissions: text('permissions').$type<string[]>().default('["view","execute"]').notNull(),
+  createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
+  updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
+}, (table) => ({
+  uniqueWorkspaceShare: unique('unique_workspace_share').on(table.workspaceId, table.sharedWithUserId),
+}));
+
 // ============================================
 // LEGACY: Sessions table (kept for migration)
 // ============================================
@@ -387,7 +415,7 @@ export const sessions = pgTable('sessions', {
   worktreePath: text('worktree_path'),
   baseCommit: text('base_commit'),
   claudeCommand: text('claude_command').$type<string[] | null>(),
-  outputBuffer: text('output_buffer').$type<string[]>().$defaultFn(() => JSON.stringify([])),
+  outputBuffer: text('output_buffer').$type<string[]>().default('[]'),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').$defaultFn(() => Date.now()).notNull(),
   updatedAt: integer('updated_at').$defaultFn(() => Date.now()).notNull(),
@@ -416,6 +444,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   proxmoxTemplates: many(proxmoxTemplates),
   gitIdentities: many(gitIdentities),
   secrets: many(secrets),
+  workspaceSharesSharedWith: many(workspaceShares, { relationName: 'sharedWithUser' }),
+  workspaceSharesSharedBy: many(workspaceShares, { relationName: 'sharedByUser' }),
   sessions: many(sessions), // Legacy
 }));
 
@@ -490,6 +520,7 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   tabs: many(tabs),
   portForwards: many(portForwards),
   tabGroups: many(tabGroups),
+  workspaceShares: many(workspaceShares),
 }));
 
 export const portForwardsRelations = relations(portForwards, ({ one }) => ({
@@ -564,6 +595,23 @@ export const repositorySecretsRelations = relations(repositorySecrets, ({ one })
   }),
 }));
 
+export const workspaceSharesRelations = relations(workspaceShares, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [workspaceShares.workspaceId],
+    references: [workspaces.id],
+  }),
+  sharedWithUser: one(users, {
+    fields: [workspaceShares.sharedWithUserId],
+    references: [users.id],
+    relationName: 'sharedWithUser',
+  }),
+  sharedByUser: one(users, {
+    fields: [workspaceShares.sharedByUserId],
+    references: [users.id],
+    relationName: 'sharedByUser',
+  }),
+}));
+
 // Legacy relations
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   user: one(users, {
@@ -587,6 +635,7 @@ export const sessionLogsRelations = relations(sessionLogs, ({ one }) => ({
 // Users
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type UserRole = (typeof userRoleEnum.enumValues)[number];
 
 // Repositories
 export type Repository = typeof repositories.$inferSelect;
@@ -651,6 +700,10 @@ export type Secret = typeof secrets.$inferSelect;
 export type NewSecret = typeof secrets.$inferInsert;
 export type RepositorySecret = typeof repositorySecrets.$inferSelect;
 export type NewRepositorySecret = typeof repositorySecrets.$inferInsert;
+
+// Workspace Sharing
+export type WorkspaceShare = typeof workspaceShares.$inferSelect;
+export type NewWorkspaceShare = typeof workspaceShares.$inferInsert;
 
 // Shared enums
 export type SessionStatus = (typeof sessionStatusEnum.enumValues)[number];

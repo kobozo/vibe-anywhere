@@ -6,6 +6,7 @@ import {
   withErrorHandling,
   NotFoundError,
   ValidationError,
+  ApiRequestError,
 } from '@/lib/api-utils';
 
 interface RouteContext {
@@ -27,12 +28,10 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     throw new NotFoundError('Workspace', id);
   }
 
-  // Verify ownership through repository
-  const repoService = getRepositoryService();
-  const repository = await repoService.getRepository(workspace.repositoryId);
-
-  if (!repository || repository.userId !== user.id) {
-    throw new NotFoundError('Workspace', id);
+  // Check permission: owner, shared user with execute permission, or admin
+  const permission = await workspaceService.checkWorkspacePermission(id, user.id, 'execute');
+  if (!permission.hasPermission) {
+    throw new ApiRequestError('You don\'t have permission to perform this action', 'FORBIDDEN', 403);
   }
 
   // Check if container is already running

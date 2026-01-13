@@ -52,12 +52,12 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
   const repoService = getRepositoryService();
   const repository = await repoService.getRepository(id);
 
-  if (!repository || repository.userId !== user.id) {
+  if (!repository) {
     throw new NotFoundError('Repository', id);
   }
 
   const workspaceService = await getWorkspaceService();
-  const workspaces = await workspaceService.listWorkspaces(id);
+  const workspaces = await workspaceService.listWorkspaces(id, user.id, user.role);
 
   return successResponse({ workspaces });
 });

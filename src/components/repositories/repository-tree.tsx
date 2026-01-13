@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useWorkspaceState } from '@/hooks/useWorkspaceState';
+import { useAuth } from '@/hooks/useAuth';
 import type { Repository, Workspace, ContainerStatus } from '@/lib/db/schema';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SidebarContextMenu } from './sidebar-context-menu';
+import { WorkspaceShareModal } from '@/components/workspace/workspace-share-modal';
 
 type SortOption = 'name-asc' | 'name-desc' | 'updated-desc' | 'updated-asc' | 'created-desc' | 'created-asc';
 
@@ -59,6 +61,7 @@ export function RepositoryTree({
   onSortOptionChange,
 }: RepositoryTreeProps) {
 
+  const { user, role } = useAuth();
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set(initialExpandedRepos || []));
   const [isInitialized, setIsInitialized] = useState(false);
   const [workspacesByRepo, setWorkspacesByRepo] = useState<Record<string, Workspace[]>>({});
@@ -68,6 +71,7 @@ export function RepositoryTree({
   const [workspaceToDestroy, setWorkspaceToDestroy] = useState<Workspace | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
   const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
+  const [workspaceToShare, setWorkspaceToShare] = useState<Workspace | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     repository?: Repository;
@@ -538,6 +542,10 @@ export function RepositoryTree({
     }
   };
 
+  const handleShareWorkspaceClick = (workspace: Workspace) => {
+    setWorkspaceToShare(workspace);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-border">
@@ -643,80 +651,132 @@ export function RepositoryTree({
           </div>
         )}
 
-        {filteredAndSortedRepos.map((repo) => (
-          <div key={repo.id} className="mb-1">
-            {/* Repository header */}
-            <div
-              onClick={() => {
-                // Select repository to show dashboard
-                onSelectWorkspace(null, repo);
-              }}
-              onContextMenu={(e) => handleRepoContextMenu(e, repo)}
-              className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
-                hover:bg-background-tertiary/50 ${
-                  selectedRepositoryId === repo.id && !selectedWorkspaceId
-                    ? 'bg-primary/20 ring-1 ring-primary/30'
-                    : expandedRepos.has(repo.id)
-                    ? 'bg-background-tertiary/30'
-                    : ''
-                }`}
-            >
-              <span
-                className="text-foreground-secondary text-xs w-4 hover:text-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRepo(repo.id);
-                }}
-              >
-                {expandedRepos.has(repo.id) ? '▾' : '▸'}
-              </span>
-              <span className={`flex-1 text-sm truncate ${
-                selectedRepositoryId === repo.id && !selectedWorkspaceId
-                  ? 'text-primary'
-                  : 'text-foreground'
-              }`}>{repo.name}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditRepository(repo);
-                }}
-                className="text-foreground-secondary hover:text-primary px-1 transition-colors"
-                title="Edit repository"
-              >
-                ✎
-              </button>
-              <button
-                onClick={(e) => handleDeleteRepoClick(e, repo)}
-                className="text-foreground-secondary hover:text-error px-1 transition-colors"
-                title="Delete repository"
-              >
-                ×
-              </button>
-            </div>
+        {filteredAndSortedRepos.map((repo) => {
+          // Type assertion to access owner metadata
+          const repoWithOwner = repo as typeof repo & { ownerUsername?: string };
+          const isOwnedByCurrentUser = repo.userId === user?.id;
+          const canEdit = isOwnedByCurrentUser || role === 'admin';
+          const canDelete = isOwnedByCurrentUser || role === 'admin';
 
-            {/* Workspaces */}
-            {expandedRepos.has(repo.id) && (
-              <div className="ml-4 border-l border-border">
+          return (
+            <div key={repo.id} className="mb-1">
+              {/* Repository header */}
+              <div
+                onClick={() => {
+                  // Select repository to show dashboard
+                  onSelectWorkspace(null, repo);
+                }}
+                onContextMenu={(e) => handleRepoContextMenu(e, repo)}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer group
+                  hover:bg-background-tertiary/50 ${
+                    selectedRepositoryId === repo.id && !selectedWorkspaceId
+                      ? 'bg-primary/20 ring-1 ring-primary/30'
+                      : expandedRepos.has(repo.id)
+                      ? 'bg-background-tertiary/30'
+                      : ''
+                  }`}
+              >
+                <span
+                  className="text-foreground-secondary text-xs w-4 hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleRepo(repo.id);
+                  }}
+                >
+                  {expandedRepos.has(repo.id) ? '▾' : '▸'}
+                </span>
+                <div className={`flex-1 text-sm truncate ${
+                  selectedRepositoryId === repo.id && !selectedWorkspaceId
+                    ? 'text-primary'
+                    : 'text-foreground'
+                }`}>
+                  <span>{repo.name}</span>
+                  {!isOwnedByCurrentUser && repoWithOwner.ownerUsername && (
+                    <span className="text-xs text-foreground-tertiary ml-2">
+                      (Owner: {repoWithOwner.ownerUsername})
+                    </span>
+                  )}
+                </div>
+                {canEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditRepository(repo);
+                    }}
+                    className="text-foreground-secondary hover:text-primary px-1 transition-colors"
+                    title="Edit repository"
+                  >
+                    ✎
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={(e) => handleDeleteRepoClick(e, repo)}
+                    className="text-foreground-secondary hover:text-error px-1 transition-colors"
+                    title="Delete repository"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Workspaces */}
+              {expandedRepos.has(repo.id) && (
+                <div className="ml-4 border-l border-border">
                 {loadingRepos.has(repo.id) ? (
                   <div className="text-foreground-tertiary text-xs py-2 pl-4">Loading...</div>
                 ) : (
                   <>
-                    {(workspacesByRepo[repo.id] || []).map((workspace) => (
-                      <div
-                        key={workspace.id}
-                        onClick={() => onSelectWorkspace(workspace, repo)}
-                        onContextMenu={(e) => handleWorkspaceContextMenu(e, workspace)}
-                        className={`flex items-center gap-2 px-2 py-1.5 ml-2 rounded cursor-pointer group relative
-                          hover:bg-background-tertiary/50
-                          ${selectedWorkspaceId === workspace.id ? 'bg-primary/20 text-primary' : 'text-foreground'}`}
-                      >
-                        <span className="text-sm" title={`Container: ${workspace.containerStatus || 'unknown'}`}>
-                          {getContainerStatusIcon(workspace)}
-                        </span>
-                        <span className="flex-1 text-sm truncate">{workspace.name}</span>
-                        <span className="text-xs text-foreground-tertiary">{workspace.branchName}</span>
-                      </div>
-                    ))}
+                    {(workspacesByRepo[repo.id] || []).map((workspace) => {
+                      // Type assertion to access share metadata
+                      const ws = workspace as typeof workspace & {
+                        isShared?: boolean;
+                        sharedBy?: string;
+                        shareCount?: number;
+                        sharedWithUsernames?: string[];
+                      };
+
+                      return (
+                        <div
+                          key={workspace.id}
+                          onClick={() => onSelectWorkspace(workspace, repo)}
+                          onContextMenu={(e) => handleWorkspaceContextMenu(e, workspace)}
+                          className={`px-2 py-1.5 ml-2 rounded cursor-pointer group relative
+                            hover:bg-background-tertiary/50
+                            ${selectedWorkspaceId === workspace.id ? 'bg-primary/20 text-primary' : 'text-foreground'}`}
+                        >
+                          {/* Main workspace info row */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm" title={`Container: ${workspace.containerStatus || 'unknown'}`}>
+                              {getContainerStatusIcon(workspace)}
+                            </span>
+                            <span className="flex-1 text-sm truncate">{workspace.name}</span>
+                            <span className="text-xs text-foreground-tertiary">{workspace.branchName}</span>
+                          </div>
+
+                          {/* Share badges */}
+                          {ws.isShared && ws.sharedBy && (
+                            <div className="ml-6 mt-1">
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs">
+                                <span>👤</span>
+                                <span>Shared by {ws.sharedBy}</span>
+                              </div>
+                            </div>
+                          )}
+                          {!ws.isShared && ws.shareCount !== undefined && ws.shareCount > 0 && (
+                            <div className="ml-6 mt-1">
+                              <div
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-400 rounded text-xs cursor-help"
+                                title={ws.sharedWithUsernames?.join(', ') || ''}
+                              >
+                                <span>👥</span>
+                                <span>Shared with {ws.shareCount} user{ws.shareCount !== 1 ? 's' : ''}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     <button
                       onClick={() => onAddWorkspace(repo.id)}
                       className="flex items-center gap-2 px-2 py-1.5 ml-2 text-foreground-tertiary hover:text-foreground text-sm"
@@ -726,10 +786,11 @@ export function RepositoryTree({
                     </button>
                   </>
                 )}
-              </div>
-            )}
-          </div>
-        ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Delete Repository Confirmation */}
@@ -822,8 +883,33 @@ export function RepositoryTree({
               handleReloadEnvVars(contextMenu.workspace);
             }
           }}
+          onShareWorkspace={() => {
+            if (contextMenu.workspace) {
+              handleShareWorkspaceClick(contextMenu.workspace);
+            }
+          }}
           isRedeploying={contextMenu.workspace ? redeployingWorkspaces.has(contextMenu.workspace.id) : false}
           isDestroying={contextMenu.workspace ? destroyingWorkspaces.has(contextMenu.workspace.id) : false}
+          isOwner={
+            contextMenu.repository
+              ? contextMenu.repository.userId === user?.id
+              : contextMenu.workspace
+              ? (() => {
+                  const repo = repositories.find(r => r.id === contextMenu.workspace?.repositoryId);
+                  return repo?.userId === user?.id;
+                })()
+              : false
+          }
+          isAdmin={role === 'admin'}
+        />
+      )}
+
+      {/* Workspace Share Modal */}
+      {workspaceToShare && (
+        <WorkspaceShareModal
+          isOpen={!!workspaceToShare}
+          onClose={() => setWorkspaceToShare(null)}
+          workspace={workspaceToShare}
         />
       )}
     </div>

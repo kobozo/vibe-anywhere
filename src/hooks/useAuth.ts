@@ -12,6 +12,7 @@ interface User {
 interface AuthState {
   user: User | null;
   token: string | null;
+  role: string;
   forcePasswordChange: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -33,6 +34,7 @@ export function useAuthState(): AuthContextValue {
   const [state, setState] = useState<AuthState>({
     user: null,
     token: null,
+    role: 'developer',
     forcePasswordChange: false,
     isLoading: true,
     isAuthenticated: false,
@@ -44,7 +46,7 @@ export function useAuthState(): AuthContextValue {
       const stored = localStorage.getItem(AUTH_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        const { user, token, forcePasswordChange } = parsed;
+        const { user, token, forcePasswordChange, role } = parsed;
 
         // Validate that we have valid user and token
         if (user && token && typeof token === 'string') {
@@ -53,6 +55,7 @@ export function useAuthState(): AuthContextValue {
           setState({
             user,
             token,
+            role: role || 'developer',
             forcePasswordChange: Boolean(forcePasswordChange),
             isLoading: false,
             isAuthenticated: true,
@@ -92,14 +95,18 @@ export function useAuthState(): AuthContextValue {
     // Ensure forcePasswordChange is a boolean
     const forcePasswordChangeBool = Boolean(forcePasswordChange);
 
+    // Extract role from user object, default to 'developer'
+    const role = user.role || 'developer';
+
     // Store in localStorage
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user, token, forcePasswordChange: forcePasswordChangeBool }));
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user, token, forcePasswordChange: forcePasswordChangeBool, role }));
     // Also store token separately for direct access by API calls
     localStorage.setItem('auth_token', token);
 
     setState({
       user,
       token,
+      role,
       forcePasswordChange: forcePasswordChangeBool,
       isLoading: false,
       isAuthenticated: true,
@@ -112,6 +119,7 @@ export function useAuthState(): AuthContextValue {
     setState({
       user: null,
       token: null,
+      role: 'developer',
       forcePasswordChange: false,
       isLoading: false,
       isAuthenticated: false,

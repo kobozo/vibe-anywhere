@@ -46,6 +46,7 @@ export type TabType = 'terminal' | 'git' | 'docker' | 'dashboard';
 export type PortForwardProtocol = 'http' | 'tcp';
 export type TabGroupLayout = 'horizontal' | 'vertical' | 'left-stack' | 'right-stack' | 'grid-2x2';
 export type TemplateStatus = 'pending' | 'provisioning' | 'staging' | 'ready' | 'error';
+export type UserRole = 'admin' | 'user-admin' | 'developer' | 'template-admin' | 'security-admin';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -53,6 +54,7 @@ export const users = sqliteTable('users', {
   username: text('username').unique().notNull(),
   passwordHash: text('password_hash').notNull(),
   token: text('token').unique(),
+  role: text('role').$type<UserRole>().default('developer').notNull(),
   forcePasswordChange: boolean('force_password_change').default(false).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
@@ -82,12 +84,12 @@ export const proxmoxTemplates = sqliteTable('proxmox_templates', {
   node: text('node'),
   storage: text('storage'),
   status: text('status').$type<TemplateStatus>().default('pending').notNull(),
-  techStacks: jsonb<string[]>('tech_stacks').default([]),
-  inheritedTechStacks: jsonb<string[]>('inherited_tech_stacks').default([]),
+  techStacks: jsonb<string[]>('tech_stacks').default('[]'),
+  inheritedTechStacks: jsonb<string[]>('inherited_tech_stacks').default('[]'),
   isDefault: boolean('is_default').default(false).notNull(),
   errorMessage: text('error_message'),
   stagingContainerIp: text('staging_container_ip'),
-  envVars: jsonb<EnvVarsJson>('env_vars').default({}),
+  envVars: jsonb<EnvVarsJson>('env_vars').default('{}'),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
@@ -103,10 +105,10 @@ export const repositories = sqliteTable('repositories', {
   cloneUrl: text('clone_url').notNull(),
   cloneDepth: integer('clone_depth'),
   defaultBranch: text('default_branch').default('main'),
-  techStack: jsonb<string[]>('tech_stack').default([]),
-  envVars: jsonb<EnvVarsJson>('env_vars').default({}),
-  gitHooks: jsonb<GitHooksJson>('git_hooks').default({}),
-  cachedBranches: jsonb<string[]>('cached_branches').default([]),
+  techStack: jsonb<string[]>('tech_stack').default('[]'),
+  envVars: jsonb<EnvVarsJson>('env_vars').default('{}'),
+  gitHooks: jsonb<GitHooksJson>('git_hooks').default('{}'),
+  cachedBranches: jsonb<string[]>('cached_branches').default('[]'),
   branchesCachedAt: integer('branches_cached_at'), // Unix timestamp ms
   resourceMemory: integer('resource_memory'),
   resourceCpuCores: integer('resource_cpu_cores'),
@@ -154,9 +156,9 @@ export const tabs = sqliteTable('tabs', {
   icon: text('icon'),
   isPinned: boolean('is_pinned').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
-  command: jsonb<string[]>('command').default(['/bin/bash']),
+  command: jsonb<string[]>('command').default('["/bin/bash"]'),
   exitOnClose: boolean('exit_on_close').default(false).notNull(),
-  outputBuffer: jsonb<string[]>('output_buffer').default([]),
+  outputBuffer: jsonb<string[]>('output_buffer').default('[]'),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
@@ -186,7 +188,7 @@ export const tabTemplates = sqliteTable('tab_templates', {
   name: text('name').notNull(),
   icon: text('icon').default('terminal'),
   command: text('command').notNull(),
-  args: jsonb<string[]>('args').default([]),
+  args: jsonb<string[]>('args').default('[]'),
   description: text('description'),
   exitOnClose: boolean('exit_on_close').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
@@ -257,7 +259,7 @@ export const secrets = sqliteTable('secrets', {
   envKey: text('env_key').notNull(),
   valueEncrypted: text('value_encrypted').notNull(),
   description: text('description'),
-  templateWhitelist: jsonb<string[]>('template_whitelist').default([]).notNull(),
+  templateWhitelist: jsonb<string[]>('template_whitelist').default('[]').notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 }, (table) => ({
@@ -277,6 +279,19 @@ export const repositorySecrets = sqliteTable('repository_secrets', {
   secretIdIdx: index('repository_secrets_secret_id_idx').on(table.secretId),
 }));
 
+// Workspace sharing - for tmux session collaboration
+export const workspaceShares = sqliteTable('workspace_shares', {
+  id: uuid('id'),
+  workspaceId: uuidRef('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  sharedWithUserId: uuidRef('shared_with_user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  sharedByUserId: uuidRef('shared_by_user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  permissions: jsonb<string[]>('permissions').default('["view","execute"]').notNull(),
+  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+}, (table) => ({
+  uniqueWorkspaceShare: unique('unique_workspace_share').on(table.workspaceId, table.sharedWithUserId),
+}));
+
 // LEGACY: Sessions table
 export const sessions = sqliteTable('sessions', {
   id: uuid('id'),
@@ -291,7 +306,7 @@ export const sessions = sqliteTable('sessions', {
   worktreePath: text('worktree_path'),
   baseCommit: text('base_commit'),
   claudeCommand: jsonb<string[] | null>('claude_command'),
-  outputBuffer: jsonb<string[]>('output_buffer').default([]),
+  outputBuffer: jsonb<string[]>('output_buffer').default('[]'),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
@@ -315,6 +330,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   proxmoxTemplates: many(proxmoxTemplates),
   gitIdentities: many(gitIdentities),
   secrets: many(secrets),
+  workspaceSharesSharedWith: many(workspaceShares, { relationName: 'sharedWithUser' }),
+  workspaceSharesSharedBy: many(workspaceShares, { relationName: 'sharedByUser' }),
   sessions: many(sessions),
 }));
 
@@ -389,6 +406,7 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   tabs: many(tabs),
   portForwards: many(portForwards),
   tabGroups: many(tabGroups),
+  workspaceShares: many(workspaceShares),
 }));
 
 export const portForwardsRelations = relations(portForwards, ({ one }) => ({
@@ -463,6 +481,23 @@ export const repositorySecretsRelations = relations(repositorySecrets, ({ one })
   }),
 }));
 
+export const workspaceSharesRelations = relations(workspaceShares, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [workspaceShares.workspaceId],
+    references: [workspaces.id],
+  }),
+  sharedWithUser: one(users, {
+    fields: [workspaceShares.sharedWithUserId],
+    references: [users.id],
+    relationName: 'sharedWithUser',
+  }),
+  sharedByUser: one(users, {
+    fields: [workspaceShares.sharedByUserId],
+    references: [users.id],
+    relationName: 'sharedByUser',
+  }),
+}));
+
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   user: one(users, {
     fields: [sessions.userId],
@@ -513,3 +548,5 @@ export type Secret = typeof secrets.$inferSelect;
 export type NewSecret = typeof secrets.$inferInsert;
 export type RepositorySecret = typeof repositorySecrets.$inferSelect;
 export type NewRepositorySecret = typeof repositorySecrets.$inferInsert;
+export type WorkspaceShare = typeof workspaceShares.$inferSelect;
+export type NewWorkspaceShare = typeof workspaceShares.$inferInsert;

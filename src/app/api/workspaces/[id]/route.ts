@@ -5,6 +5,7 @@ import {
   successResponse,
   withErrorHandling,
   NotFoundError,
+  ApiRequestError,
 } from '@/lib/api-utils';
 
 interface RouteContext {
@@ -25,12 +26,10 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     throw new NotFoundError('Workspace', id);
   }
 
-  // Verify ownership through repository
-  const repoService = getRepositoryService();
-  const repository = await repoService.getRepository(workspace.repositoryId);
-
-  if (!repository || repository.userId !== user.id) {
-    throw new NotFoundError('Workspace', id);
+  // Check permission: owner, shared user with view permission, or admin
+  const permission = await workspaceService.checkWorkspacePermission(id, user.id, 'view');
+  if (!permission.hasPermission) {
+    throw new ApiRequestError('You don\'t have permission to perform this action', 'FORBIDDEN', 403);
   }
 
   // Get git status
@@ -58,12 +57,10 @@ export const DELETE = withErrorHandling(async (request: NextRequest, context: un
     throw new NotFoundError('Workspace', id);
   }
 
-  // Verify ownership through repository
-  const repoService = getRepositoryService();
-  const repository = await repoService.getRepository(workspace.repositoryId);
-
-  if (!repository || repository.userId !== user.id) {
-    throw new NotFoundError('Workspace', id);
+  // Check permission: only owner or admin can delete
+  const permission = await workspaceService.checkWorkspacePermission(id, user.id, 'modify');
+  if (!permission.hasPermission) {
+    throw new ApiRequestError('You don\'t have permission to perform this action', 'FORBIDDEN', 403);
   }
 
   await workspaceService.deleteWorkspace(id);

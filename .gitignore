@@ -57,3 +57,7 @@ next-env.d.ts
 # Use docker-compose.local.yml for personal overrides
 docker-compose.local.yml
 .next-cache
+.chief-wiggum
+
+# Generated JS files from tsx transformation
+src/**/*.js

@@ -34,8 +34,24 @@ export interface UpdateTemplateInput {
 export class TemplateService {
   /**
    * List all templates for a user
+   *
+   * @param userId - Optional user ID. If not provided and user is admin/template-admin, returns all templates
+   * @param role - User's role for determining visibility
    */
-  async listTemplates(userId: string): Promise<ProxmoxTemplate[]> {
+  async listTemplates(userId?: string, role?: string): Promise<ProxmoxTemplate[]> {
+    // Admin and template-admin can see all templates
+    if (role === 'admin' || role === 'template-admin') {
+      return db
+        .select()
+        .from(proxmoxTemplates)
+        .orderBy(desc(proxmoxTemplates.createdAt));
+    }
+
+    // Other roles only see their own templates
+    if (!userId) {
+      return [];
+    }
+
     return db
       .select()
       .from(proxmoxTemplates)

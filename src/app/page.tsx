@@ -47,7 +47,7 @@ const Terminal = dynamic(
 );
 
 function Dashboard() {
-  const { isAuthenticated, isLoading: authLoading, logout, user, forcePasswordChange } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, user, forcePasswordChange, role } = useAuth();
   const {
     repositories,
     isLoading: reposLoading,
@@ -1259,6 +1259,7 @@ function Dashboard() {
           />
           <UserMenu
             username={user?.username || ''}
+            role={role}
             onProfile={() => setIsProfileOpen(true)}
             onSettings={() => setIsSettingsOpen(true)}
             onLogout={logout}

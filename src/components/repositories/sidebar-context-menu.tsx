@@ -20,9 +20,13 @@ interface SidebarContextMenuProps {
   onDestroyWorkspace?: () => void;
   onDeleteWorkspace?: () => void;
   onReloadEnvVars?: () => void;
+  onShareWorkspace?: () => void;
   // Loading states
   isRedeploying?: boolean;
   isDestroying?: boolean;
+  // Permission checks
+  isOwner?: boolean;
+  isAdmin?: boolean;
 }
 
 export function SidebarContextMenu({
@@ -40,8 +44,11 @@ export function SidebarContextMenu({
   onDestroyWorkspace,
   onDeleteWorkspace,
   onReloadEnvVars,
+  onShareWorkspace,
   isRedeploying,
   isDestroying,
+  isOwner,
+  isAdmin,
 }: SidebarContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -99,16 +106,19 @@ export function SidebarContextMenu({
       {/* Repository Context Menu */}
       {repository && (
         <>
-          <button
-            onClick={() => {
-              onClose();
-              onEditRepository?.();
-            }}
-            className={menuItemClass}
-          >
-            <span className="w-4 text-center">✎</span>
-            Edit Repository
-          </button>
+          {/* Edit - only show if owner or admin */}
+          {(isOwner || isAdmin) && (
+            <button
+              onClick={() => {
+                onClose();
+                onEditRepository?.();
+              }}
+              className={menuItemClass}
+            >
+              <span className="w-4 text-center">✎</span>
+              Edit Repository
+            </button>
+          )}
 
           <button
             onClick={() => {
@@ -121,18 +131,23 @@ export function SidebarContextMenu({
             New Workspace
           </button>
 
-          <div className="h-px bg-border my-1" />
+          {/* Delete - only show if owner or admin */}
+          {(isOwner || isAdmin) && (
+            <>
+              <div className="h-px bg-border my-1" />
 
-          <button
-            onClick={() => {
-              onClose();
-              onDeleteRepository?.();
-            }}
-            className={`${menuItemClass} text-error`}
-          >
-            <span className="w-4 text-center">×</span>
-            Delete Repository
-          </button>
+              <button
+                onClick={() => {
+                  onClose();
+                  onDeleteRepository?.();
+                }}
+                className={`${menuItemClass} text-error`}
+              >
+                <span className="w-4 text-center">×</span>
+                Delete Repository
+              </button>
+            </>
+          )}
         </>
       )}
 
@@ -198,6 +213,22 @@ export function SidebarContextMenu({
             >
               <span className="w-4 text-center">🔄</span>
               Reload Env Vars
+            </button>
+          )}
+
+          <div className="h-px bg-border my-1" />
+
+          {/* Share Workspace - only show if owner or admin */}
+          {(isOwner || isAdmin) && (
+            <button
+              onClick={() => {
+                onClose();
+                onShareWorkspace?.();
+              }}
+              className={menuItemClass}
+            >
+              <span className="w-4 text-center">👥</span>
+              Share Workspace
             </button>
           )}
 

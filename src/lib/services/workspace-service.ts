@@ -1,6 +1,6 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { workspaces, type Workspace, type WorkspaceStatus, type ContainerStatus, type ContainerBackend } from '@/lib/db/schema';
+import { workspaces, workspaceShares, users, type Workspace, type WorkspaceShare, type WorkspaceStatus, type ContainerStatus, type ContainerBackend } from '@/lib/db/schema';
 import { getRepositoryService, RepositoryService } from './repository-service';
 import { getSSHKeyService } from './ssh-key-service';
 import { getTemplateService } from './template-service';
@@ -13,6 +13,7 @@ import { buildWorkspaceTags } from '@/lib/container/proxmox/tags';
 import { config } from '@/lib/config';
 import { startupProgressStore } from './startup-progress-store';
 import type { StartupStep } from '@/lib/types/startup-progress';
+import { NotFoundError, AuthError } from '@/lib/errors';
 
 export interface CreateWorkspaceInput {
   name: string;
@@ -130,13 +131,102 @@ export class WorkspaceService {
 
   /**
    * List workspaces for a repository
+   * Includes workspaces owned by user (via repository) and workspaces shared with user
+   *
+   * @param repositoryId - Repository ID to filter workspaces
+   * @param userId - User ID to check ownership and shares
+   * @param role - User role (optional, for admin visibility)
+   * @returns Array of workspaces with share metadata
    */
-  async listWorkspaces(repositoryId: string): Promise<Workspace[]> {
-    return db
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.repositoryId, repositoryId))
+  async listWorkspaces(
+    repositoryId: string,
+    userId?: string,
+    role?: string
+  ): Promise<Array<Workspace & {
+    isShared?: boolean;
+    sharedBy?: string;
+    permissions?: string[];
+    shareCount?: number;
+    sharedWithUsernames?: string[];
+  }>> {
+    // If no userId provided, use legacy behavior (all workspaces for repository)
+    if (!userId) {
+      return db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.repositoryId, repositoryId))
+        .orderBy(desc(workspaces.lastActivityAt));
+    }
+
+    // Get repository to check ownership
+    const repo = await this.repositoryService.getRepository(repositoryId);
+    if (!repo) {
+      return [];
+    }
+
+    const isOwner = repo.userId === userId;
+
+    // If user owns the repository, return all workspaces with share counts
+    if (isOwner) {
+      const ownedWorkspaces = await db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.repositoryId, repositoryId))
+        .orderBy(desc(workspaces.lastActivityAt));
+
+      // Fetch share information for each owned workspace
+      const workspacesWithShares = await Promise.all(
+        ownedWorkspaces.map(async (ws) => {
+          // Get all shares for this workspace
+          const shares = await db
+            .select({
+              share: workspaceShares,
+              user: users,
+            })
+            .from(workspaceShares)
+            .innerJoin(users, eq(workspaceShares.sharedWithUserId, users.id))
+            .where(eq(workspaceShares.workspaceId, ws.id));
+
+          const shareCount = shares.length;
+          const sharedWithUsernames = shares.map(({ user }) => user.username);
+
+          return {
+            ...ws,
+            isShared: false,
+            shareCount,
+            sharedWithUsernames,
+          };
+        })
+      );
+
+      return workspacesWithShares;
+    }
+
+    // User doesn't own the repository - return only shared workspaces
+    const sharedWorkspaces = await db
+      .select({
+        workspace: workspaces,
+        share: workspaceShares,
+        owner: users,
+      })
+      .from(workspaceShares)
+      .innerJoin(workspaces, eq(workspaceShares.workspaceId, workspaces.id))
+      .innerJoin(users, eq(workspaceShares.sharedByUserId, users.id))
+      .where(
+        and(
+          eq(workspaces.repositoryId, repositoryId),
+          eq(workspaceShares.sharedWithUserId, userId)
+        )
+      )
       .orderBy(desc(workspaces.lastActivityAt));
+
+    // Map to workspace with share metadata
+    return sharedWorkspaces.map(({ workspace, share, owner }) => ({
+      ...workspace,
+      isShared: true,
+      sharedBy: owner.username,
+      permissions: share.permissions,
+    }));
   }
 
   /**
@@ -853,6 +943,270 @@ export class WorkspaceService {
         untracked: 0,
       };
     }
+  }
+
+  /**
+   * Check if user has permission to access a workspace
+   * @param workspaceId - Workspace ID to check
+   * @param userId - User ID to check
+   * @param requiredPermission - Permission required: 'view', 'execute', or 'modify'
+   * @returns Object with { hasPermission: boolean, isOwner: boolean, isAdmin: boolean, share?: WorkspaceShare }
+   */
+  async checkWorkspacePermission(
+    workspaceId: string,
+    userId: string,
+    requiredPermission: 'view' | 'execute' | 'modify'
+  ): Promise<{
+    hasPermission: boolean;
+    isOwner: boolean;
+    isAdmin: boolean;
+    share?: WorkspaceShare;
+  }> {
+    // Get workspace
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    // Get repository to check ownership
+    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+    if (!repo) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    // Get user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    const isOwner = repo.userId === userId;
+    const isAdmin = user.role === 'admin';
+
+    // Owner or admin always has permission
+    if (isOwner || isAdmin) {
+      return { hasPermission: true, isOwner, isAdmin };
+    }
+
+    // Check if workspace is shared with user
+    const [share] = await db
+      .select()
+      .from(workspaceShares)
+      .where(
+        and(
+          eq(workspaceShares.workspaceId, workspaceId),
+          eq(workspaceShares.sharedWithUserId, userId)
+        )
+      );
+
+    if (!share) {
+      return { hasPermission: false, isOwner: false, isAdmin: false };
+    }
+
+    // Check if share has required permission
+    const permissions = share.permissions as string[];
+    let hasRequiredPermission = false;
+
+    if (requiredPermission === 'view') {
+      // View requires 'view' permission
+      hasRequiredPermission = permissions.includes('view');
+    } else if (requiredPermission === 'execute') {
+      // Execute requires 'execute' permission
+      hasRequiredPermission = permissions.includes('execute');
+    } else if (requiredPermission === 'modify') {
+      // Modify is only allowed for owner or admin (never via share)
+      hasRequiredPermission = false;
+    }
+
+    return {
+      hasPermission: hasRequiredPermission,
+      isOwner: false,
+      isAdmin: false,
+      share,
+    };
+  }
+
+  /**
+   * Share a workspace with another user
+   * @throws {NotFoundError} if workspace or user doesn't exist
+   * @throws {AuthError} if requesting user doesn't own the workspace
+   */
+  async shareWorkspace(
+    workspaceId: string,
+    sharedByUserId: string,
+    sharedWithUsername: string,
+    permissions: string[] = ['view', 'execute']
+  ): Promise<WorkspaceShare> {
+    // Validate workspace exists
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new NotFoundError('Workspace', workspaceId);
+    }
+
+    // Validate requesting user owns the workspace
+    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+    if (!repo) {
+      throw new NotFoundError('Repository', workspace.repositoryId);
+    }
+    if (repo.userId !== sharedByUserId) {
+      throw new AuthError('Only workspace owner can share workspaces', 'FORBIDDEN');
+    }
+
+    // Validate target user exists
+    const [targetUser] = await db.select().from(users).where(eq(users.username, sharedWithUsername));
+    if (!targetUser) {
+      throw new NotFoundError('User', sharedWithUsername);
+    }
+
+    // Create share (unique constraint prevents duplicates)
+    const [share] = await db
+      .insert(workspaceShares)
+      .values({
+        workspaceId,
+        sharedWithUserId: targetUser.id,
+        sharedByUserId,
+        permissions,
+      })
+      .returning();
+
+    return share;
+  }
+
+  /**
+   * Remove a workspace share
+   * @throws {NotFoundError} if workspace or share doesn't exist
+   * @throws {AuthError} if requesting user is not owner or recipient
+   */
+  async unshareWorkspace(
+    workspaceId: string,
+    sharedWithUserId: string,
+    requestingUserId: string
+  ): Promise<void> {
+    // Validate workspace exists
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new NotFoundError('Workspace', workspaceId);
+    }
+
+    // Get the share
+    const [share] = await db
+      .select()
+      .from(workspaceShares)
+      .where(
+        and(
+          eq(workspaceShares.workspaceId, workspaceId),
+          eq(workspaceShares.sharedWithUserId, sharedWithUserId)
+        )
+      );
+
+    if (!share) {
+      throw new NotFoundError('Workspace share');
+    }
+
+    // Validate requesting user is owner or recipient
+    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+    if (!repo) {
+      throw new NotFoundError('Repository', workspace.repositoryId);
+    }
+
+    const isOwner = repo.userId === requestingUserId;
+    const isRecipient = share.sharedWithUserId === requestingUserId;
+
+    if (!isOwner && !isRecipient) {
+      throw new AuthError('Only workspace owner or share recipient can remove shares', 'FORBIDDEN');
+    }
+
+    // Delete the share
+    await db
+      .delete(workspaceShares)
+      .where(
+        and(
+          eq(workspaceShares.workspaceId, workspaceId),
+          eq(workspaceShares.sharedWithUserId, sharedWithUserId)
+        )
+      );
+  }
+
+  /**
+   * List all shares for a workspace
+   * @throws {NotFoundError} if workspace doesn't exist
+   * @throws {AuthError} if requesting user doesn't own the workspace and is not admin
+   */
+  async listWorkspaceShares(workspaceId: string, requestingUserId: string): Promise<WorkspaceShare[]> {
+    // Validate workspace exists
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new NotFoundError('Workspace', workspaceId);
+    }
+
+    // Check if requesting user owns the workspace or is admin
+    const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+    if (!repo) {
+      throw new NotFoundError('Repository', workspace.repositoryId);
+    }
+
+    const [requestingUser] = await db.select().from(users).where(eq(users.id, requestingUserId));
+    if (!requestingUser) {
+      throw new NotFoundError('User', requestingUserId);
+    }
+
+    const isOwner = repo.userId === requestingUserId;
+    const isAdmin = requestingUser.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      throw new AuthError('Only workspace owner or admin can list shares', 'FORBIDDEN');
+    }
+
+    // List all shares for this workspace
+    return db.select().from(workspaceShares).where(eq(workspaceShares.workspaceId, workspaceId));
+  }
+
+  /**
+   * List all workspaces shared with a user
+   * Returns workspace details and owner info
+   */
+  async listSharedWithMe(userId: string): Promise<Array<{
+    share: WorkspaceShare;
+    workspace: Workspace;
+    owner: { id: string; username: string };
+  }>> {
+    // Get all shares for this user
+    const shares = await db
+      .select()
+      .from(workspaceShares)
+      .where(eq(workspaceShares.sharedWithUserId, userId));
+
+    // Fetch workspace and owner details for each share
+    const results = await Promise.all(
+      shares.map(async (share) => {
+        const workspace = await this.getWorkspace(share.workspaceId);
+        if (!workspace) {
+          return null;
+        }
+
+        const repo = await this.repositoryService.getRepository(workspace.repositoryId);
+        if (!repo) {
+          return null;
+        }
+
+        const [owner] = await db.select().from(users).where(eq(users.id, repo.userId));
+        if (!owner) {
+          return null;
+        }
+
+        return {
+          share,
+          workspace,
+          owner: {
+            id: owner.id,
+            username: owner.username,
+          },
+        };
+      })
+    );
+
+    // Filter out null results (deleted workspaces/repos/users)
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
   }
 }
 

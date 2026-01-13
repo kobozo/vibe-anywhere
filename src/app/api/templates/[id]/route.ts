@@ -10,7 +10,9 @@ import {
   withErrorHandling,
   ValidationError,
   NotFoundError,
+  ApiRequestError,
 } from '@/lib/api-utils';
+import { canManageTemplates } from '@/lib/permissions';
 
 const updateTemplateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -24,6 +26,8 @@ interface RouteContext {
 
 /**
  * GET /api/templates/[id] - Get a template by ID
+ * - admin/template-admin: Can view any template
+ * - other roles: Can only view their own templates
  */
 export const GET = withErrorHandling(
   async (request: NextRequest, context: unknown) => {
@@ -37,9 +41,16 @@ export const GET = withErrorHandling(
       throw new NotFoundError('Template not found');
     }
 
-    // Verify ownership
-    if (template.userId !== user.id) {
-      throw new NotFoundError('Template not found');
+    // Check permission: owner, admin, or template-admin
+    const isOwner = template.userId === user.id;
+    const hasManagePermission = canManageTemplates(user);
+
+    if (!isOwner && !hasManagePermission) {
+      throw new ApiRequestError(
+        "You don't have permission to perform this action",
+        'FORBIDDEN',
+        403
+      );
     }
 
     return successResponse({ template });
@@ -48,6 +59,9 @@ export const GET = withErrorHandling(
 
 /**
  * PATCH /api/templates/[id] - Update a template
+ * - admin/template-admin: Can edit any template
+ * - owner: Can edit their own template
+ * - other roles: Cannot edit
  */
 export const PATCH = withErrorHandling(
   async (request: NextRequest, context: unknown) => {
@@ -67,9 +81,16 @@ export const PATCH = withErrorHandling(
       throw new NotFoundError('Template not found');
     }
 
-    // Verify ownership
-    if (existing.userId !== user.id) {
-      throw new NotFoundError('Template not found');
+    // Check permission: owner, admin, or template-admin
+    const isOwner = existing.userId === user.id;
+    const hasManagePermission = canManageTemplates(user);
+
+    if (!isOwner && !hasManagePermission) {
+      throw new ApiRequestError(
+        "You don't have permission to perform this action",
+        'FORBIDDEN',
+        403
+      );
     }
 
     const template = await templateService.updateTemplate(id, result.data);
@@ -81,6 +102,9 @@ export const PATCH = withErrorHandling(
 /**
  * DELETE /api/templates/[id] - Delete a template
  * Also deletes from Proxmox if the template was provisioned
+ * - admin/template-admin: Can delete any template
+ * - owner: Can delete their own template
+ * - other roles: Cannot delete
  */
 export const DELETE = withErrorHandling(
   async (request: NextRequest, context: unknown) => {
@@ -94,9 +118,16 @@ export const DELETE = withErrorHandling(
       throw new NotFoundError('Template not found');
     }
 
-    // Verify ownership
-    if (existing.userId !== user.id) {
-      throw new NotFoundError('Template not found');
+    // Check permission: owner, admin, or template-admin
+    const isOwner = existing.userId === user.id;
+    const hasManagePermission = canManageTemplates(user);
+
+    if (!isOwner && !hasManagePermission) {
+      throw new ApiRequestError(
+        "You don't have permission to perform this action",
+        'FORBIDDEN',
+        403
+      );
     }
 
     // If template was provisioned on Proxmox, delete it there first
