@@ -126,6 +126,8 @@ You should see your machine listed with an IP in the `100.64.x.x` range.
 1. Open Chrome and go to the [Claude Code extension page](https://chromewebstore.google.com/detail/claude-code-chrome/pblkcbbjbdmamikdbgiemkofkjhpjhpp)
 2. Click **Add to Chrome**
 
+**Official Documentation**: For detailed information about the Claude Code Chrome extension and browser control features, see the [official Claude Code Chrome documentation](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/chrome-extension)
+
 #### Launch Chrome with Remote Debugging
 Chrome must be launched with the `--remote-debugging-port=9222` flag to enable CDP:
 
@@ -173,6 +175,57 @@ claude --chrome
 ```
 
 Claude will automatically detect and use the CDP proxy shim to control your local Chrome browser.
+
+## Visual Walkthrough
+
+### Connection Status Indicators
+
+The Vibe Anywhere dashboard shows real-time connection status for both Tailscale and Chrome:
+
+**Tailscale Status**:
+- ✅ **Green "Connected"**: Tailscale VPN is active and connected to your tailnet
+- ❌ **Red "Disconnected"**: Tailscale is not connected (check container logs)
+- ⚪ **Gray "Unknown"**: Status not yet determined (wait for first heartbeat)
+
+**Chrome Status**:
+- ✅ **Green with hostname/IP**: Chrome is connected and ready for browser control
+  - Example: `macbook-pro (100.64.0.5:9222)`
+- ⚪ **Gray "Waiting..."**: CDP proxy is searching for Chrome or Chrome is not running
+
+### Step-by-Step Connection Flow
+
+1. **Start Workspace**: Create or start a workspace with the `chrome-mcp-proxy` tech stack
+2. **Wait for Tailscale**: Dashboard shows Tailscale status changing from "Unknown" → "Connected" (30 seconds)
+3. **Launch Chrome Locally**: Start Chrome with `--remote-debugging-port=9222` on your local machine
+4. **Start Claude CLI**: In workspace terminal, run `claude --chrome`
+5. **Auto-Discovery**: CDP proxy automatically discovers your Chrome instance via Tailscale
+6. **Dashboard Updates**: Chrome status shows green with your machine's hostname and IP
+7. **Browser Control Active**: Claude can now interact with your local Chrome browser
+
+### Troubleshooting with Dashboard
+
+The dashboard provides real-time diagnostics:
+
+| Dashboard Shows | What It Means | Next Steps |
+|----------------|---------------|------------|
+| Tailscale: Disconnected | Container can't reach Tailnet | Check `TAILSCALE_OAUTH_TOKEN` in .env, verify token has `devices:write` scope |
+| Tailscale: Connected, Chrome: Waiting | Tailscale works, but Chrome not found | Start Chrome with `--remote-debugging-port=9222`, verify same Tailnet |
+| Both Connected | Everything working | Ready to use `claude --chrome` for browser automation |
+
+### Example Session
+
+```bash
+# Inside workspace terminal
+$ claude --chrome
+[CDP Shim] Discovering Chrome... Found 2 Tailscale peer(s)
+[CDP Shim] Testing macbook-pro (100.64.0.5:9222)...
+[CDP Shim] Connected to Chrome on macbook-pro (100.64.0.5:9222)
+
+# Claude is now controlling your local Chrome browser
+> Navigate to https://example.com and screenshot the page
+✓ Navigated to https://example.com
+✓ Screenshot saved to workspace
+```
 
 ## Troubleshooting
 
@@ -396,9 +449,20 @@ The `chrome-mcp-proxy` tech stack automatically installs:
   - If not set, auto-discovers by trying all Tailscale peers
   - Can be set at repository or workspace level
 
-## Support
+## Additional Resources
 
-For issues or questions:
-- GitHub Issues: [vibe-anywhere/issues](https://github.com/your-repo/issues)
-- Tailscale Docs: [tailscale.com/kb](https://tailscale.com/kb/)
-- Claude Code Docs: [docs.anthropic.com/claude-code](https://docs.anthropic.com/claude-code)
+### Claude Code Documentation
+- [Claude Code Chrome Extension](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/chrome-extension) - Official guide to browser control features
+- [Claude Code Overview](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) - Getting started with Claude Code CLI
+- [Claude Code GitHub](https://github.com/anthropics/claude-code) - Source code and issue tracker
+
+### Tailscale Documentation
+- [Tailscale Quickstart](https://tailscale.com/kb/1017/install) - Installation guides for all platforms
+- [Tailscale SSH](https://tailscale.com/kb/1193/tailscale-ssh) - Secure SSH access over Tailscale
+- [OAuth Clients](https://tailscale.com/kb/1215/oauth-clients) - API authentication guide
+
+### Support
+For Vibe Anywhere-specific issues:
+- Check the troubleshooting section above
+- Review container logs for error messages
+- Verify Tailscale and Chrome connection status in the dashboard
