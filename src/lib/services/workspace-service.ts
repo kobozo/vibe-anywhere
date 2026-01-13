@@ -1100,7 +1100,7 @@ export class WorkspaceService {
       );
 
     if (!share) {
-      throw new NotFoundError('Workspace share');
+      throw new NotFoundError('Workspace share', `${workspaceId}:${sharedWithUserId}`);
     }
 
     // Validate requesting user is owner or recipient

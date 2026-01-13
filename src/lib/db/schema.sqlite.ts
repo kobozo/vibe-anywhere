@@ -5,7 +5,7 @@ import {
   index,
   unique,
 } from 'drizzle-orm/sqlite-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // Helper to generate UUID-like IDs (SQLite doesn't have native UUID)
 // We'll use TEXT with default value
@@ -102,12 +102,12 @@ export const proxmoxTemplates = sqliteTable('proxmox_templates', {
   node: text('node'),
   storage: text('storage'),
   status: text('status').$type<TemplateStatus>().default('pending').notNull(),
-  techStacks: jsonb<string[]>('tech_stacks').default('[]'),
-  inheritedTechStacks: jsonb<string[]>('inherited_tech_stacks').default('[]'),
+  techStacks: jsonb<string[]>('tech_stacks').default(sql`'[]'`),
+  inheritedTechStacks: jsonb<string[]>('inherited_tech_stacks').default(sql`'[]'`),
   isDefault: boolean('is_default').default(false).notNull(),
   errorMessage: text('error_message'),
   stagingContainerIp: text('staging_container_ip'),
-  envVars: jsonb<EnvVarsJson>('env_vars').default('{}'),
+  envVars: jsonb<EnvVarsJson>('env_vars').default(sql`'{}'`),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 });
@@ -123,10 +123,10 @@ export const repositories = sqliteTable('repositories', {
   cloneUrl: text('clone_url').notNull(),
   cloneDepth: integer('clone_depth'),
   defaultBranch: text('default_branch').default('main'),
-  techStack: jsonb<string[]>('tech_stack').default('[]'),
-  envVars: jsonb<EnvVarsJson>('env_vars').default('{}'),
-  gitHooks: jsonb<GitHooksJson>('git_hooks').default('{}'),
-  cachedBranches: jsonb<string[]>('cached_branches').default('[]'),
+  techStack: jsonb<string[]>('tech_stack').default(sql`'[]'`),
+  envVars: jsonb<EnvVarsJson>('env_vars').default(sql`'{}'`),
+  gitHooks: jsonb<GitHooksJson>('git_hooks').default(sql`'{}'`),
+  cachedBranches: jsonb<string[]>('cached_branches').default(sql`'[]'`),
   branchesCachedAt: integer('branches_cached_at'), // Unix timestamp ms
   resourceMemory: integer('resource_memory'),
   resourceCpuCores: integer('resource_cpu_cores'),
@@ -174,9 +174,9 @@ export const tabs = sqliteTable('tabs', {
   icon: text('icon'),
   isPinned: boolean('is_pinned').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
-  command: jsonb<string[]>('command').default('["/bin/bash"]'),
+  command: jsonb<string[]>('command').default(sql`'["/bin/bash"]'`),
   exitOnClose: boolean('exit_on_close').default(false).notNull(),
-  outputBuffer: jsonb<string[]>('output_buffer').default('[]'),
+  outputBuffer: jsonb<string[]>('output_buffer').default(sql`'[]'`),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
@@ -206,7 +206,7 @@ export const tabTemplates = sqliteTable('tab_templates', {
   name: text('name').notNull(),
   icon: text('icon').default('terminal'),
   command: text('command').notNull(),
-  args: jsonb<string[]>('args').default('[]'),
+  args: jsonb<string[]>('args').default(sql`'[]'`),
   description: text('description'),
   exitOnClose: boolean('exit_on_close').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
@@ -277,7 +277,7 @@ export const secrets = sqliteTable('secrets', {
   envKey: text('env_key').notNull(),
   valueEncrypted: text('value_encrypted').notNull(),
   description: text('description'),
-  templateWhitelist: jsonb<string[]>('template_whitelist').default('[]').notNull(),
+  templateWhitelist: jsonb<string[]>('template_whitelist').default(sql`'[]'`).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 }, (table) => ({
@@ -303,7 +303,7 @@ export const workspaceShares = sqliteTable('workspace_shares', {
   workspaceId: uuidRef('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
   sharedWithUserId: uuidRef('shared_with_user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   sharedByUserId: uuidRef('shared_by_user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  permissions: jsonb<string[]>('permissions').default('["view","execute"]').notNull(),
+  permissions: jsonb<string[]>('permissions').default(sql`'["view","execute"]'`).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
 }, (table) => ({
@@ -324,7 +324,7 @@ export const sessions = sqliteTable('sessions', {
   worktreePath: text('worktree_path'),
   baseCommit: text('base_commit'),
   claudeCommand: jsonb<string[] | null>('claude_command'),
-  outputBuffer: jsonb<string[]>('output_buffer').default('[]'),
+  outputBuffer: jsonb<string[]>('output_buffer').default(sql`'[]'`),
   outputBufferSize: integer('output_buffer_size').default(1000).notNull(),
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
