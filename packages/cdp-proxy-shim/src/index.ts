@@ -13,6 +13,7 @@
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import * as http from 'node:http';
+import { writeFile } from 'node:fs/promises';
 
 const VERSION = '1.0.0';
 const CONNECTION_TIMEOUT = 10000; // 10 seconds
@@ -20,6 +21,7 @@ const IP_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const PING_INTERVAL = 30000; // 30 seconds
 const RECONNECT_BACKOFF_MIN = 1000; // 1 second
 const RECONNECT_BACKOFF_MAX = 30000; // 30 seconds
+const STATUS_FILE_PATH = '/tmp/cdp-status.json';
 
 interface TailscaleStatus {
   Self: {
@@ -37,8 +39,31 @@ interface CachedIP {
   hostname?: string;
 }
 
+interface CDPStatus {
+  connected: boolean;
+  chromeHost: string | null;
+  lastActivity: string;
+}
+
 // In-memory cache for discovered IP
 let cachedIP: CachedIP | null = null;
+
+/**
+ * Write CDP connection status to file for agent monitoring
+ */
+async function writeStatusFile(connected: boolean, chromeHost: string | null): Promise<void> {
+  const status: CDPStatus = {
+    connected,
+    chromeHost,
+    lastActivity: new Date().toISOString()
+  };
+
+  try {
+    await writeFile(STATUS_FILE_PATH, JSON.stringify(status, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('[CDP Shim] Failed to write status file:', error instanceof Error ? error.message : 'Unknown error');
+  }
+}
 
 /**
  * Get the local machine's Tailscale IP by parsing `tailscale status --json`
@@ -451,6 +476,12 @@ async function startCDPProxy(
         console.log('[CDP Shim] Connected to Chrome successfully!');
         console.log('[CDP Shim] CDP proxy is ready. Keeping connection alive...');
 
+        // Write connection status to file
+        const chromeHost = currentHostname ? `${currentHostname} (${currentIP}:${debugPort})` : `${currentIP}:${debugPort}`;
+        writeStatusFile(true, chromeHost).catch(err => {
+          console.error('[CDP Shim] Failed to write status on connect:', err);
+        });
+
         // Start health check pings
         if (pingInterval) {
           clearInterval(pingInterval);
@@ -459,6 +490,10 @@ async function startCDPProxy(
         pingInterval = setInterval(() => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.ping();
+            // Update status file with last activity timestamp
+            writeStatusFile(true, chromeHost).catch(err => {
+              console.error('[CDP Shim] Failed to update status:', err);
+            });
           }
         }, PING_INTERVAL);
 
@@ -474,6 +509,11 @@ async function startCDPProxy(
           reject(new Error(`WebSocket connection failed: ${error.message}`));
         } else {
           console.error('[CDP Shim] WebSocket error:', error.message);
+
+          // Write disconnected status
+          writeStatusFile(false, null).catch(err => {
+            console.error('[CDP Shim] Failed to write status on error:', err);
+          });
 
           // Clear ping interval
           if (pingInterval) {
@@ -493,6 +533,11 @@ async function startCDPProxy(
         if (isShuttingDown) return;
 
         console.log('[CDP Shim] Connection to Chrome closed.');
+
+        // Write disconnected status
+        writeStatusFile(false, null).catch(err => {
+          console.error('[CDP Shim] Failed to write status on close:', err);
+        });
 
         // Clear ping interval
         if (pingInterval) {

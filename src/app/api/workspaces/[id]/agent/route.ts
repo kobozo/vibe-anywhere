@@ -66,6 +66,7 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
       lastHeartbeat: workspace.agentLastHeartbeat,
       tabCount: agent?.tabs.size || 0,
       tailscaleConnected: agent?.tailscaleConnected ?? null,
+      chromeStatus: agent?.chromeStatus ?? null,
     },
   });
 });

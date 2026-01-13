@@ -6,6 +6,12 @@ import { useEnvVarSync } from '@/hooks/useEnvVarSync';
 import { EnvVarSyncDialog } from '@/components/workspaces/env-var-sync-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
+interface ChromeStatus {
+  connected: boolean;
+  chromeHost: string | null;
+  lastActivity: string;
+}
+
 interface AgentInfo {
   connected: boolean;
   currentVersion: string | null;
@@ -15,6 +21,7 @@ interface AgentInfo {
   lastHeartbeat: string | null;
   tabCount: number;
   tailscaleConnected: boolean | null;
+  chromeStatus: ChromeStatus | null;
 }
 
 interface TemplateInfo {
@@ -490,6 +497,20 @@ export function DashboardPanel({
                         {agentInfo.tailscaleConnected === true ? 'Connected' :
                          agentInfo.tailscaleConnected === false ? 'Disconnected' :
                          'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground-secondary">Chrome:</span>
+                      <span className={`font-medium ${
+                        agentInfo.chromeStatus?.connected ? 'text-success' : 'text-foreground-secondary'
+                      }`} title={
+                        agentInfo.chromeStatus?.connected
+                          ? `Chrome connected: ${agentInfo.chromeStatus.chromeHost}`
+                          : 'Chrome disconnected: Waiting for connection...'
+                      }>
+                        {agentInfo.chromeStatus?.connected
+                          ? agentInfo.chromeStatus.chromeHost
+                          : 'Waiting...'}
                       </span>
                     </div>
                     <div className="flex justify-between">

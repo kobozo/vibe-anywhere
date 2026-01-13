@@ -18,6 +18,12 @@ interface TabState {
   status: 'pending' | 'running' | 'stopped';
 }
 
+interface ChromeStatus {
+  connected: boolean;
+  chromeHost: string | null;
+  lastActivity: string;
+}
+
 interface ConnectedAgent {
   socket: Socket;
   workspaceId: string;
@@ -27,6 +33,7 @@ interface ConnectedAgent {
   lastHeartbeat: Date;
   tabs: Map<string, TabState>;
   tailscaleConnected: boolean | null;
+  chromeStatus: ChromeStatus | null;
 }
 
 // Expected agent version (agents older than this will be asked to update)
@@ -79,6 +86,7 @@ class AgentRegistry {
       lastHeartbeat: new Date(),
       tabs: new Map(),
       tailscaleConnected: null,
+      chromeStatus: null,
     };
 
     this.agents.set(workspaceId, agent);
@@ -195,7 +203,8 @@ class AgentRegistry {
   async heartbeat(
     workspaceId: string,
     tabs: Array<{ tabId: string; status: string }>,
-    tailscaleConnected?: boolean
+    tailscaleConnected?: boolean,
+    chromeStatus?: ChromeStatus | null
   ): Promise<void> {
     const agent = this.agents.get(workspaceId);
     if (!agent) return;
@@ -205,6 +214,11 @@ class AgentRegistry {
     // Update Tailscale connection status if provided
     if (tailscaleConnected !== undefined) {
       agent.tailscaleConnected = tailscaleConnected;
+    }
+
+    // Update Chrome connection status if provided
+    if (chromeStatus !== undefined) {
+      agent.chromeStatus = chromeStatus;
     }
 
     // Update tab states

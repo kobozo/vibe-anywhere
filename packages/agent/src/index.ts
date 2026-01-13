@@ -432,19 +432,42 @@ async function checkTailscaleStatus(): Promise<boolean> {
   }
 }
 
+interface ChromeStatus {
+  connected: boolean;
+  chromeHost: string | null;
+  lastActivity: string;
+}
+
+/**
+ * Check Chrome CDP connection status by reading status file written by CDP proxy shim
+ * Returns status object or null if status file doesn't exist
+ */
+async function checkChromeStatus(): Promise<ChromeStatus | null> {
+  try {
+    const statusContent = await fs.promises.readFile('/tmp/cdp-status.json', 'utf-8');
+    const status: ChromeStatus = JSON.parse(statusContent);
+    return status;
+  } catch {
+    // Status file doesn't exist or can't be read (CDP shim not running)
+    return null;
+  }
+}
+
 // Start connection
 wsClient.connect();
 
-// Heartbeat with tab status and Tailscale connection status
+// Heartbeat with tab status, Tailscale connection status, and Chrome connection status
 setInterval(async () => {
   const windows = tmuxManager.getWindowStatus();
   const tailscaleConnected = await checkTailscaleStatus();
+  const chromeStatus = await checkChromeStatus();
   wsClient.sendHeartbeat(
     windows.map(w => ({
       tabId: w.tabId,
       status: w.isEnded ? 'stopped' : 'running',
     })),
-    tailscaleConnected
+    tailscaleConnected,
+    chromeStatus
   );
 }, config.heartbeatInterval);
 
