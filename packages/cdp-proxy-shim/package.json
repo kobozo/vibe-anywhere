@@ -1,0 +1,27 @@
+{
+  "name": "@vibe-anywhere/cdp-proxy-shim",
+  "version": "1.0.0",
+  "description": "CDP proxy shim for Chrome browser control via Tailscale",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "bundle:code": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/cdp-shim-bundled.js --external:node:* --minify --sourcemap",
+    "bundle:binary": "bash scripts/build-binary.sh",
+    "bundle": "npm run bundle:binary && mkdir -p bundle-temp && cp dist/cdp-shim bundle-temp/ && cp package.json bundle-temp/ && tar -czf cdp-shim.tar.gz -C bundle-temp . && rm -rf bundle-temp"
+  },
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "esbuild": "^0.25.0",
+    "postject": "^1.0.0-alpha.6",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
