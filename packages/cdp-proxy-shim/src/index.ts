@@ -102,7 +102,7 @@ async function getTailscaleIP(hostnamePattern?: string): Promise<string> {
           return;
         }
 
-        console.log(`[CDP Shim] Found ${peers.length} Tailscale peer(s)`);
+        console.log(`[CDP Shim] Discovering Chrome... Found ${peers.length} Tailscale peer(s)`);
 
         // Filter by hostname pattern if provided
         let candidatePeers = peers;
@@ -136,7 +136,7 @@ async function getTailscaleIP(hostnamePattern?: string): Promise<string> {
         const localIP = selectedPeer.TailscaleIPs[0];
         const hostname = selectedPeer.HostName || 'unknown';
 
-        console.log(`[CDP Shim] Selected peer: ${hostname} (${localIP})`);
+        console.log(`[CDP Shim] Found: ${localIP}`);
 
         // Cache the result
         cachedIP = { ip: localIP, timestamp: Date.now(), hostname };
@@ -274,7 +274,15 @@ async function testChromeConnection(host: string, port: number): Promise<boolean
       resolve(res.statusCode === 200);
     });
 
-    req.on('error', () => {
+    req.on('error', (error: NodeJS.ErrnoException) => {
+      // Log specific error types for debugging
+      if (error.code === 'ECONNREFUSED') {
+        console.log(`[CDP Shim] ✗ Connection refused on ${host}:${port} (Chrome not running)`);
+      } else if (error.code === 'ETIMEDOUT') {
+        console.log(`[CDP Shim] ✗ Connection timeout to ${host}:${port} (Tailscale not connected)`);
+      } else if (error.code === 'ENOTFOUND') {
+        console.log(`[CDP Shim] ✗ Host not found: ${host} (hostname doesn't resolve)`);
+      }
       resolve(false);
     });
 
@@ -311,8 +319,17 @@ async function getCDPWebSocketURL(host: string, port: number): Promise<string> {
       });
     });
 
-    req.on('error', (error) => {
-      reject(new Error(`Failed to connect to Chrome: ${error.message}`));
+    req.on('error', (error: NodeJS.ErrnoException) => {
+      // Provide specific error messages based on error code
+      if (error.code === 'ECONNREFUSED') {
+        reject(new Error(`Chrome not running on ${host}:${port} (connection refused)`));
+      } else if (error.code === 'ETIMEDOUT') {
+        reject(new Error(`Connection timeout to ${host}:${port} (check Tailscale connection)`));
+      } else if (error.code === 'ENOTFOUND') {
+        reject(new Error(`Hostname ${host} doesn't resolve (check Tailscale configuration)`));
+      } else {
+        reject(new Error(`Failed to connect to Chrome: ${error.message}`));
+      }
     });
 
     req.setTimeout(CONNECTION_TIMEOUT, () => {
@@ -486,7 +503,7 @@ async function main() {
       throw new Error('Failed to discover Chrome instance on any Tailscale peer');
     }
 
-    console.log(`[CDP Shim] Chrome is running and accepting connections on ${targetHostname || 'unknown'} (${tailscaleIP})`);
+    console.log(`[CDP Shim] Connected to Chrome on ${targetHostname || 'unknown'} (${tailscaleIP}:${debugPort})`);
 
     // Get CDP WebSocket URL
     const wsUrl = await getCDPWebSocketURL(tailscaleIP, debugPort);
@@ -495,18 +512,65 @@ async function main() {
     await startCDPProxy(wsUrl);
 
   } catch (error) {
-    console.error('[CDP Shim] ERROR:', error instanceof Error ? error.message : 'Unknown error');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[CDP Shim] ERROR:', errorMessage);
 
-    // Provide helpful error messages
+    // Provide helpful, user-friendly error messages based on error type
     if (error instanceof Error) {
-      if (error.message.includes('tailscale')) {
-        console.error('[CDP Shim] Make sure Tailscale is installed and running in this container.');
-        console.error('[CDP Shim] Run: tailscale status');
-      } else if (error.message.includes('Chrome')) {
-        console.error('[CDP Shim] Make sure Chrome is running on your local machine with:');
-        console.error('[CDP Shim]   google-chrome --remote-debugging-port=9222');
-        console.error('[CDP Shim] Or:');
-        console.error('[CDP Shim]   chromium --remote-debugging-port=9222');
+      const msg = error.message.toLowerCase();
+
+      if (msg.includes('connection refused') || msg.includes('econnrefused')) {
+        console.error('');
+        console.error('Chrome browser not found. Please start Chrome with:');
+        console.error('  google-chrome --remote-debugging-port=9222');
+        console.error('Or:');
+        console.error('  chromium --remote-debugging-port=9222');
+        console.error('');
+      } else if (msg.includes('timeout') || msg.includes('etimedout')) {
+        console.error('');
+        console.error('Connection timeout. This usually means:');
+        console.error('  1. Tailscale is not connected on this container or your local machine');
+        console.error('  2. Your local machine is not visible in the Tailnet');
+        console.error('');
+        console.error('Troubleshooting:');
+        console.error('  - Run: tailscale status');
+        console.error('  - Check both machines are connected to the same Tailnet');
+        console.error('  - Verify network connectivity: ping <local-machine-ip>');
+        console.error('');
+      } else if (msg.includes('not found') || msg.includes('enotfound')) {
+        console.error('');
+        console.error("Hostname doesn't resolve. This usually means:");
+        console.error('  1. The hostname is not in your Tailscale network');
+        console.error('  2. MagicDNS is not enabled or not working');
+        console.error('');
+        console.error('Troubleshooting:');
+        console.error('  - Run: tailscale status --json');
+        console.error('  - Check the hostname in the Peer list');
+        console.error('  - Try setting TAILSCALE_CHROME_HOST to an IP address instead');
+        console.error('');
+      } else if (msg.includes('no tailscale peers')) {
+        console.error('');
+        console.error('No Tailscale peers found. Make sure:');
+        console.error('  1. Tailscale is running on your local machine');
+        console.error('  2. Both machines are connected to the same Tailnet');
+        console.error('  3. Your local machine is visible to this container');
+        console.error('');
+        console.error('Run: tailscale status');
+        console.error('');
+      } else if (msg.includes('tailscale') || msg.includes('failed to run tailscale')) {
+        console.error('');
+        console.error('Tailscale is not installed or not running. Make sure:');
+        console.error('  1. Tailscale is installed: which tailscale');
+        console.error('  2. Tailscale daemon is running: systemctl status tailscaled');
+        console.error('  3. Tailscale is authenticated: tailscale status');
+        console.error('');
+      } else if (msg.includes('no chrome') || msg.includes('chrome not running')) {
+        console.error('');
+        console.error('Chrome browser not found. Please start Chrome with:');
+        console.error('  google-chrome --remote-debugging-port=9222');
+        console.error('Or:');
+        console.error('  chromium --remote-debugging-port=9222');
+        console.error('');
       }
     }
 
