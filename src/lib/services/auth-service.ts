@@ -114,6 +114,24 @@ export class AuthService {
   }
 
   /**
+   * Validate password strength requirements
+   */
+  private validatePasswordStrength(password: string): void {
+    if (password.length < 8) {
+      throw new Error('Password must be at least 8 characters');
+    }
+    if (!/[A-Z]/.test(password)) {
+      throw new Error('Password must contain at least one uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+      throw new Error('Password must contain at least one lowercase letter');
+    }
+    if (!/[0-9]/.test(password)) {
+      throw new Error('Password must contain at least one number');
+    }
+  }
+
+  /**
    * Change user password
    */
   async changePassword(
@@ -132,6 +150,9 @@ export class AuthService {
     if (!valid) {
       throw new Error('Current password is incorrect');
     }
+
+    // Validate new password strength
+    this.validatePasswordStrength(newPassword);
 
     // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);

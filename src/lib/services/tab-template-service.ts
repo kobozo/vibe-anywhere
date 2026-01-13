@@ -102,36 +102,48 @@ export class TabTemplateService {
    */
   async getTemplates(userId: string): Promise<TabTemplate[]> {
     console.log('[getTemplates] userId:', userId, 'type:', typeof userId);
-    let templates = await db
-      .select()
-      .from(tabTemplates)
-      .where(eq(tabTemplates.userId, userId))
-      .orderBy(asc(tabTemplates.sortOrder));
-    console.log('[getTemplates] Found', templates.length, 'templates');
 
-    // If no templates exist, create all defaults
-    if (templates.length === 0) {
-      try {
-        templates = await this.createDefaultTemplates(userId);
-      } catch (error) {
-        console.error('[getTemplates] Failed to create default templates:', error);
-        // TEMPORARY: Return empty array to unblock RBAC testing
-        return [];
+    try {
+      let templates = await db
+        .select()
+        .from(tabTemplates)
+        .where(eq(tabTemplates.userId, userId))
+        .orderBy(asc(tabTemplates.sortOrder));
+      console.log('[getTemplates] Found', templates.length, 'templates');
+
+      // If no templates exist, create all defaults
+      if (templates.length === 0) {
+        try {
+          templates = await this.createDefaultTemplates(userId);
+        } catch (error) {
+          console.error('[getTemplates] Failed to create default templates:', error);
+          // Return empty array to allow graceful degradation
+          return [];
+        }
+      } else {
+        // Sync any missing built-in templates (for existing users after updates)
+        try {
+          const syncResult = await this.syncMissingBuiltInTemplates(userId, templates);
+          if (syncResult.created.length > 0 || syncResult.updatedIds.size > 0) {
+            // Re-fetch to get the accurate state after sync
+            templates = await db
+              .select()
+              .from(tabTemplates)
+              .where(eq(tabTemplates.userId, userId))
+              .orderBy(asc(tabTemplates.sortOrder));
+          }
+        } catch (error) {
+          console.error('[getTemplates] Failed to sync built-in templates:', error);
+          // Continue with existing templates despite sync failure
+        }
       }
-    } else {
-      // Sync any missing built-in templates (for existing users after updates)
-      const syncResult = await this.syncMissingBuiltInTemplates(userId, templates);
-      if (syncResult.created.length > 0 || syncResult.updatedIds.size > 0) {
-        // Re-fetch to get the accurate state after sync
-        templates = await db
-          .select()
-          .from(tabTemplates)
-          .where(eq(tabTemplates.userId, userId))
-          .orderBy(asc(tabTemplates.sortOrder));
-      }
+
+      return templates;
+    } catch (error) {
+      console.error('[getTemplates] Failed to fetch templates:', error);
+      // Return empty array to prevent UI breakage
+      return [];
     }
-
-    return templates;
   }
 
   /**
@@ -289,12 +301,19 @@ export class TabTemplateService {
       requiredTechStack: string | null;
     }>
   ): Promise<TabTemplate> {
+    // Serialize args if provided, to maintain consistency with createTemplate
+    const setData: any = {
+      ...updates,
+      updatedAt: Date.now(),
+    };
+
+    if (updates.args !== undefined) {
+      setData.args = JSON.stringify(updates.args);
+    }
+
     const [template] = await db
       .update(tabTemplates)
-      .set({
-        ...updates,
-        updatedAt: Date.now(),
-      })
+      .set(setData)
       .where(eq(tabTemplates.id, templateId))
       .returning();
 

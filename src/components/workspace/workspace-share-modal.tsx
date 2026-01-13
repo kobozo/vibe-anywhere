@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Workspace } from '@/lib/db/schema.sqlite';
 import type { WorkspaceShare } from '@/lib/db/schema.sqlite';
@@ -41,12 +41,38 @@ export function WorkspaceShareModal({
   const [executePermission, setExecutePermission] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Fetch shares - wrapped in useCallback to prevent stale closures
+  const fetchShares = useCallback(async () => {
+    if (!workspace) return;
+
+    setIsLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}/shares`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch shares');
+      }
+
+      const data = await response.json();
+      setShares(data.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load shares');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [workspace]);
+
   // Fetch shares when modal opens
   useEffect(() => {
     if (isOpen && workspace) {
       fetchShares();
     }
-  }, [isOpen, workspace]);
+  }, [isOpen, workspace, fetchShares]);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -106,29 +132,6 @@ export function WorkspaceShareModal({
       </div>
     );
   }
-
-  const fetchShares = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/shares`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch shares');
-      }
-
-      const data = await response.json();
-      setShares(data.data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load shares');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAddShare = async (e: React.FormEvent) => {
     e.preventDefault();
