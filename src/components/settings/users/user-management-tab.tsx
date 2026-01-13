@@ -67,7 +67,7 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
         throw new Error('Failed to fetch users');
       }
       const data = await response.json();
-      setUsers(data.users || []);
+      setUsers(data.data?.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
@@ -191,10 +191,37 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
           <p className="text-sm text-foreground-secondary">
             Manage user accounts, roles, and permissions.
           </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsAuditLogPanelOpen(true)}
+              className="px-3 py-1.5 text-sm bg-background-tertiary hover:bg-background-tertiary/80 text-foreground rounded transition-colors"
+            >
+              Audit Log
+            </button>
+            <button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="px-3 py-1.5 text-sm bg-primary hover:bg-primary-hover text-foreground rounded transition-colors"
+            >
+              Create User
+            </button>
+          </div>
         </div>
         <div className="text-foreground-tertiary text-sm py-8 text-center">
-          No users found.
+          No users found. Click &quot;Create User&quot; to add your first user.
         </div>
+
+        {/* Create User Dialog */}
+        <CreateUserDialog
+          isOpen={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          onSuccess={fetchUsers}
+        />
+
+        {/* Audit Log Panel */}
+        <AuditLogPanel
+          isOpen={isAuditLogPanelOpen}
+          onClose={() => setIsAuditLogPanelOpen(false)}
+        />
       </div>
     );
   }
