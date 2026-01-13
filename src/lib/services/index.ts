@@ -16,6 +16,7 @@ export { AgentRegistry, getAgentRegistry } from './agent-registry';
 export { ContainerStatusSyncService, getContainerStatusSyncService } from './container-status-sync';
 export { EnvVarSyncService, getEnvVarSyncService } from './env-var-sync-service';
 export { TailscaleService, getTailscaleService } from './tailscale-service';
+export { CdpShimRegistry, getCdpShimRegistry } from './cdp-shim-registry';
 
 // Container backend (abstraction layer)
 export {
