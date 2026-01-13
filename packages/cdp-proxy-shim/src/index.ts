@@ -17,6 +17,9 @@ import * as http from 'node:http';
 const VERSION = '1.0.0';
 const CONNECTION_TIMEOUT = 10000; // 10 seconds
 const IP_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const PING_INTERVAL = 30000; // 30 seconds
+const RECONNECT_BACKOFF_MIN = 1000; // 1 second
+const RECONNECT_BACKOFF_MAX = 30000; // 30 seconds
 
 interface TailscaleStatus {
   Self: {
@@ -340,47 +343,185 @@ async function getCDPWebSocketURL(host: string, port: number): Promise<string> {
 }
 
 /**
- * Start the CDP proxy - keeps the process alive and proxies CDP commands
+ * Start the CDP proxy with health checks and automatic reconnection
  */
-async function startCDPProxy(wsUrl: string): Promise<void> {
-  console.log(`[CDP Shim] Connecting to Chrome at ${wsUrl}...`);
+async function startCDPProxy(
+  initialWsUrl: string,
+  tailscaleIP: string,
+  targetHostname: string | undefined,
+  debugPort: number,
+  hostnamePattern?: string
+): Promise<void> {
+  console.log(`[CDP Shim] Connecting to Chrome at ${initialWsUrl}...`);
 
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl);
-    let isConnected = false;
+  let ws: WebSocket | null = null;
+  let pingInterval: NodeJS.Timeout | null = null;
+  let reconnectAttempt = 0;
+  let isShuttingDown = false;
+  let currentIP = tailscaleIP;
+  let currentHostname = targetHostname;
 
-    ws.on('open', () => {
-      isConnected = true;
-      console.log('[CDP Shim] Connected to Chrome successfully!');
-      console.log('[CDP Shim] CDP proxy is ready. Keeping connection alive...');
+  // Calculate exponential backoff delay
+  function getBackoffDelay(): number {
+    const delay = RECONNECT_BACKOFF_MIN * Math.pow(2, reconnectAttempt);
+    return Math.min(delay, RECONNECT_BACKOFF_MAX);
+  }
 
-      // Keep the process running
-      // In a real implementation, this would handle bidirectional proxying
-      // For now, we just keep the connection alive to simulate a browser process
-    });
+  // Cleanup function
+  const cleanup = () => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
 
-    ws.on('error', (error) => {
-      if (!isConnected) {
-        reject(new Error(`WebSocket connection failed: ${error.message}`));
-      } else {
-        console.error('[CDP Shim] WebSocket error:', error.message);
-      }
-    });
+    console.log('\n[CDP Shim] Shutting down...');
 
-    ws.on('close', () => {
-      console.log('[CDP Shim] Connection to Chrome closed.');
-      process.exit(0);
-    });
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
 
-    // Handle process signals
-    const cleanup = () => {
-      console.log('\n[CDP Shim] Shutting down...');
+    if (ws) {
       ws.close();
-      process.exit(0);
-    };
+      ws = null;
+    }
 
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
+    process.exit(0);
+  };
+
+  // Handle process signals
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  // Reconnect with exponential backoff
+  async function reconnect(): Promise<void> {
+    if (isShuttingDown) return;
+
+    const backoffDelay = getBackoffDelay();
+    reconnectAttempt++;
+
+    console.log(`[CDP Shim] Connection lost. Retrying in ${backoffDelay / 1000}s...`);
+
+    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+
+    if (isShuttingDown) return;
+
+    try {
+      // Test if previous IP still works
+      console.log(`[CDP Shim] Testing previous IP ${currentIP}...`);
+      const ipStillWorks = await testChromeConnection(currentIP, debugPort);
+
+      if (!ipStillWorks) {
+        console.log('[CDP Shim] Previous IP no longer reachable, re-discovering...');
+
+        // Clear cache to force fresh discovery
+        cachedIP = null;
+
+        // Re-discover Chrome instance
+        const result = await findWorkingChromePeer(debugPort, hostnamePattern);
+        currentIP = result.ip;
+        currentHostname = result.hostname;
+
+        console.log(`[CDP Shim] Discovered new Chrome instance at ${currentHostname} (${currentIP}:${debugPort})`);
+      }
+
+      // Get new WebSocket URL
+      const wsUrl = await getCDPWebSocketURL(currentIP, debugPort);
+
+      // Reconnect
+      await connect(wsUrl);
+
+      // Reset backoff on successful connection
+      reconnectAttempt = 0;
+
+    } catch (error) {
+      console.error('[CDP Shim] Reconnection failed:', error instanceof Error ? error.message : 'Unknown error');
+
+      // Continue retrying
+      await reconnect();
+    }
+  }
+
+  // Main connection function
+  async function connect(wsUrl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      ws = new WebSocket(wsUrl);
+      let isConnected = false;
+
+      ws.on('open', () => {
+        isConnected = true;
+        console.log('[CDP Shim] Connected to Chrome successfully!');
+        console.log('[CDP Shim] CDP proxy is ready. Keeping connection alive...');
+
+        // Start health check pings
+        if (pingInterval) {
+          clearInterval(pingInterval);
+        }
+
+        pingInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.ping();
+          }
+        }, PING_INTERVAL);
+
+        resolve();
+      });
+
+      ws.on('pong', () => {
+        // Connection is healthy
+      });
+
+      ws.on('error', (error) => {
+        if (!isConnected) {
+          reject(new Error(`WebSocket connection failed: ${error.message}`));
+        } else {
+          console.error('[CDP Shim] WebSocket error:', error.message);
+
+          // Clear ping interval
+          if (pingInterval) {
+            clearInterval(pingInterval);
+            pingInterval = null;
+          }
+
+          // Trigger reconnection
+          reconnect().catch(err => {
+            console.error('[CDP Shim] Fatal reconnection error:', err);
+            process.exit(1);
+          });
+        }
+      });
+
+      ws.on('close', () => {
+        if (isShuttingDown) return;
+
+        console.log('[CDP Shim] Connection to Chrome closed.');
+
+        // Clear ping interval
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
+
+        // Trigger reconnection
+        reconnect().catch(err => {
+          console.error('[CDP Shim] Fatal reconnection error:', err);
+          process.exit(1);
+        });
+      });
+    });
+  }
+
+  // Initial connection
+  try {
+    await connect(initialWsUrl);
+  } catch (error) {
+    console.error('[CDP Shim] Initial connection failed:', error instanceof Error ? error.message : 'Unknown error');
+
+    // Try to reconnect
+    await reconnect();
+  }
+
+  // Keep process alive
+  return new Promise(() => {
+    // Never resolve - keep running until shutdown
   });
 }
 
@@ -508,8 +649,8 @@ async function main() {
     // Get CDP WebSocket URL
     const wsUrl = await getCDPWebSocketURL(tailscaleIP, debugPort);
 
-    // Start CDP proxy
-    await startCDPProxy(wsUrl);
+    // Start CDP proxy with health checks and reconnection
+    await startCDPProxy(wsUrl, tailscaleIP, targetHostname, debugPort, hostnamePattern);
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
