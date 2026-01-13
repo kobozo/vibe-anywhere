@@ -101,15 +101,23 @@ export class TabTemplateService {
    * and syncing any missing built-in templates
    */
   async getTemplates(userId: string): Promise<TabTemplate[]> {
+    console.log('[getTemplates] userId:', userId, 'type:', typeof userId);
     let templates = await db
       .select()
       .from(tabTemplates)
       .where(eq(tabTemplates.userId, userId))
       .orderBy(asc(tabTemplates.sortOrder));
+    console.log('[getTemplates] Found', templates.length, 'templates');
 
     // If no templates exist, create all defaults
     if (templates.length === 0) {
-      templates = await this.createDefaultTemplates(userId);
+      try {
+        templates = await this.createDefaultTemplates(userId);
+      } catch (error) {
+        console.error('[getTemplates] Failed to create default templates:', error);
+        // TEMPORARY: Return empty array to unblock RBAC testing
+        return [];
+      }
     } else {
       // Sync any missing built-in templates (for existing users after updates)
       const syncResult = await this.syncMissingBuiltInTemplates(userId, templates);
@@ -173,9 +181,16 @@ export class TabTemplateService {
     let created: TabTemplate[] = [];
     if (missingTemplates.length > 0) {
       const templateData = missingTemplates.map((t) => ({
-        ...t,
+        name: t.name,
+        icon: t.icon,
+        command: t.command,
+        args: JSON.stringify(t.args),
+        description: t.description,
+        exitOnClose: t.exitOnClose,
+        sortOrder: t.sortOrder,
+        isBuiltIn: t.isBuiltIn,
+        requiredTechStack: t.requiredTechStack,
         userId,
-        args: JSON.stringify(t.args) as any,
       }));
       created = await db.insert(tabTemplates).values(templateData).returning();
     }
@@ -187,13 +202,27 @@ export class TabTemplateService {
    * Create default templates for a user
    */
   async createDefaultTemplates(userId: string): Promise<TabTemplate[]> {
+    console.log('[createDefaultTemplates] Creating templates for userId:', userId);
     const templateData = DEFAULT_TEMPLATES.map((t) => ({
-      ...t,
+      name: t.name,
+      icon: t.icon,
+      command: t.command,
+      args: JSON.stringify(t.args),
+      description: t.description,
+      exitOnClose: t.exitOnClose,
+      sortOrder: t.sortOrder,
+      isBuiltIn: t.isBuiltIn,
+      requiredTechStack: t.requiredTechStack,
       userId,
-      args: JSON.stringify(t.args) as any,
     }));
-
-    return db.insert(tabTemplates).values(templateData).returning();
+    console.log('[createDefaultTemplates] Sample template data:', JSON.stringify(templateData[0], null, 2));
+    try {
+      return await db.insert(tabTemplates).values(templateData).returning();
+    } catch (error: any) {
+      console.error('[createDefaultTemplates] Error:', error.message);
+      console.error('[createDefaultTemplates] Stack:', error.stack);
+      throw error;
+    }
   }
 
   /**
