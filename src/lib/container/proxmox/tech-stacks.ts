@@ -5,7 +5,7 @@
  * or installed per-workspace based on repository configuration.
  */
 
-export type TechStackCategory = 'runtime' | 'ai-assistant';
+export type TechStackCategory = 'runtime' | 'ai-assistant' | 'network';
 
 export interface TechStack {
   id: string;
@@ -19,6 +19,38 @@ export interface TechStack {
 }
 
 export const TECH_STACKS: TechStack[] = [
+  // ===================
+  // Network / VPN
+  // ===================
+  {
+    id: 'tailscale-vpn',
+    name: 'Tailscale VPN',
+    description: 'Secure mesh VPN for peer-to-peer connectivity',
+    category: 'network',
+    installScript: `
+# Install Tailscale VPN
+curl -fsSL https://tailscale.com/install.sh | sh
+
+# Enable and start tailscaled daemon
+systemctl enable tailscaled
+systemctl start tailscaled
+
+# Authenticate with Tailscale using ephemeral auth key from environment variable
+# Note: TAILSCALE_AUTHKEY is injected by Vibe Anywhere during container startup
+if [ -n "$TAILSCALE_AUTHKEY" ]; then
+  tailscale up --authkey="$TAILSCALE_AUTHKEY" --accept-routes --accept-dns=false
+  echo "Tailscale authenticated successfully"
+  tailscale status
+else
+  echo "Warning: TAILSCALE_AUTHKEY not set. Run 'tailscale up --authkey=<key>' manually."
+fi
+
+# Verify Tailscale is running and connected
+tailscale status || echo "Tailscale installed but not authenticated yet"
+`.trim(),
+    verifyCommand: 'tailscale version',
+  },
+
   // ===================
   // Runtime / Dev Tools
   // ===================
