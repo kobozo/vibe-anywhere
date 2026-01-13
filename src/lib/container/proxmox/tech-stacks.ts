@@ -145,6 +145,46 @@ docker --version
   // AI Coding Assistants
   // ===================
   {
+    id: 'chrome-mcp-proxy',
+    name: 'Chrome MCP Proxy',
+    description: 'Chrome DevTools Protocol proxy over Tailscale for remote browser control',
+    category: 'ai-assistant',
+    dependencies: ['nodejs', 'tailscale-vpn'],
+    installScript: `
+# Install Chrome MCP Proxy (CDP shim)
+# This allows AI assistants to control Chrome browser on your local machine via Tailscale
+
+# Note: VIBE_ANYWHERE_SERVER_URL is injected by Vibe Anywhere during container startup
+if [ -z "$VIBE_ANYWHERE_SERVER_URL" ]; then
+  echo "Error: VIBE_ANYWHERE_SERVER_URL not set. Cannot download CDP shim bundle."
+  exit 1
+fi
+
+# Download CDP shim bundle from Vibe Anywhere server
+echo "Downloading CDP shim bundle from $VIBE_ANYWHERE_SERVER_URL/api/cdp-shim/bundle..."
+curl -fsSL "$VIBE_ANYWHERE_SERVER_URL/api/cdp-shim/bundle" -o /tmp/cdp-shim.tar.gz
+
+# Create installation directory
+mkdir -p /opt/vibe-anywhere-cdp-shim
+
+# Extract bundle to installation directory
+echo "Extracting CDP shim to /opt/vibe-anywhere-cdp-shim..."
+tar -xzf /tmp/cdp-shim.tar.gz -C /opt/vibe-anywhere-cdp-shim
+rm /tmp/cdp-shim.tar.gz
+
+# Set execute permissions on the binary
+chmod +x /opt/vibe-anywhere-cdp-shim/cdp-shim
+
+# Create symlink to /usr/local/bin/chromium (so it acts like real chromium)
+ln -sf /opt/vibe-anywhere-cdp-shim/cdp-shim /usr/local/bin/chromium
+
+# Verify installation
+chromium --version
+echo "Chrome MCP Proxy installed successfully!"
+`.trim(),
+    verifyCommand: 'chromium --version',
+  },
+  {
     id: 'claude',
     name: 'Claude Code',
     description: 'Anthropic AI coding assistant',
