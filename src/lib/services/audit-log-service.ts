@@ -1,6 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import { db, userAuditLog, type UserAuditLog, type NewUserAuditLog, type UserAuditAction } from '@/lib/db';
+import { db, userAuditLog, users, type UserAuditLog, type NewUserAuditLog, type UserAuditAction } from '@/lib/db';
 
 export interface AuditLogFilters {
   action?: UserAuditAction;
@@ -63,9 +63,9 @@ export class AuditLogService {
   /**
    * Get user audit logs with optional filters
    * @param filters - Optional filters for querying audit logs
-   * @returns Array of audit log entries
+   * @returns Array of audit log entries with performer username
    */
-  async getUserAuditLogs(filters?: AuditLogFilters): Promise<UserAuditLog[]> {
+  async getUserAuditLogs(filters?: AuditLogFilters): Promise<Array<Omit<UserAuditLog, 'performedBy'> & { performedBy: string | null }>> {
     const limit = filters?.limit || 100;
 
     // Build where conditions
@@ -80,10 +80,21 @@ export class AuditLogService {
       conditions.push(eq(userAuditLog.performedBy, filters.performedBy));
     }
 
-    // Query with filters
+    // Query with left join to get performer username
     let query = db
-      .select()
+      .select({
+        id: userAuditLog.id,
+        action: userAuditLog.action,
+        performedBy: users.username, // Join to get username instead of ID
+        targetUserId: userAuditLog.targetUserId,
+        targetUsername: userAuditLog.targetUsername,
+        details: userAuditLog.details,
+        ipAddress: userAuditLog.ipAddress,
+        userAgent: userAuditLog.userAgent,
+        timestamp: userAuditLog.timestamp,
+      })
       .from(userAuditLog)
+      .leftJoin(users, eq(userAuditLog.performedBy, users.id))
       .orderBy(desc(userAuditLog.timestamp))
       .limit(limit);
 
