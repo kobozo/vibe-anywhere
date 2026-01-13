@@ -7,6 +7,7 @@ import { EditUserDialog } from './edit-user-dialog';
 import { DeleteUserDialog } from './delete-user-dialog';
 import { ChangeRoleDialog } from './change-role-dialog';
 import { ResetPasswordDialog } from './reset-password-dialog';
+import { AuditLogPanel } from './audit-log-panel';
 
 /**
  * User Management Tab
@@ -37,6 +38,7 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isChangeRoleDialogOpen, setIsChangeRoleDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [isAuditLogPanelOpen, setIsAuditLogPanelOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [resourceCount, setResourceCount] = useState({ repositories: 0, workspaces: 0 });
 
@@ -195,12 +197,20 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
         <p className="text-sm text-foreground-secondary">
           Manage user accounts, roles, and permissions.
         </p>
-        <button
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="px-3 py-1.5 text-sm bg-primary hover:bg-primary-hover text-foreground rounded transition-colors"
-        >
-          Create User
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsAuditLogPanelOpen(true)}
+            className="px-3 py-1.5 text-sm bg-background-tertiary hover:bg-background-tertiary/80 text-foreground rounded transition-colors"
+          >
+            Audit Log
+          </button>
+          <button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="px-3 py-1.5 text-sm bg-primary hover:bg-primary-hover text-foreground rounded transition-colors"
+          >
+            Create User
+          </button>
+        </div>
       </div>
 
       {/* User Table */}
@@ -314,6 +324,12 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
         onClose={() => setIsResetPasswordDialogOpen(false)}
         onSuccess={fetchUsers}
         user={selectedUser}
+      />
+
+      {/* Audit Log Panel */}
+      <AuditLogPanel
+        isOpen={isAuditLogPanelOpen}
+        onClose={() => setIsAuditLogPanelOpen(false)}
       />
     </div>
   );
