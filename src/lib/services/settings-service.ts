@@ -22,6 +22,7 @@ export const SETTINGS_KEYS = {
   PROXMOX_SETTINGS: 'proxmox.settings',
   PROXMOX_CONNECTION: 'proxmox.connection',
   OPENAI_API_KEY: 'openai.apiKey',
+  TAILSCALE_OAUTH_TOKEN: 'tailscale.oauthToken',
 } as const;
 
 // Default starting VMID for Proxmox containers
@@ -97,7 +98,7 @@ export interface ProxmoxSettings {
   defaultCtTemplate?: string;
 }
 
-class SettingsService {
+export class SettingsService {
   /**
    * Get a setting value by key
    */
@@ -112,7 +113,16 @@ class SettingsService {
       return null;
     }
 
-    return result[0].value as T;
+    const value = result[0].value;
+    // Parse JSON if it's a string
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as T;
+      } catch {
+        return value as T;
+      }
+    }
+    return value as T;
   }
 
   /**
@@ -125,16 +135,19 @@ class SettingsService {
       await db
         .update(appSettings)
         .set({
-          value: value as unknown,
+          value: JSON.stringify(value),
           description,
           updatedAt: Date.now(),
         })
         .where(eq(appSettings.key, key));
     } else {
       await db.insert(appSettings).values({
+        id: crypto.randomUUID(),
         key,
-        value: value as unknown,
+        value: JSON.stringify(value),
         description,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
     }
   }
@@ -490,16 +503,100 @@ class SettingsService {
     );
     return !!stored?.host && !!stored?.encryptedTokenSecret;
   }
-}
 
-// Singleton instance
-let settingsServiceInstance: SettingsService | null = null;
+  // ============================================
+  // Tailscale OAuth Token (Encrypted)
+  // ============================================
 
-export function getSettingsService(): SettingsService {
-  if (!settingsServiceInstance) {
-    settingsServiceInstance = new SettingsService();
+  /**
+   * Get the encryption key for Tailscale OAuth token
+   */
+  private getTailscaleEncryptionKey(): Buffer {
+    return crypto.scryptSync(config.auth.secret, 'tailscale-token-salt', 32);
   }
-  return settingsServiceInstance;
+
+  /**
+   * Encrypt a value using AES-256-GCM (for Tailscale OAuth token)
+   */
+  private encryptTailscale(value: string): string {
+    const encryptionKey = this.getTailscaleEncryptionKey();
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, encryptionKey, iv);
+
+    let encrypted = cipher.update(value, 'utf8', 'base64');
+    encrypted += cipher.final('base64');
+
+    const authTag = cipher.getAuthTag();
+
+    // Combine IV + authTag + encrypted data
+    return Buffer.concat([iv, authTag, Buffer.from(encrypted, 'base64')]).toString('base64');
+  }
+
+  /**
+   * Decrypt a value using AES-256-GCM (for Tailscale OAuth token)
+   */
+  private decryptTailscale(encryptedData: string): string {
+    const encryptionKey = this.getTailscaleEncryptionKey();
+    const data = Buffer.from(encryptedData, 'base64');
+
+    const iv = data.subarray(0, IV_LENGTH);
+    const authTag = data.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+    const encrypted = data.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+
+    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encrypted.toString('base64'), 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return decrypted;
+  }
+
+  /**
+   * Save Tailscale OAuth token (encrypted)
+   */
+  async saveTailscaleOAuthToken(token: string): Promise<void> {
+    const encryptedToken = this.encryptTailscale(token);
+    await this.set(
+      SETTINGS_KEYS.TAILSCALE_OAUTH_TOKEN,
+      { encryptedToken },
+      'Tailscale OAuth token for ephemeral auth key generation'
+    );
+  }
+
+  /**
+   * Get the decrypted Tailscale OAuth token
+   */
+  async getTailscaleOAuthToken(): Promise<string | null> {
+    const data = await this.get<{ encryptedToken: string }>(SETTINGS_KEYS.TAILSCALE_OAUTH_TOKEN);
+    if (!data?.encryptedToken) {
+      return null;
+    }
+    try {
+      return this.decryptTailscale(data.encryptedToken);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Clear the Tailscale OAuth token
+   */
+  async clearTailscaleOAuthToken(): Promise<void> {
+    await this.delete(SETTINGS_KEYS.TAILSCALE_OAUTH_TOKEN);
+  }
+
+  /**
+   * Check if Tailscale is configured (has OAuth token)
+   */
+  async isTailscaleConfigured(): Promise<boolean> {
+    const data = await this.get<{ encryptedToken: string }>(SETTINGS_KEYS.TAILSCALE_OAUTH_TOKEN);
+    return !!data?.encryptedToken;
+  }
 }
 
-export { SettingsService };
+// No singleton - always create new instance to avoid caching issues
+export function getSettingsService(): SettingsService {
+  return new SettingsService();
+}
+

@@ -67,6 +67,13 @@ interface PendingStatsOperation {
 }
 const pendingStatsOperations: Map<string, PendingStatsOperation> = new Map();
 
+// Track pending Tailscale operations for relay between browser and agent
+interface PendingTailscaleOperation {
+  socket: AuthenticatedSocket;
+  timeoutId: NodeJS.Timeout;
+}
+const pendingTailscaleOperations: Map<string, PendingTailscaleOperation> = new Map();
+
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io = new SocketServer(httpServer, {
     cors: {
@@ -492,6 +499,82 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
+    // Tailscale operations from browser
+    socket.on('tailscale:status', async (data: { requestId: string; workspaceId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('tailscale:status:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingTailscaleOperations.delete(data.requestId);
+        }, 30000); // 30 second timeout
+
+        pendingTailscaleOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.tailscaleStatus(data.workspaceId, data.requestId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingTailscaleOperations.delete(data.requestId);
+          socket.emit('tailscale:status:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('tailscale:status:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Tailscale status failed',
+        });
+      }
+    });
+
+    socket.on('tailscale:connect', async (data: { requestId: string; workspaceId: string; authKey: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('tailscale:connect:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingTailscaleOperations.delete(data.requestId);
+        }, 30000); // 30 second timeout
+
+        pendingTailscaleOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.tailscaleConnect(data.workspaceId, data.requestId, data.authKey);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingTailscaleOperations.delete(data.requestId);
+          socket.emit('tailscale:connect:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('tailscale:connect:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Tailscale connect failed',
+        });
+      }
+    });
+
+    socket.on('tailscale:disconnect', async (data: { requestId: string; workspaceId: string }) => {
+      try {
+        const agentRegistry = getAgentRegistry();
+        const timeout = setTimeout(() => {
+          socket.emit('tailscale:disconnect:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
+          pendingTailscaleOperations.delete(data.requestId);
+        }, 30000); // 30 second timeout
+
+        pendingTailscaleOperations.set(data.requestId, { socket, timeoutId: timeout });
+
+        const sent = agentRegistry.tailscaleDisconnect(data.workspaceId, data.requestId);
+        if (!sent) {
+          clearTimeout(timeout);
+          pendingTailscaleOperations.delete(data.requestId);
+          socket.emit('tailscale:disconnect:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
+        }
+      } catch (error) {
+        socket.emit('tailscale:disconnect:response', {
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Tailscale disconnect failed',
+        });
+      }
+    });
+
     // Handle file upload (for clipboard image paste)
     socket.on('file:upload', async (data: { requestId: string; filename: string; data: string; mimeType: string }) => {
       try {
@@ -635,12 +718,12 @@ function setupAgentNamespace(io: SocketServer): void {
     socket.on('agent:heartbeat', async (data: {
       workspaceId: string;
       tabs: Array<{ tabId: string; status: string }>;
-      tailscaleConnected?: boolean;
+      tailscaleStatus?: { online: boolean; tailscaleIP: string | null; hostname: string | null; tailnet: string | null; peerCount: number; version: string | null; exitNode: string | null } | null;
       chromeStatus?: { connected: boolean; chromeHost: string | null; lastActivity: string } | null;
       metrics?: unknown
     }) => {
       if (socket.workspaceId && socket.workspaceId === data.workspaceId) {
-        await agentRegistry.heartbeat(data.workspaceId, data.tabs, data.tailscaleConnected, data.chromeStatus);
+        await agentRegistry.heartbeat(data.workspaceId, data.tabs, data.tailscaleStatus, data.chromeStatus);
       }
     });
 
@@ -806,6 +889,34 @@ function setupAgentNamespace(io: SocketServer): void {
         clearTimeout(pending.timeoutId);
         pending.socket.emit('stats:response', data);
         pendingStatsOperations.delete(data.requestId);
+      }
+    });
+
+    // Tailscale response handlers (relay from agent to browser)
+    socket.on('tailscale:status:response', (data: { requestId: string; success: boolean; status?: unknown; error?: string }) => {
+      const pending = pendingTailscaleOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('tailscale:status:response', data);
+        pendingTailscaleOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('tailscale:connect:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingTailscaleOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('tailscale:connect:response', data);
+        pendingTailscaleOperations.delete(data.requestId);
+      }
+    });
+
+    socket.on('tailscale:disconnect:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      const pending = pendingTailscaleOperations.get(data.requestId);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.socket.emit('tailscale:disconnect:response', data);
+        pendingTailscaleOperations.delete(data.requestId);
       }
     });
 

@@ -10,6 +10,7 @@ import { OutputBufferManager } from './output-buffer.js';
 import { selfUpdate } from './updater.js';
 import { GitHandler } from './git-handler.js';
 import { StatsHandler } from './stats-handler.js';
+import { TailscaleHandler } from './tailscale-handler.js';
 import { AgentIpcServer } from './ipc-server.js';
 import { CliInstaller } from './cli-installer.js';
 import * as fs from 'fs';
@@ -44,6 +45,7 @@ console.log(`Vibe Anywhere URL: ${config.sessionHubUrl}`);
 const bufferManager = new OutputBufferManager(config.bufferSize);
 const gitHandler = new GitHandler('/workspace');
 const statsHandler = new StatsHandler();
+const tailscaleHandler = new TailscaleHandler();
 
 const tmuxManager = new TmuxManager(
   config.workspaceId,
@@ -352,6 +354,61 @@ const wsClient = new AgentWebSocket(config, {
     }
   },
 
+  // Tailscale event handlers
+  onTailscaleStatus: async (data) => {
+    console.log(`Tailscale status request: ${data.requestId}`);
+    try {
+      const status = await tailscaleHandler.getStatus();
+      wsClient.sendTailscaleStatusResponse(data.requestId, true, status);
+    } catch (error) {
+      console.error('Tailscale status failed:', error);
+      wsClient.sendTailscaleStatusResponse(
+        data.requestId,
+        false,
+        null,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onTailscaleConnect: async (data) => {
+    console.log(`Tailscale connect request: ${data.requestId}`);
+    try {
+      const result = await tailscaleHandler.connect(data.authKey);
+      if (result.success) {
+        wsClient.sendTailscaleConnectResponse(data.requestId, true);
+      } else {
+        wsClient.sendTailscaleConnectResponse(data.requestId, false, result.error);
+      }
+    } catch (error) {
+      console.error('Tailscale connect failed:', error);
+      wsClient.sendTailscaleConnectResponse(
+        data.requestId,
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
+  onTailscaleDisconnect: async (data) => {
+    console.log(`Tailscale disconnect request: ${data.requestId}`);
+    try {
+      const result = await tailscaleHandler.disconnect();
+      if (result.success) {
+        wsClient.sendTailscaleDisconnectResponse(data.requestId, true);
+      } else {
+        wsClient.sendTailscaleDisconnectResponse(data.requestId, false, result.error);
+      }
+    } catch (error) {
+      console.error('Tailscale disconnect failed:', error);
+      wsClient.sendTailscaleDisconnectResponse(
+        data.requestId,
+        false,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  },
+
   onError: (error) => {
     console.error('WebSocket error:', error);
   },
@@ -416,21 +473,6 @@ try {
   // Continue - CLI is optional
 }
 
-/**
- * Check if Tailscale is connected
- * Returns true if tailscale is running and online, false otherwise
- */
-async function checkTailscaleStatus(): Promise<boolean> {
-  try {
-    // Run: tailscale status --json | jq '.Self.Online'
-    const { stdout } = await execAsync('tailscale status --json 2>/dev/null');
-    const status = JSON.parse(stdout);
-    return status?.Self?.Online === true;
-  } catch {
-    // Tailscale not installed, not running, or not connected
-    return false;
-  }
-}
 
 interface ChromeStatus {
   connected: boolean;
@@ -459,14 +501,14 @@ wsClient.connect();
 // Heartbeat with tab status, Tailscale connection status, and Chrome connection status
 setInterval(async () => {
   const windows = tmuxManager.getWindowStatus();
-  const tailscaleConnected = await checkTailscaleStatus();
+  const tailscaleStatus = await tailscaleHandler.getStatus();
   const chromeStatus = await checkChromeStatus();
   wsClient.sendHeartbeat(
     windows.map(w => ({
       tabId: w.tabId,
       status: w.isEnded ? 'stopped' : 'running',
     })),
-    tailscaleConnected,
+    tailscaleStatus,
     chromeStatus
   );
 }, config.heartbeatInterval);

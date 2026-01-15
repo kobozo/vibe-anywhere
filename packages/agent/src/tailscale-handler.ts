@@ -1,0 +1,189 @@
+/**
+ * Tailscale Handler
+ * Manages Tailscale connection status and operations
+ */
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export interface TailscaleStatus {
+  online: boolean;
+  tailscaleIP: string | null;
+  hostname: string | null;
+  tailnet: string | null;
+  peerCount: number;
+  version: string | null;
+  exitNode: string | null;
+}
+
+export class TailscaleHandler {
+  private readonly COMMAND_TIMEOUT = 30000; // 30 seconds
+
+  /**
+   * Check if Tailscale is installed
+   */
+  async isInstalled(): Promise<boolean> {
+    try {
+      await execAsync('which tailscale', { timeout: 5000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get detailed Tailscale status
+   * Returns null if Tailscale is not installed or not connected
+   */
+  async getStatus(): Promise<TailscaleStatus | null> {
+    try {
+      const { stdout } = await execAsync('tailscale status --json', {
+        timeout: this.COMMAND_TIMEOUT,
+      });
+
+      const status = JSON.parse(stdout);
+
+      // Self represents the current device
+      const self = status.Self;
+      if (!self) {
+        return null;
+      }
+
+      // Count peers (excluding self)
+      const peers = status.Peer || {};
+      const peerCount = Object.keys(peers).length;
+
+      // Get exit node if configured
+      let exitNode: string | null = null;
+      for (const [_, peer] of Object.entries(peers)) {
+        const p = peer as any;
+        if (p.ExitNode) {
+          exitNode = p.HostName || p.DNSName || null;
+          break;
+        }
+      }
+
+      return {
+        online: self.Online || false,
+        tailscaleIP: self.TailscaleIPs?.[0] || null,
+        hostname: self.HostName || null,
+        tailnet: self.TailnetName || null,
+        peerCount,
+        version: status.Version || null,
+        exitNode,
+      };
+    } catch (error) {
+      // If command fails, Tailscale might not be installed or not running
+      return null;
+    }
+  }
+
+  /**
+   * Connect to Tailscale using an auth key
+   */
+  async connect(authKey: string): Promise<{ success: boolean; error?: string }> {
+    // Validate auth key format
+    if (!authKey || typeof authKey !== 'string') {
+      return { success: false, error: 'Auth key is required' };
+    }
+
+    if (!authKey.startsWith('tskey-auth-')) {
+      return {
+        success: false,
+        error: 'Invalid auth key format (must start with tskey-auth-)',
+      };
+    }
+
+    try {
+      // Run tailscale up with the auth key
+      // --accept-routes allows accessing subnet routes advertised by peers
+      // --authkey authenticates the device
+      const { stdout, stderr } = await execAsync(
+        `tailscale up --authkey=${authKey} --accept-routes`,
+        {
+          timeout: this.COMMAND_TIMEOUT,
+        }
+      );
+
+      // Check if connection was successful
+      const connected = await this.isConnected();
+      if (!connected) {
+        return {
+          success: false,
+          error: stderr || 'Failed to connect to Tailscale',
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      // Provide helpful error messages
+      if (message.includes('timeout')) {
+        return {
+          success: false,
+          error: 'Connection timeout. Check network connectivity.',
+        };
+      }
+
+      if (message.includes('authentication') || message.includes('auth')) {
+        return {
+          success: false,
+          error: 'Authentication failed. Check your auth key.',
+        };
+      }
+
+      return {
+        success: false,
+        error: `Failed to connect: ${message}`,
+      };
+    }
+  }
+
+  /**
+   * Disconnect from Tailscale
+   */
+  async disconnect(): Promise<{ success: boolean; error?: string }> {
+    try {
+      await execAsync('tailscale down', {
+        timeout: this.COMMAND_TIMEOUT,
+      });
+
+      // Verify disconnection
+      const stillConnected = await this.isConnected();
+      if (stillConnected) {
+        return {
+          success: false,
+          error: 'Failed to disconnect from Tailscale',
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: `Failed to disconnect: ${message}`,
+      };
+    }
+  }
+
+  /**
+   * Check if Tailscale is currently connected
+   * Lightweight check compared to getStatus()
+   */
+  async isConnected(): Promise<boolean> {
+    try {
+      const { stdout } = await execAsync('tailscale status --json', {
+        timeout: 5000,
+      });
+
+      const status = JSON.parse(stdout);
+      return status.Self?.Online === true;
+    } catch {
+      return false;
+    }
+  }
+}

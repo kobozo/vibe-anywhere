@@ -44,24 +44,37 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
  * - other roles: Can create personal templates
  */
 export const POST = withErrorHandling(async (request: NextRequest) => {
+  console.log('[API /api/templates POST] Request received');
   const user = await requireAuth(request);
+  console.log('[API /api/templates POST] Auth passed, user:', user.id);
   const body = await request.json();
+  console.log('[API /api/templates POST] Body:', JSON.stringify(body));
 
   const result = createTemplateSchema.safeParse(body);
+  console.log('[API /api/templates POST] Validation result:', result.success);
   if (!result.success) {
+    console.log('[API /api/templates POST] Validation errors:', result.error);
     throw new ValidationError('Invalid request body', result.error.flatten());
   }
 
+  console.log('[API /api/templates POST] Calling templateService.createTemplate');
   const templateService = getTemplateService();
-  // All authenticated users can create templates (personal templates)
-  const template = await templateService.createTemplate(user.id, {
-    name: result.data.name,
-    description: result.data.description,
-    techStacks: result.data.techStacks,
-    isDefault: result.data.isDefault,
-    parentTemplateId: result.data.parentTemplateId,
-    baseCtTemplate: result.data.baseCtTemplate,
-  });
+  console.log('[API /api/templates POST] Got template service instance');
 
-  return successResponse({ template }, 201);
+  // All authenticated users can create templates (personal templates)
+  try {
+    const template = await templateService.createTemplate(user.id, {
+      name: result.data.name,
+      description: result.data.description,
+      techStacks: result.data.techStacks,
+      isDefault: result.data.isDefault,
+      parentTemplateId: result.data.parentTemplateId,
+      baseCtTemplate: result.data.baseCtTemplate,
+    });
+    console.log('[API /api/templates POST] Template created successfully');
+    return successResponse({ template }, 201);
+  } catch (error) {
+    console.error('[API /api/templates POST] Error in createTemplate:', error);
+    throw error;
+  }
 });

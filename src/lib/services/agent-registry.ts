@@ -24,6 +24,16 @@ interface ChromeStatus {
   lastActivity: string;
 }
 
+export interface TailscaleStatus {
+  online: boolean;
+  tailscaleIP: string | null;
+  hostname: string | null;
+  tailnet: string | null;
+  peerCount: number;
+  version: string | null;
+  exitNode: string | null;
+}
+
 interface ConnectedAgent {
   socket: Socket;
   workspaceId: string;
@@ -32,12 +42,12 @@ interface ConnectedAgent {
   connectedAt: Date;
   lastHeartbeat: Date;
   tabs: Map<string, TabState>;
-  tailscaleConnected: boolean | null;
+  tailscaleStatus: TailscaleStatus | null;
   chromeStatus: ChromeStatus | null;
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '3.0.0';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '3.1.0';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -85,7 +95,7 @@ class AgentRegistry {
       connectedAt: new Date(),
       lastHeartbeat: new Date(),
       tabs: new Map(),
-      tailscaleConnected: null,
+      tailscaleStatus: null,
       chromeStatus: null,
     };
 
@@ -203,7 +213,7 @@ class AgentRegistry {
   async heartbeat(
     workspaceId: string,
     tabs: Array<{ tabId: string; status: string }>,
-    tailscaleConnected?: boolean,
+    tailscaleStatus?: TailscaleStatus | null,
     chromeStatus?: ChromeStatus | null
   ): Promise<void> {
     const agent = this.agents.get(workspaceId);
@@ -211,9 +221,9 @@ class AgentRegistry {
 
     agent.lastHeartbeat = new Date();
 
-    // Update Tailscale connection status if provided
-    if (tailscaleConnected !== undefined) {
-      agent.tailscaleConnected = tailscaleConnected;
+    // Update Tailscale status if provided
+    if (tailscaleStatus !== undefined) {
+      agent.tailscaleStatus = tailscaleStatus;
     }
 
     // Update Chrome connection status if provided
@@ -511,6 +521,27 @@ class AgentRegistry {
    */
   requestStats(workspaceId: string, requestId: string): boolean {
     return this.emit(workspaceId, 'stats:request', { requestId });
+  }
+
+  /**
+   * Request Tailscale status from the agent
+   */
+  tailscaleStatus(workspaceId: string, requestId: string): boolean {
+    return this.emit(workspaceId, 'tailscale:status', { requestId });
+  }
+
+  /**
+   * Request Tailscale connect from the agent
+   */
+  tailscaleConnect(workspaceId: string, requestId: string, authKey: string): boolean {
+    return this.emit(workspaceId, 'tailscale:connect', { requestId, authKey });
+  }
+
+  /**
+   * Request Tailscale disconnect from the agent
+   */
+  tailscaleDisconnect(workspaceId: string, requestId: string): boolean {
+    return this.emit(workspaceId, 'tailscale:disconnect', { requestId });
   }
 
   /**

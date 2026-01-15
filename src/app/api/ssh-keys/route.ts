@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+import * as crypto from 'crypto';
 import { getSSHKeyService } from '@/lib/services';
 import {
   requireAuth,

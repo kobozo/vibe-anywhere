@@ -1,7 +1,8 @@
 import { eq, and, or, isNull } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, queryClient } from '@/lib/db';
 import { sshKeys, type SSHKey, type NewSSHKey, type SSHKeyType } from '@/lib/db/schema';
 import { config } from '@/lib/config';
+import type Database from 'better-sqlite3';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -226,19 +227,40 @@ export class SSHKeyService {
       }
     }
 
-    const [key] = await db
-      .insert(sshKeys)
-      .values({
-        userId,
+    const now = Date.now();
+    const keyId = crypto.randomUUID();
+
+    // Use raw SQLite client directly to bypass Drizzle's pgEnum type system
+    // This avoids issues with pgEnum not being compatible with SQLite
+    if (queryClient && 'prepare' in queryClient) {
+      // SQLite: Use raw prepared statements
+      const stmt = (queryClient as Database.Database).prepare(`
+        INSERT INTO ssh_keys (
+          id, user_id, repository_id, name, public_key, private_key_encrypted,
+          key_type, fingerprint, is_default, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(keyId, userId, null, input.name, input.publicKey, encryptedPrivateKey,
+               keyType, fingerprint, 0, now, now);
+    } else {
+      // PostgreSQL: Use Drizzle ORM (pgEnum works fine here)
+      await db.insert(sshKeys).values({
+        id: keyId,
+        userId: userId,
+        repositoryId: null,
         name: input.name,
         publicKey: input.publicKey,
         privateKeyEncrypted: encryptedPrivateKey,
-        keyType,
-        fingerprint,
-        isDefault: false,
-      })
-      .returning();
+        keyType: keyType as any,
+        fingerprint: fingerprint,
+        isDefault: 0 as any,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
+    // Fetch the inserted key
+    const [key] = await db.select().from(sshKeys).where(eq(sshKeys.id, keyId));
     return key;
   }
 
@@ -274,19 +296,39 @@ export class SSHKeyService {
       }
     }
 
-    const [key] = await db
-      .insert(sshKeys)
-      .values({
+    const now = Date.now();
+    const keyId = crypto.randomUUID();
+
+    // Use raw SQLite client directly to bypass Drizzle's pgEnum type system
+    if (queryClient && 'prepare' in queryClient) {
+      // SQLite: Use raw prepared statements
+      const stmt = (queryClient as Database.Database).prepare(`
+        INSERT INTO ssh_keys (
+          id, user_id, repository_id, name, public_key, private_key_encrypted,
+          key_type, fingerprint, is_default, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(keyId, null, repositoryId, input.name, input.publicKey, encryptedPrivateKey,
+               keyType, fingerprint, 0, now, now);
+    } else {
+      // PostgreSQL: Use Drizzle ORM (pgEnum works fine here)
+      await db.insert(sshKeys).values({
+        id: keyId,
+        userId: null,
         repositoryId,
         name: input.name,
         publicKey: input.publicKey,
         privateKeyEncrypted: encryptedPrivateKey,
-        keyType,
+        keyType: keyType as any,
         fingerprint,
-        isDefault: false,
-      })
-      .returning();
+        isDefault: 0 as any,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
+    // Fetch the inserted key
+    const [key] = await db.select().from(sshKeys).where(eq(sshKeys.id, keyId));
     return key;
   }
 
@@ -349,7 +391,7 @@ export class SSHKeyService {
       .from(sshKeys)
       .where(
         or(
-          and(eq(sshKeys.userId, userId), eq(sshKeys.isDefault, true)),
+          and(eq(sshKeys.userId, userId), eq(sshKeys.isDefault, 1)), // SQLite uses 0/1 for boolean
           eq(sshKeys.repositoryId, repositoryId)
         )
       );
@@ -388,13 +430,13 @@ export class SSHKeyService {
     // First, unset all other defaults for this user
     await db
       .update(sshKeys)
-      .set({ isDefault: false })
+      .set({ isDefault: 0 }) // SQLite uses 0/1 for boolean
       .where(eq(sshKeys.userId, userId));
 
     // Then set the new default
     await db
       .update(sshKeys)
-      .set({ isDefault: true })
+      .set({ isDefault: 1 }) // SQLite uses 0/1 for boolean
       .where(and(eq(sshKeys.id, keyId), eq(sshKeys.userId, userId)));
   }
 
@@ -410,7 +452,10 @@ export class SSHKeyService {
    */
   toKeyInfo(key: SSHKey): Omit<SSHKey, 'privateKeyEncrypted'> {
     const { privateKeyEncrypted, ...keyInfo } = key;
-    return keyInfo;
+    return {
+      ...keyInfo,
+      isDefault: Boolean(keyInfo.isDefault), // Convert SQLite integer to boolean
+    };
   }
 }
 

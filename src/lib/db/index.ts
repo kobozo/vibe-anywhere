@@ -47,6 +47,9 @@ if (dbConfig.backend === 'postgresql') {
 // Export the database instance
 export { db };
 
+// Export the raw query client for direct access when needed (e.g., bypassing Drizzle type system)
+export { queryClient };
+
 // Export database config
 export { dbConfig };
 

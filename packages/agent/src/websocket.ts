@@ -7,6 +7,7 @@ import { io, Socket } from 'socket.io-client';
 import type { AgentConfig } from './config.js';
 import { EnvStateManager } from './env-state-manager.js';
 import { applyEnvVarChanges } from './env-sync.js';
+import type { TailscaleStatus } from './tailscale-handler.js';
 
 export interface AgentEvents {
   onConnected: () => void;
@@ -31,6 +32,10 @@ export interface AgentEvents {
   onGitConfig: (data: { requestId: string; name: string; email: string }) => void;
   // Stats events
   onStatsRequest: (data: { requestId: string }) => void;
+  // Tailscale events
+  onTailscaleStatus: (data: { requestId: string }) => void;
+  onTailscaleConnect: (data: { requestId: string; authKey: string }) => void;
+  onTailscaleDisconnect: (data: { requestId: string }) => void;
 }
 
 export class AgentWebSocket {
@@ -202,6 +207,19 @@ export class AgentWebSocket {
       this.events.onStatsRequest(data);
     });
 
+    // Tailscale events
+    this.socket.on('tailscale:status', (data) => {
+      this.events.onTailscaleStatus(data);
+    });
+
+    this.socket.on('tailscale:connect', (data) => {
+      this.events.onTailscaleConnect(data);
+    });
+
+    this.socket.on('tailscale:disconnect', (data) => {
+      this.events.onTailscaleDisconnect(data);
+    });
+
     // Environment variable update event
     this.socket.on('env:update', async (data: {
       workspaceId: string;
@@ -324,7 +342,7 @@ export class AgentWebSocket {
    */
   sendHeartbeat(
     tabs?: Array<{ tabId: string; status: string }>,
-    tailscaleConnected?: boolean,
+    tailscaleStatus?: TailscaleStatus | null,
     chromeStatus?: { connected: boolean; chromeHost: string | null; lastActivity: string } | null
   ): void {
     if (!this.socket?.connected) return;
@@ -332,7 +350,7 @@ export class AgentWebSocket {
     this.socket.emit('agent:heartbeat', {
       workspaceId: this.config.workspaceId,
       tabs: tabs || [],
-      tailscaleConnected,
+      tailscaleStatus: tailscaleStatus || null,
       chromeStatus,
       metrics: {
         uptime: process.uptime(),
@@ -474,6 +492,33 @@ export class AgentWebSocket {
     if (!this.socket?.connected) return;
 
     this.socket.emit('stats:response', { requestId, success, stats, error });
+  }
+
+  /**
+   * Send Tailscale status response
+   */
+  sendTailscaleStatusResponse(requestId: string, success: boolean, status?: TailscaleStatus | null, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('tailscale:status:response', { requestId, success, status, error });
+  }
+
+  /**
+   * Send Tailscale connect response
+   */
+  sendTailscaleConnectResponse(requestId: string, success: boolean, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('tailscale:connect:response', { requestId, success, error });
+  }
+
+  /**
+   * Send Tailscale disconnect response
+   */
+  sendTailscaleDisconnectResponse(requestId: string, success: boolean, error?: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit('tailscale:disconnect:response', { requestId, success, error });
   }
 
   /**

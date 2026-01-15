@@ -6,6 +6,7 @@ import { useSSHKeys, SSHKeyInfo } from '@/hooks/useSSHKeys';
 import { useSecrets, type Secret } from '@/hooks/useSecrets';
 import { useAuth } from '@/hooks/useAuth';
 import { ProxmoxSettings } from './proxmox-settings';
+import { TailscaleSettings } from './tailscale-settings';
 import { VoiceSettings } from './voice-settings';
 import { ThemeSettings } from './theme-settings';
 import { GitIdentityList } from '@/components/git-identity/git-identity-list';
@@ -20,7 +21,7 @@ interface SettingsModalProps {
   onVoiceSettingsChange?: () => void;
 }
 
-type SettingsTab = 'theme' | 'templates' | 'users' | 'ssh-keys' | 'git-identities' | 'secrets' | 'proxmox' | 'voice';
+type SettingsTab = 'theme' | 'templates' | 'users' | 'ssh-keys' | 'git-identities' | 'secrets' | 'proxmox' | 'tailscale' | 'voice';
 
 // Get AI assistant tech stacks for the dropdown
 const AI_TECH_STACKS: TechStack[] = getStacksByCategory('ai-assistant');
@@ -240,7 +241,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                   ? 'text-primary border-l-4 border-primary bg-background-tertiary'
                   : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
             >
-              Tab Templates
+              Tabs
             </button>
             <button
               onClick={() => setActiveTab('secrets')}
@@ -288,6 +289,15 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
             >
               Proxmox
             </button>
+            <button
+              onClick={() => setActiveTab('tailscale')}
+              className={`px-4 py-3 text-left w-full text-sm font-medium transition-colors
+                ${activeTab === 'tailscale'
+                  ? 'text-primary border-l-4 border-primary bg-background-tertiary'
+                  : 'text-foreground-secondary hover:text-foreground hover:bg-background-tertiary/50'}`}
+            >
+              Tailscale
+            </button>
 
             {/* Administration Section */}
             {canManageUsers && (
@@ -324,7 +334,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                   onClick={() => setShowAddTemplate(!showAddTemplate)}
                   className="text-sm text-primary hover:text-primary-hover"
                 >
-                  {showAddTemplate ? 'Cancel' : '+ Add Template'}
+                  {showAddTemplate ? 'Cancel' : '+ Add Predefined Tab'}
                 </button>
               </div>
 
@@ -423,7 +433,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                     disabled={!newTemplate.name || !newTemplate.command}
                     className="px-3 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-background-input disabled:opacity-50 rounded text-sm text-primary-foreground"
                   >
-                    Add Template
+                    Add Predefined Tab
                   </button>
                 </div>
               )}
@@ -667,7 +677,7 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
                   </div>
                   <div>
                     <label className="block text-xs text-foreground-secondary mb-2">
-                      Tab Templates * <span className="text-foreground-tertiary">(select at least one)</span>
+                      Tabs * <span className="text-foreground-tertiary">(select at least one)</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {templates.map((template) => (
@@ -760,6 +770,9 @@ export function SettingsModal({ isOpen, onClose, onVoiceSettingsChange }: Settin
           {activeTab === 'proxmox' && (
             <ProxmoxSettings />
           )}
+
+          {/* Tailscale */}
+          {activeTab === 'tailscale' && <TailscaleSettings />}
 
           {/* Voice (Whisper) */}
           {activeTab === 'voice' && <VoiceSettings onSettingsChange={onVoiceSettingsChange} />}

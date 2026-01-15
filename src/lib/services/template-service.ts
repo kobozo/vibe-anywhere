@@ -39,24 +39,32 @@ export class TemplateService {
    * @param role - User's role for determining visibility
    */
   async listTemplates(userId?: string, role?: string): Promise<ProxmoxTemplate[]> {
+    console.log('[TemplateService.listTemplates] START - userId:', userId, 'role:', role);
     // Admin and template-admin can see all templates
     if (role === 'admin' || role === 'template-admin') {
-      return db
+      console.log('[TemplateService.listTemplates] Admin query starting');
+      const result = await db
         .select()
         .from(proxmoxTemplates)
         .orderBy(desc(proxmoxTemplates.createdAt));
+      console.log('[TemplateService.listTemplates] Admin query complete, count:', result.length);
+      return result;
     }
 
     // Other roles only see their own templates
     if (!userId) {
+      console.log('[TemplateService.listTemplates] No userId, returning empty');
       return [];
     }
 
-    return db
+    console.log('[TemplateService.listTemplates] User query starting');
+    const result = await db
       .select()
       .from(proxmoxTemplates)
       .where(eq(proxmoxTemplates.userId, userId))
       .orderBy(desc(proxmoxTemplates.createdAt));
+    console.log('[TemplateService.listTemplates] User query complete, count:', result.length);
+    return result;
   }
 
   /**
@@ -155,10 +163,20 @@ export class TemplateService {
     userId: string,
     input: CreateTemplateInput
   ): Promise<ProxmoxTemplate> {
+    try {
+      console.log('[TemplateService] createTemplate START');
+      console.log('[TemplateService] userId:', userId);
+      console.log('[TemplateService] input.name:', input.name);
+      console.log('[TemplateService] input.techStacks:', input.techStacks);
+      console.log('[TemplateService] input.techStacks type:', typeof input.techStacks, Array.isArray(input.techStacks));
+    } catch (e) {
+      console.error('[TemplateService] Error in initial logging:', e);
+    }
     let inheritedTechStacks: string[] = [];
 
     // Validate parent template if specified
     if (input.parentTemplateId) {
+      console.log('[TemplateService] Validating parent template');
       const parent = await this.validateParentTemplate(input.parentTemplateId, userId);
       // Capture inherited tech stacks from parent (including its inherited stacks)
       inheritedTechStacks = this.getEffectiveTechStacks(parent);
@@ -168,15 +186,19 @@ export class TemplateService {
     const newTechStacks = (input.techStacks || []).filter(
       (stack) => !inheritedTechStacks.includes(stack)
     );
+    console.log('[TemplateService] Filtered tech stacks:', { newTechStacks, inheritedTechStacks });
 
     // If this is the first template or marked as default, unset other defaults
     if (input.isDefault) {
+      console.log('[TemplateService] Clearing default templates');
       await this.clearDefaultTemplates(userId);
     }
 
     // Check if this is the first template for the user
+    console.log('[TemplateService] Checking if first template');
     const existingTemplates = await this.listTemplates(userId);
     const isFirstTemplate = existingTemplates.length === 0;
+    console.log('[TemplateService] Is first template:', isFirstTemplate);
 
     // Determine base CT template:
     // - If cloning from parent template, inherit parent's baseCtTemplate
@@ -187,6 +209,20 @@ export class TemplateService {
       baseCtTemplate = parent?.baseCtTemplate || null;
     }
 
+    const techStacksStr = JSON.stringify(newTechStacks);
+    const inheritedTechStacksStr = JSON.stringify(inheritedTechStacks);
+
+    console.log('[TemplateService] About to insert with:');
+    console.log('  userId:', userId, typeof userId);
+    console.log('  parentTemplateId:', input.parentTemplateId, typeof input.parentTemplateId);
+    console.log('  baseCtTemplate:', baseCtTemplate, typeof baseCtTemplate);
+    console.log('  name:', input.name, typeof input.name);
+    console.log('  description:', input.description, typeof input.description);
+    console.log('  techStacks:', techStacksStr, typeof techStacksStr);
+    console.log('  inheritedTechStacks:', inheritedTechStacksStr, typeof inheritedTechStacksStr);
+    console.log('  isDefault:', input.isDefault || isFirstTemplate, typeof (input.isDefault || isFirstTemplate));
+    console.log('  status: pending');
+
     const [template] = await db
       .insert(proxmoxTemplates)
       .values({
@@ -195,11 +231,11 @@ export class TemplateService {
         baseCtTemplate,
         name: input.name,
         description: input.description || null,
-        techStacks: newTechStacks,
-        inheritedTechStacks: inheritedTechStacks,
+        techStacks: techStacksStr,
+        inheritedTechStacks: inheritedTechStacksStr,
         isDefault: input.isDefault || isFirstTemplate, // First template is always default
         status: 'pending',
-      })
+      } as any)
       .returning();
 
     return template;

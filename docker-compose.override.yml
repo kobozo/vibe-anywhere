@@ -29,9 +29,6 @@ services:
       # Preserve node_modules from container (don't override with host)
       - /app/node_modules
 
-      # Mount .next build cache for faster rebuilds
-      - .next-cache:/app/.next
-
       # App data directory (cloned repos, worktrees, SSH keys)
       - ${HOST_DATA_PATH:-vibe-anywhere-data}:/data:rw
 
@@ -44,7 +41,4 @@ services:
     healthcheck:
       disable: true
 
-# Development-specific volumes
-volumes:
-  .next-cache:
-    name: vibe-anywhere-next-cache
+# Development-specific volumes (none currently)

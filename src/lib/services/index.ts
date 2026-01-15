@@ -17,6 +17,7 @@ export { ContainerStatusSyncService, getContainerStatusSyncService } from './con
 export { EnvVarSyncService, getEnvVarSyncService } from './env-var-sync-service';
 export { TailscaleService, getTailscaleService } from './tailscale-service';
 export { CdpShimRegistry, getCdpShimRegistry } from './cdp-shim-registry';
+export { SettingsService, getSettingsService } from './settings-service';
 
 // Container backend (abstraction layer)
 export {

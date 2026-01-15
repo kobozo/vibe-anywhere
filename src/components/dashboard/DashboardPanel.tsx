@@ -5,6 +5,17 @@ import type { Workspace, Repository } from '@/lib/db/schema';
 import { useEnvVarSync } from '@/hooks/useEnvVarSync';
 import { EnvVarSyncDialog } from '@/components/workspaces/env-var-sync-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { TailscaleWidget } from './TailscaleWidget';
+
+interface TailscaleStatus {
+  online: boolean;
+  tailscaleIP: string | null;
+  hostname: string | null;
+  tailnet: string | null;
+  peerCount: number;
+  version: string | null;
+  exitNode: string | null;
+}
 
 interface ChromeStatus {
   connected: boolean;
@@ -20,7 +31,7 @@ interface AgentInfo {
   connectedAt: string | null;
   lastHeartbeat: string | null;
   tabCount: number;
-  tailscaleConnected: boolean | null;
+  tailscaleStatus: TailscaleStatus | null;
   chromeStatus: ChromeStatus | null;
 }
 
@@ -81,6 +92,7 @@ export function DashboardPanel({
   const [isDestroying, setIsDestroying] = useState(false);
   const [showDeleteWorkspaceConfirm, setShowDeleteWorkspaceConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTailscaleConfigured, setIsTailscaleConfigured] = useState(false);
 
   // Env var sync check before container operations
   const {
@@ -111,11 +123,29 @@ export function DashboardPanel({
     }
   }, [workspace.id]);
 
+  const fetchTailscaleConfig = useCallback(async () => {
+    try {
+      const response = await fetch('/api/tailscale/settings', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (response.ok) {
+        const { data } = await response.json();
+        setIsTailscaleConfigured(data.isConfigured);
+      }
+    } catch (error) {
+      console.error('Failed to fetch Tailscale config:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAgentInfo();
     const interval = setInterval(fetchAgentInfo, 5000);
     return () => clearInterval(interval);
   }, [fetchAgentInfo]);
+
+  useEffect(() => {
+    fetchTailscaleConfig();
+  }, [fetchTailscaleConfig]);
 
   useEffect(() => {
     const fetchTemplateInfo = async () => {
@@ -484,36 +514,6 @@ export function DashboardPanel({
                       <span className="text-foreground">{agentInfo.tabCount}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Tailscale:</span>
-                      <span className={`font-medium ${
-                        agentInfo.tailscaleConnected === true ? 'text-success' :
-                        agentInfo.tailscaleConnected === false ? 'text-error' :
-                        'text-foreground-secondary'
-                      }`} title={
-                        agentInfo.tailscaleConnected === true ? 'Connected to Tailscale network' :
-                        agentInfo.tailscaleConnected === false ? 'Tailscale disconnected - Chrome browser control unavailable' :
-                        'Tailscale status unknown'
-                      }>
-                        {agentInfo.tailscaleConnected === true ? 'Connected' :
-                         agentInfo.tailscaleConnected === false ? 'Disconnected' :
-                         'Unknown'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Chrome:</span>
-                      <span className={`font-medium ${
-                        agentInfo.chromeStatus?.connected ? 'text-success' : 'text-foreground-secondary'
-                      }`} title={
-                        agentInfo.chromeStatus?.connected
-                          ? `Chrome connected: ${agentInfo.chromeStatus.chromeHost}`
-                          : 'Chrome disconnected: Waiting for connection...'
-                      }>
-                        {agentInfo.chromeStatus?.connected
-                          ? agentInfo.chromeStatus.chromeHost
-                          : 'Waiting...'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-foreground-secondary">Heartbeat:</span>
                       <span className="text-foreground text-xs">{formatDate(agentInfo.lastHeartbeat)}</span>
                     </div>
@@ -585,6 +585,15 @@ export function DashboardPanel({
               <p className="text-sm text-foreground-tertiary italic">No template assigned</p>
             )}
           </div>
+
+          {/* Tailscale Widget */}
+          <TailscaleWidget
+            workspaceId={workspace.id}
+            tailscaleStatus={agentInfo?.tailscaleStatus || null}
+            chromeStatus={agentInfo?.chromeStatus || null}
+            isAgentConnected={agentInfo?.connected || false}
+            isTailscaleConfigured={isTailscaleConfigured}
+          />
 
           {/* Workspace Info Card */}
           <div className="bg-background-secondary rounded-lg p-4 border border-border">

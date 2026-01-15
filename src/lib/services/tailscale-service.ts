@@ -3,6 +3,8 @@
  * Manages Tailscale authentication and ephemeral auth key generation
  */
 
+import { getSettingsService } from './settings-service';
+
 export interface TailscaleAuthKey {
   key: string;
   expiresAt: Date;
@@ -10,9 +12,31 @@ export interface TailscaleAuthKey {
 
 export class TailscaleService {
   private oauthToken: string | null = null;
+  private initialized: boolean = false;
 
   constructor() {
+    // Fallback to env var for backward compatibility
     this.oauthToken = process.env.TAILSCALE_OAUTH_TOKEN || null;
+  }
+
+  /**
+   * Load OAuth token from database
+   * Should be called after construction to load from DB
+   */
+  async loadOAuthToken(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    const settingsService = getSettingsService();
+    const dbToken = await settingsService.getTailscaleOAuthToken();
+
+    // Prioritize database token over env var
+    if (dbToken) {
+      this.oauthToken = dbToken;
+    }
+
+    this.initialized = true;
   }
 
   /**
@@ -89,12 +113,27 @@ export class TailscaleService {
       };
     }
 
+    return this.testConnectionWithToken(this.oauthToken);
+  }
+
+  /**
+   * Test a specific OAuth token without saving it
+   * Used for validating tokens before storing them in the database
+   */
+  async testConnectionWithToken(token: string): Promise<{ success: boolean; error?: string }> {
+    if (!token) {
+      return {
+        success: false,
+        error: 'Token is required',
+      };
+    }
+
     try {
       // Try to list devices (read-only operation)
       const response = await fetch('https://api.tailscale.com/api/v2/tailnet/-/devices', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.oauthToken}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -121,6 +160,7 @@ let tailscaleService: TailscaleService | null = null;
 
 /**
  * Get the Tailscale service singleton
+ * Note: Call loadOAuthToken() after getting the service to load token from database
  */
 export function getTailscaleService(): TailscaleService {
   if (!tailscaleService) {

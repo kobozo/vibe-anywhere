@@ -1,6 +1,8 @@
 import { eq, asc, sql } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { db, queryClient } from '@/lib/db';
 import { repositories, users, type Repository } from '@/lib/db/schema';
+import type Database from 'better-sqlite3';
+import * as crypto from 'crypto';
 
 /**
  * Input for creating a repository (metadata-only, no local cloning)
@@ -55,10 +57,48 @@ export class RepositoryService {
     // Validate resource values if provided
     this.validateResourceValues(input);
 
-    // Create database record (metadata only)
-    const [repo] = await db
-      .insert(repositories)
-      .values({
+    const repoId = crypto.randomUUID();
+    const now = Date.now();
+
+    // Use raw SQLite client directly to bypass Drizzle's type system
+    if (queryClient && 'prepare' in queryClient) {
+      // SQLite: Use raw prepared statements with explicit values for all fields
+      const stmt = (queryClient as Database.Database).prepare(`
+        INSERT INTO repositories (
+          id, user_id, template_id, ssh_key_id, name, description, clone_url, clone_depth,
+          default_branch, tech_stack, env_vars, git_hooks, cached_branches, branches_cached_at,
+          resource_memory, resource_cpu_cores, resource_disk_size,
+          git_identity_id, git_custom_name, git_custom_email, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        repoId,
+        userId,
+        input.templateId || null,
+        input.sshKeyId || null,
+        input.name,
+        input.description || null,
+        input.cloneUrl,
+        input.cloneDepth || null,
+        input.defaultBranch || 'main',
+        JSON.stringify(input.techStack || []),
+        '{}', // env_vars default
+        '{}', // git_hooks default
+        '[]', // cached_branches default
+        null, // branches_cached_at
+        input.resourceMemory ?? null,
+        input.resourceCpuCores ?? null,
+        input.resourceDiskSize ?? null,
+        input.gitIdentityId ?? null,
+        input.gitCustomName ?? null,
+        input.gitCustomEmail ?? null,
+        now,
+        now
+      );
+    } else {
+      // PostgreSQL: Use Drizzle ORM
+      await db.insert(repositories).values({
+        id: repoId,
         userId,
         name: input.name,
         description: input.description || null,
@@ -74,9 +114,13 @@ export class RepositoryService {
         gitIdentityId: input.gitIdentityId ?? null,
         gitCustomName: input.gitCustomName ?? null,
         gitCustomEmail: input.gitCustomEmail ?? null,
-      })
-      .returning();
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
+    // Fetch the inserted repository
+    const [repo] = await db.select().from(repositories).where(eq(repositories.id, repoId));
     return repo;
   }
 
