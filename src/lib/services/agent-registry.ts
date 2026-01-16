@@ -106,8 +106,8 @@ class AgentRegistry {
     await db
       .update(workspaces)
       .set({
-        agentConnectedAt: new Date().toISOString(),
-        agentLastHeartbeat: new Date().toISOString(),
+        agentConnectedAt: sql`NOW()`,
+        agentLastHeartbeat: sql`NOW()`,
         agentVersion: version,
       })
       .where(eq(workspaces.id, workspaceId));
@@ -243,7 +243,7 @@ class AgentRegistry {
     await db
       .update(workspaces)
       .set({
-        agentLastHeartbeat: new Date().toISOString(),
+        agentLastHeartbeat: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId));
   }

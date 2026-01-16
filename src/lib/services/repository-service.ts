@@ -203,7 +203,7 @@ export class RepositoryService {
 
     const updates: Record<string, unknown> = {
       cachedBranches: JSON.stringify(branches),
-      branchesCachedAt: new Date().toISOString(),
+      branchesCachedAt: sql`NOW()`,
       updatedAt: sql`NOW()`,
     };
 

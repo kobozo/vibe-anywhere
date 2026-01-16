@@ -159,7 +159,7 @@ class ContainerStatusSyncService {
           container_id = ${newContainerId},
           container_status = ${newStatus},
           container_ip = ${newContainerIp},
-          updated_at = ${new Date().toISOString()}::timestamptz,
+          updated_at = NOW(),
           agent_connected_at = NULL
         WHERE id = ${workspace.id}
       `);
@@ -170,7 +170,7 @@ class ContainerStatusSyncService {
           container_id = ${newContainerId},
           container_status = ${newStatus},
           container_ip = ${newContainerIp},
-          updated_at = ${new Date().toISOString()}::timestamptz
+          updated_at = NOW()
         WHERE id = ${workspace.id}
       `);
     }
