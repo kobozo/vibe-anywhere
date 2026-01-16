@@ -1,4 +1,4 @@
-import { eq, and, inArray, asc } from 'drizzle-orm';
+import { eq, and, inArray, asc , sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   tabGroups,
@@ -18,7 +18,7 @@ export interface TabGroupMemberInfo {
   tabId: string;
   paneIndex: number;
   sizePercent: number;
-  createdAt: number;
+  createdAt: Date;
   tab: TabInfo;
 }
 
@@ -28,8 +28,8 @@ export interface TabGroupInfo {
   name: string;
   layout: TabGroupLayout;
   sortOrder: number;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
   members: TabGroupMemberInfo[];
 }
 
@@ -158,7 +158,7 @@ export class TabGroupService {
       .update(tabGroups)
       .set({
         ...input,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(tabGroups.id, groupId))
       .returning();
@@ -206,7 +206,7 @@ export class TabGroupService {
     // Update group timestamp
     await db
       .update(tabGroups)
-      .set({ updatedAt: Date.now() })
+      .set({ updatedAt: sql`NOW()` })
       .where(eq(tabGroups.id, groupId));
 
     return this.getGroup(groupId) as Promise<TabGroupInfo>;
@@ -416,7 +416,7 @@ export class TabGroupService {
           tabId: member.tabId,
           paneIndex: member.paneIndex,
           sizePercent: member.sizePercent,
-          createdAt: member.createdAt,
+          createdAt: new Date(member.createdAt),
           tab: tab ? this.tabService.toTabInfo(tab) : null as unknown as TabInfo,
         };
       })
@@ -428,8 +428,8 @@ export class TabGroupService {
       name: group.name,
       layout: group.layout,
       sortOrder: group.sortOrder,
-      createdAt: group.createdAt,
-      updatedAt: group.updatedAt,
+      createdAt: new Date(group.createdAt),
+      updatedAt: new Date(group.updatedAt),
       members: memberInfos.filter(m => m.tab !== null),
     };
   }
@@ -464,7 +464,7 @@ export class TabGroupService {
       for (const { id, sortOrder } of updates) {
         await tx
           .update(tabGroups)
-          .set({ sortOrder, updatedAt: Date.now() })
+          .set({ sortOrder, updatedAt: sql`NOW()` })
           .where(eq(tabGroups.id, id));
       }
     });

@@ -1,4 +1,4 @@
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and , sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { workspaces, workspaceShares, users, type Workspace, type WorkspaceShare, type WorkspaceStatus, type ContainerStatus, type ContainerBackend } from '@/lib/db/schema';
 import { getRepositoryService, RepositoryService } from './repository-service';
@@ -226,7 +226,7 @@ export class WorkspaceService {
       ...workspace,
       isShared: true,
       sharedBy: owner.username,
-      permissions: share.permissions,
+      permissions: share.permissions as string[],
     }));
   }
 
@@ -262,7 +262,7 @@ export class WorkspaceService {
       .update(workspaces)
       .set({
         status: 'archived',
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -282,7 +282,7 @@ export class WorkspaceService {
       .update(workspaces)
       .set({
         status,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -301,8 +301,8 @@ export class WorkspaceService {
     await db
       .update(workspaces)
       .set({
-        lastActivityAt: Date.now(),
-        updatedAt: Date.now(),
+        lastActivityAt: sql`NOW()`,
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId));
   }
@@ -395,8 +395,8 @@ export class WorkspaceService {
         try {
           const templateService = getTemplateService();
           const repoTemplate = await templateService.getTemplateForRepository(repo.id);
-          const templateTechStacks = repoTemplate?.techStacks || [];
-          const missingStacks = repo.techStack.filter(
+          const templateTechStacks = (repoTemplate?.techStacks as string[]) || [];
+          const missingStacks = (repo.techStack as string[]).filter(
             (stackId: string) => !templateTechStacks.includes(stackId)
           );
 
@@ -444,11 +444,17 @@ export class WorkspaceService {
    * Internal implementation of container start (wrapped for error handling)
    */
   private async doStartContainerInternal(workspaceId: string): Promise<Workspace> {
+    console.log('[DEBUG] Starting container for workspace:', workspaceId);
     // Re-fetch workspace to get latest state
     const workspace = await this.getWorkspace(workspaceId);
     if (!workspace) {
       throw new Error(`Workspace ${workspaceId} not found`);
     }
+    console.log('[DEBUG] Got workspace, timestamp types:', {
+      createdAt: typeof workspace.createdAt,
+      updatedAt: typeof workspace.updatedAt,
+      lastActivityAt: typeof workspace.lastActivityAt,
+    });
 
     // Get repository for clone URL and settings
     const repo = await this.repositoryService.getRepository(workspace.repositoryId);
@@ -471,7 +477,7 @@ export class WorkspaceService {
         }
         // Ensure repo is cloned (may have been started before refactor)
         if (containerIp) {
-          await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, workspace.containerId);
+          await this.ensureRepoCloned(workspaceId, containerIp, { ...repo, techStack: repo.techStack as string[] | null }, workspace.branchName, workspace.containerId);
         }
         return workspace; // Already running
       }
@@ -487,7 +493,7 @@ export class WorkspaceService {
         // Ensure repo is cloned after starting (may have been started before refactor)
         if (containerIp) {
           this.emitProgress(workspaceId, 'cloning_repository');
-          await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, workspace.containerId);
+          await this.ensureRepoCloned(workspaceId, containerIp, { ...repo, techStack: repo.techStack as string[] | null }, workspace.branchName, workspace.containerId);
         }
         this.emitProgress(workspaceId, 'connecting');
         return this.updateContainerStatus(workspaceId, workspace.containerId, 'running');
@@ -540,7 +546,7 @@ export class WorkspaceService {
 
     // Build tags for Proxmox container (repository name + tech stacks)
     const tags = backendType === 'proxmox'
-      ? buildWorkspaceTags(repo.name, repo.techStack || [])
+      ? buildWorkspaceTags(repo.name, (repo.techStack as string[]) || [])
       : undefined;
 
     const containerId = await this.containerBackend.createContainer(workspaceId, {
@@ -558,15 +564,38 @@ export class WorkspaceService {
     });
 
     // Save containerId immediately to prevent race conditions
-    await db
-      .update(workspaces)
-      .set({
-        containerId,
-        containerStatus: 'creating',
-        containerBackend: backendType as ContainerBackend,
-        updatedAt: Date.now(),
-      })
-      .where(eq(workspaces.id, workspaceId));
+    const updateData = {
+      containerId,
+      containerStatus: 'creating' as const,
+      containerBackend: backendType as ContainerBackend,
+      updatedAt: sql`NOW()`,
+    };
+    console.log('[DEBUG] About to UPDATE workspace:', workspaceId);
+    console.log('[DEBUG] UPDATE data:', JSON.stringify(updateData));
+    console.log('[DEBUG] All field types:', Object.entries(updateData).map(([k, v]) =>
+      `${k}: ${typeof v}`
+    ).join(', '));
+
+    try {
+      // Use raw SQL to bypass Drizzle's type handling
+      await db.execute(sql`
+        UPDATE workspaces
+        SET
+          container_id = ${updateData.containerId},
+          container_status = ${updateData.containerStatus},
+          container_backend = ${updateData.containerBackend},
+          updated_at = ${updateData.updatedAt}::timestamptz
+        WHERE id = ${workspaceId}
+      `);
+      console.log('[DEBUG] UPDATE successful (raw SQL)');
+    } catch (error) {
+      console.error('[DEBUG] UPDATE failed:', error);
+      console.error('[DEBUG] All updateData fields:');
+      for (const [key, value] of Object.entries(updateData)) {
+        console.error(`  ${key}:`, value, `(type: ${typeof value})`);
+      }
+      throw error;
+    }
 
     console.log(`Container ${containerId} created for workspace ${workspaceId}, starting...`);
 
@@ -591,7 +620,7 @@ export class WorkspaceService {
       this.emitProgress(workspaceId, 'cloning_repository');
 
       // Ensure repo is cloned (uses helper which handles SSH keys and tech stacks)
-      await this.ensureRepoCloned(workspaceId, containerIp, repo, workspace.branchName, containerId);
+      await this.ensureRepoCloned(workspaceId, containerIp, { ...repo, techStack: repo.techStack as string[] | null }, workspace.branchName, containerId);
 
       // Inject environment variables to container
       try {
@@ -610,7 +639,10 @@ export class WorkspaceService {
               `repository:${repo.name}`,
             ]);
             mergedEnvVars.TAILSCALE_AUTHKEY = authKey.key;
-            console.log(`Generated ephemeral Tailscale auth key for workspace ${workspaceId} (expires: ${authKey.expiresAt.toISOString()})`);
+            const expiresAt = typeof authKey.expiresAt === 'object' && authKey.expiresAt !== null
+              ? (authKey.expiresAt as Date).toISOString()
+              : authKey.expiresAt;
+            console.log(`Generated ephemeral Tailscale auth key for workspace ${workspaceId} (expires: ${expiresAt})`);
           } catch (error) {
             console.warn('Failed to generate Tailscale auth key:', error);
             // Don't fail container startup if Tailscale isn't configured
@@ -681,7 +713,7 @@ export class WorkspaceService {
           const agentToken = proxmoxBackend.generateAgentToken();
           await db
             .update(workspaces)
-            .set({ agentToken, updatedAt: Date.now() })
+            .set({ agentToken, updatedAt: sql`NOW()` })
             .where(eq(workspaces.id, workspaceId));
 
           await proxmoxBackend.provisionAgent(containerId, workspaceId, agentToken);
@@ -703,7 +735,7 @@ export class WorkspaceService {
         containerStatus: 'running',
         containerBackend: backendType as ContainerBackend,
         containerIp: containerIp || null,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -727,7 +759,7 @@ export class WorkspaceService {
       .update(workspaces)
       .set({
         containerIp: ip,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId));
   }
@@ -802,7 +834,7 @@ export class WorkspaceService {
         .update(workspaces)
         .set({
           hasUncommittedChanges: status.hasChanges,
-          updatedAt: Date.now(),
+          updatedAt: sql`NOW()`,
         })
         .where(eq(workspaces.id, workspaceId));
 
@@ -845,7 +877,7 @@ export class WorkspaceService {
         containerStatus: 'none',
         containerIp: null,
         hasUncommittedChanges: false,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();
@@ -874,7 +906,7 @@ export class WorkspaceService {
       .set({
         containerId,
         containerStatus,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.id, workspaceId))
       .returning();

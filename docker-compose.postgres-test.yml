@@ -1,0 +1,108 @@
+# PostgreSQL Test Instance for Vibe Anywhere
+# Runs on port 3001 alongside SQLite instance on port 3000
+#
+# Usage:
+#   docker compose -f docker-compose.postgres-test.yml up -d
+#
+# Stop:
+#   docker compose -f docker-compose.postgres-test.yml down
+
+services:
+  # ==========================================================================
+  # Vibe Anywhere Application (PostgreSQL)
+  # ==========================================================================
+  app-postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: vibe-anywhere-postgres
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # External port 3001, internal 3000
+      - "9230:9229"  # Node.js debugger (different from main dev)
+    environment:
+      # Database - PostgreSQL
+      DATABASE_URL: postgresql://vibeanywhere:vibeanywhere_test_password@postgres-test:5432/vibeanywhere
+
+      # Server
+      NODE_ENV: development
+      PORT: 3000
+
+      # Auth
+      AUTH_SECRET: ${AUTH_SECRET:-change-this-to-a-secure-random-string-in-production}
+
+      # App home directory
+      APP_HOME_DIR: /data
+
+      # Git/Worktree paths
+      BASE_REPO_PATH: ${BASE_REPO_PATH:-/repos/base}
+      WORKTREE_BASE_PATH: /data/.worktrees
+
+      # Vibe Anywhere URL
+      SESSION_HUB_URL: ${SESSION_HUB_URL:-http://localhost:3001}
+
+      # Session settings
+      SESSION_IDLE_TIMEOUT_MINUTES: ${SESSION_IDLE_TIMEOUT_MINUTES:-60}
+      OUTPUT_BUFFER_SIZE: ${OUTPUT_BUFFER_SIZE:-1000}
+    volumes:
+      # Mount source code for hot-reloading
+      - .:/app:rw
+
+      # Preserve node_modules from container (don't override with host)
+      - /app/node_modules
+
+      # Separate data directory for PostgreSQL instance
+      - vibe-anywhere-data-postgres:/data:rw
+
+      # Git repositories from host
+      - ${HOST_REPO_PATH:-./repos}:/repos:rw
+
+      # SSH keys for Proxmox (optional)
+      - ${HOST_SSH_PATH:-~/.ssh}:/home/devops/.ssh:ro
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - vibe-anywhere-postgres-network
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: vibe-anywhere-db-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vibeanywhere
+      POSTGRES_PASSWORD: vibeanywhere_test_password
+      POSTGRES_DB: vibeanywhere
+    ports:
+      - "5433:5432"  # External port 5433 to avoid conflict with 5432
+    volumes:
+      - postgres_data_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibeanywhere -d vibeanywhere"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vibe-anywhere-postgres-network
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  vibe-anywhere-data-postgres:
+    name: vibe-anywhere-data-postgres
+  postgres_data_test:
+    name: vibe-anywhere-postgres-test
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  vibe-anywhere-postgres-network:
+    name: vibe-anywhere-postgres
+    driver: bridge

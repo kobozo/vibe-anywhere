@@ -124,7 +124,7 @@ export function TemplateSection({
                   </span>
                 </div>
                 {/* Tech stacks preview */}
-                {template.techStacks && template.techStacks.length > 0 && (
+                {Array.isArray(template.techStacks) && template.techStacks.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {(template.techStacks as string[]).slice(0, 3).map((stack) => (
                       <span

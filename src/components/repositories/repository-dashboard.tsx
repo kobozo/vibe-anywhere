@@ -256,9 +256,9 @@ export function RepositoryDashboard({ repository, onBranchClick }: RepositoryDas
 
               {/* Combined tech stacks */}
               {(() => {
-                const templateStacks = template?.techStacks || [];
-                const repoStacks = (repository.techStack as string[]) || [];
-                const allStacks = [...new Set([...templateStacks, ...repoStacks])];
+                const templateStacks: string[] = Array.isArray(template?.techStacks) ? template.techStacks : [];
+                const repoStacks: string[] = Array.isArray(repository.techStack) ? repository.techStack : [];
+                const allStacks: string[] = [...new Set([...templateStacks, ...repoStacks])];
 
                 if (allStacks.length > 0) {
                   return (

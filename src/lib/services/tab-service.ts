@@ -1,4 +1,4 @@
-import { eq, desc, asc, sql, and, inArray, ne } from 'drizzle-orm';
+import { eq, desc, asc, and, inArray, ne , sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { tabs, tabGroups, type Tab, type NewTab, type SessionStatus, type TabType } from '@/lib/db/schema';
 import { getWorkspaceService, WorkspaceService } from './workspace-service';
@@ -26,9 +26,9 @@ export interface TabInfo {
   sortOrder: number;
   command: string[];
   exitOnClose: boolean;
-  createdAt: number;
-  updatedAt: number;
-  lastActivityAt: number;
+  createdAt: Date;
+  updatedAt: Date;
+  lastActivityAt: Date;
 }
 
 export class TabService {
@@ -73,7 +73,6 @@ export class TabService {
         icon: input.icon || null,
         isPinned: input.isPinned || false,
         sortOrder: input.sortOrder ?? 0,
-        outputBuffer: [],
         outputBufferSize: config.session.outputBufferSize,
         autoShutdownMinutes: input.autoShutdownMinutes || null,
       })
@@ -117,8 +116,8 @@ export class TabService {
       .update(tabs)
       .set({
         status: 'running',
-        updatedAt: Date.now(),
-        lastActivityAt: Date.now(),
+        updatedAt: sql`NOW()`,
+        lastActivityAt: sql`NOW()`,
       })
       .where(eq(tabs.id, tabId))
       .returning();
@@ -143,7 +142,7 @@ export class TabService {
       .update(tabs)
       .set({
         status: 'stopped',
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(tabs.id, tabId))
       .returning();
@@ -214,7 +213,6 @@ export class TabService {
         tabType: 'git',
         isPinned: false, // Can be closed and re-added via + button
         sortOrder: -100, // Always first
-        outputBuffer: [],
         outputBufferSize: 0,
       })
       .returning();
@@ -253,7 +251,6 @@ export class TabService {
         tabType: 'docker',
         isPinned: false, // Can be closed and re-added via + button
         sortOrder: -99, // After git tab (-100), before terminals
-        outputBuffer: [],
         outputBufferSize: 0,
       })
       .returning();
@@ -268,11 +265,17 @@ export class TabService {
     tabId: string,
     updates: Partial<Pick<Tab, 'status' | 'outputBuffer'>>
   ): Promise<Tab> {
+    // Stringify outputBuffer if present
+    const processedUpdates: any = { ...updates };
+    if (updates.outputBuffer !== undefined) {
+      processedUpdates.outputBuffer = JSON.stringify(updates.outputBuffer);
+    }
+
     const [updated] = await db
       .update(tabs)
       .set({
-        ...updates,
-        updatedAt: Date.now(),
+        ...processedUpdates,
+        updatedAt: sql`NOW()`,
       })
       .where(eq(tabs.id, tabId))
       .returning();
@@ -314,13 +317,35 @@ export class TabService {
    */
   async getOutputBuffer(tabId: string): Promise<string[]> {
     const tab = await this.getTab(tabId);
-    return tab?.outputBuffer || [];
+    if (!tab?.outputBuffer) return [];
+
+    return typeof tab.outputBuffer === 'string'
+      ? JSON.parse(tab.outputBuffer)
+      : ((tab.outputBuffer as string[]) || []);
   }
 
   /**
    * Convert tab to public info
    */
   toTabInfo(tab: Tab): TabInfo {
+    const command = typeof tab.command === 'string'
+      ? JSON.parse(tab.command)
+      : (tab.command || ['/bin/bash']);
+
+    const isPinned = !!tab.isPinned;
+    const exitOnClose = !!tab.exitOnClose;
+
+    console.log('[toTabInfo] Step by step:', {
+      'tab.isPinned': tab.isPinned,
+      '!!tab.isPinned': isPinned,
+      'tab.command type': typeof tab.command,
+      'tab.command': tab.command,
+      'parsed command': command,
+      'command is array': Array.isArray(command),
+      'tab.exitOnClose': tab.exitOnClose,
+      '!!tab.exitOnClose': exitOnClose,
+    });
+
     return {
       id: tab.id,
       workspaceId: tab.workspaceId,
@@ -328,13 +353,13 @@ export class TabService {
       status: tab.status,
       tabType: tab.tabType,
       icon: tab.icon,
-      isPinned: tab.isPinned,
+      isPinned,
       sortOrder: tab.sortOrder,
-      command: tab.command || ['/bin/bash'],
-      exitOnClose: tab.exitOnClose,
-      createdAt: tab.createdAt,
-      updatedAt: tab.updatedAt,
-      lastActivityAt: tab.lastActivityAt,
+      command,
+      exitOnClose,
+      createdAt: new Date(tab.createdAt),
+      updatedAt: new Date(tab.updatedAt),
+      lastActivityAt: new Date(tab.lastActivityAt),
     };
   }
 
@@ -368,7 +393,7 @@ export class TabService {
       for (const { id, sortOrder } of updates) {
         await tx
           .update(tabs)
-          .set({ sortOrder, updatedAt: Date.now() })
+          .set({ sortOrder, updatedAt: sql`NOW()` })
           .where(eq(tabs.id, id));
       }
     });
@@ -414,7 +439,6 @@ export class TabService {
         icon: 'dashboard',
         isPinned: false,
         sortOrder: -101,
-        outputBuffer: [],
         outputBufferSize: 0,
       })
       .returning();

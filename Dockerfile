@@ -32,6 +32,11 @@ COPY . .
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Provide dummy DATABASE_URL for build (required for Next.js page data collection)
+# Actual DATABASE_URL will be provided at runtime via docker-compose
+ARG DATABASE_URL=postgresql://buildtime:buildtime@localhost:5432/buildtime
+ENV DATABASE_URL=$DATABASE_URL
+
 # Build Next.js application
 RUN npm run build
 
@@ -68,9 +73,8 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/public ./public
-# Copy migration files for both database backends
-COPY --from=builder /app/drizzle-postgres ./drizzle-postgres
-COPY --from=builder /app/drizzle-sqlite ./drizzle-sqlite
+# Copy migration files
+COPY --from=builder /app/drizzle ./drizzle
 
 # Docker support removed - this is now Proxmox-only
 # COPY --from=builder /app/docker ./docker

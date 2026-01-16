@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Workspace } from '@/lib/db/schema.sqlite';
-import type { WorkspaceShare } from '@/lib/db/schema.sqlite';
+import type { Workspace } from '@/lib/db/schema';
+import type { WorkspaceShare } from '@/lib/db/schema';
 
 interface WorkspaceWithOwner extends Workspace {
   owner?: {

@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc , sql } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { db, userAuditLog, users, type UserAuditLog, type NewUserAuditLog, type UserAuditAction } from '@/lib/db';
 

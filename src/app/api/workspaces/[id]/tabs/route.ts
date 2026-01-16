@@ -64,8 +64,24 @@ export const GET = withErrorHandling(async (request: NextRequest, context: unkno
     tabs.push(dashboardTab);
   }
 
-  const tabInfos = tabs.map((t) => tabService.toTabInfo(t));
+  const tabInfos = tabs.map((t) => {
+    console.log('[GET /tabs] Raw tab from DB:', {
+      id: t.id,
+      isPinned: t.isPinned,
+      command: t.command,
+      exitOnClose: t.exitOnClose,
+    });
+    const info = tabService.toTabInfo(t);
+    console.log('[GET /tabs] Transformed tabInfo:', {
+      id: info.id,
+      isPinned: info.isPinned,
+      command: info.command,
+      exitOnClose: info.exitOnClose,
+    });
+    return info;
+  });
 
+  console.log('[GET /tabs] Final response:', { tabsCount: tabInfos.length });
   return successResponse({ tabs: tabInfos });
 });
 
@@ -130,7 +146,9 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
     }
 
     // Build command: [command, ...templateArgs, ...userArgs]
-    command = [template.command, ...(template.args || []), ...(result.data.args || [])];
+    const templateArgs = Array.isArray(template.args) ? template.args as string[] : [];
+    const userArgs = result.data.args || [];
+    command = [template.command, ...templateArgs, ...userArgs];
 
     // Use template's exitOnClose if not explicitly provided
     if (exitOnClose === undefined) {

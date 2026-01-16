@@ -28,7 +28,7 @@ export interface ProvisionProgress {
 export interface LogEntry {
   type: 'stdout' | 'stderr';
   content: string;
-  timestamp: number;
+  timestamp: Date;
 }
 
 // Track active provisioning streams per template

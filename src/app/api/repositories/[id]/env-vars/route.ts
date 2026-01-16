@@ -108,7 +108,7 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
   // Get existing env vars and add the new one
   const existingEnvVars = repository.envVars || {};
-  const newEnvVars = Object.entries(existingEnvVars).map(([key, entry]) => ({
+  const newEnvVars = Object.entries(existingEnvVars).map(([key, entry]: [string, any]) => ({
     key,
     value: entry.value,
     encrypted: entry.encrypted,
@@ -156,7 +156,7 @@ export const DELETE = withErrorHandling(async (request: NextRequest, context: un
   const existingEnvVars = repository.envVars || {};
   const newEnvVars = Object.entries(existingEnvVars)
     .filter(([k]) => k !== key)
-    .map(([k, entry]) => ({
+    .map(([k, entry]: [string, any]) => ({
       key: k,
       value: entry.value,
       encrypted: entry.encrypted,

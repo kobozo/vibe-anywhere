@@ -41,7 +41,9 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
 
     return successResponse({
       authKey: authKeyData.key,
-      expiresAt: authKeyData.expiresAt.toISOString(),
+      expiresAt: authKeyData.expiresAt instanceof Date
+        ? authKeyData.expiresAt.toISOString()
+        : authKeyData.expiresAt,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

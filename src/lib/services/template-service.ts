@@ -3,7 +3,7 @@
  * Manages Proxmox LXC templates with different tech stacks
  */
 
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and , sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   proxmoxTemplates,
@@ -15,6 +15,7 @@ import {
 } from '@/lib/db/schema';
 import { getSettingsService } from './settings-service';
 import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
+import crypto from 'crypto';
 
 export interface CreateTemplateInput {
   name: string;
@@ -32,6 +33,66 @@ export interface UpdateTemplateInput {
 }
 
 export class TemplateService {
+
+  /**
+   * Parse JSON string fields in a template to their proper types
+   * Handles both string and already-parsed values defensively
+   */
+  private parseTemplateFields(template: any): ProxmoxTemplate {
+    if (!template) return template;
+
+    try {
+      return {
+        ...template,
+        techStacks: typeof template.techStacks === 'string'
+          ? JSON.parse(template.techStacks)
+          : (template.techStacks || []),
+        inheritedTechStacks: typeof template.inheritedTechStacks === 'string'
+          ? JSON.parse(template.inheritedTechStacks)
+          : (template.inheritedTechStacks || []),
+        envVars: typeof template.envVars === 'string'
+          ? JSON.parse(template.envVars)
+          : (template.envVars || {}),
+      };
+    } catch (error) {
+      console.error('[parseTemplateFields] Error parsing template fields:', error, template);
+      // Return template with safe defaults if parsing fails
+      return {
+        ...template,
+        techStacks: [],
+        inheritedTechStacks: [],
+        envVars: {},
+      };
+    }
+  }
+
+  /**
+   * Create template using Drizzle ORM
+   */
+  private async createTemplateRaw(
+    userId: string,
+    input: CreateTemplateInput,
+    inheritedTechStacks: string[],
+    baseCtTemplate: string | null
+  ): Promise<ProxmoxTemplate> {
+    const [template] = await db
+      .insert(proxmoxTemplates)
+      .values({
+        userId,
+        parentTemplateId: input.parentTemplateId || null,
+        baseCtTemplate,
+        name: input.name,
+        description: input.description || null,
+        techStacks: input.techStacks || [],
+        inheritedTechStacks,
+        isDefault: input.isDefault || false,
+        status: 'pending',
+      })
+      .returning();
+
+    return this.parseTemplateFields(template);
+  }
+
   /**
    * List all templates for a user
    *
@@ -39,32 +100,26 @@ export class TemplateService {
    * @param role - User's role for determining visibility
    */
   async listTemplates(userId?: string, role?: string): Promise<ProxmoxTemplate[]> {
-    console.log('[TemplateService.listTemplates] START - userId:', userId, 'role:', role);
     // Admin and template-admin can see all templates
     if (role === 'admin' || role === 'template-admin') {
-      console.log('[TemplateService.listTemplates] Admin query starting');
       const result = await db
         .select()
         .from(proxmoxTemplates)
         .orderBy(desc(proxmoxTemplates.createdAt));
-      console.log('[TemplateService.listTemplates] Admin query complete, count:', result.length);
-      return result;
+      return result.map(t => this.parseTemplateFields(t));
     }
 
     // Other roles only see their own templates
     if (!userId) {
-      console.log('[TemplateService.listTemplates] No userId, returning empty');
       return [];
     }
 
-    console.log('[TemplateService.listTemplates] User query starting');
     const result = await db
       .select()
       .from(proxmoxTemplates)
       .where(eq(proxmoxTemplates.userId, userId))
       .orderBy(desc(proxmoxTemplates.createdAt));
-    console.log('[TemplateService.listTemplates] User query complete, count:', result.length);
-    return result;
+    return result.map(t => this.parseTemplateFields(t));
   }
 
   /**
@@ -75,7 +130,7 @@ export class TemplateService {
       .select()
       .from(proxmoxTemplates)
       .where(eq(proxmoxTemplates.id, templateId));
-    return template || null;
+    return template ? this.parseTemplateFields(template) : null;
   }
 
   /**
@@ -93,7 +148,7 @@ export class TemplateService {
       );
 
     if (template) {
-      return template;
+      return this.parseTemplateFields(template);
     }
 
     // If no default, return the first template
@@ -104,7 +159,7 @@ export class TemplateService {
       .orderBy(desc(proxmoxTemplates.createdAt))
       .limit(1);
 
-    return firstTemplate || null;
+    return firstTemplate ? this.parseTemplateFields(firstTemplate) : null;
   }
 
   /**
@@ -139,10 +194,13 @@ export class TemplateService {
    * Get all effective tech stacks for a template (inherited + own)
    */
   getEffectiveTechStacks(template: ProxmoxTemplate): string[] {
-    return [
-      ...(template.inheritedTechStacks || []),
-      ...(template.techStacks || []),
-    ];
+    const inherited = Array.isArray(template.inheritedTechStacks)
+      ? (template.inheritedTechStacks as string[])
+      : [];
+    const tech = Array.isArray(template.techStacks)
+      ? (template.techStacks as string[])
+      : [];
+    return [...inherited, ...tech];
   }
 
   /**
@@ -163,15 +221,10 @@ export class TemplateService {
     userId: string,
     input: CreateTemplateInput
   ): Promise<ProxmoxTemplate> {
-    try {
-      console.log('[TemplateService] createTemplate START');
-      console.log('[TemplateService] userId:', userId);
-      console.log('[TemplateService] input.name:', input.name);
-      console.log('[TemplateService] input.techStacks:', input.techStacks);
-      console.log('[TemplateService] input.techStacks type:', typeof input.techStacks, Array.isArray(input.techStacks));
-    } catch (e) {
-      console.error('[TemplateService] Error in initial logging:', e);
-    }
+    console.log('[TemplateService.createTemplate] FUNCTION ENTRY');
+    console.log('[TemplateService.createTemplate] userId:', userId);
+    console.log('[TemplateService.createTemplate] input:', JSON.stringify(input));
+
     let inheritedTechStacks: string[] = [];
 
     // Validate parent template if specified
@@ -190,15 +243,12 @@ export class TemplateService {
 
     // If this is the first template or marked as default, unset other defaults
     if (input.isDefault) {
-      console.log('[TemplateService] Clearing default templates');
       await this.clearDefaultTemplates(userId);
     }
 
     // Check if this is the first template for the user
-    console.log('[TemplateService] Checking if first template');
     const existingTemplates = await this.listTemplates(userId);
     const isFirstTemplate = existingTemplates.length === 0;
-    console.log('[TemplateService] Is first template:', isFirstTemplate);
 
     // Determine base CT template:
     // - If cloning from parent template, inherit parent's baseCtTemplate
@@ -209,36 +259,17 @@ export class TemplateService {
       baseCtTemplate = parent?.baseCtTemplate || null;
     }
 
-    const techStacksStr = JSON.stringify(newTechStacks);
-    const inheritedTechStacksStr = JSON.stringify(inheritedTechStacks);
-
-    console.log('[TemplateService] About to insert with:');
-    console.log('  userId:', userId, typeof userId);
-    console.log('  parentTemplateId:', input.parentTemplateId, typeof input.parentTemplateId);
-    console.log('  baseCtTemplate:', baseCtTemplate, typeof baseCtTemplate);
-    console.log('  name:', input.name, typeof input.name);
-    console.log('  description:', input.description, typeof input.description);
-    console.log('  techStacks:', techStacksStr, typeof techStacksStr);
-    console.log('  inheritedTechStacks:', inheritedTechStacksStr, typeof inheritedTechStacksStr);
-    console.log('  isDefault:', input.isDefault || isFirstTemplate, typeof (input.isDefault || isFirstTemplate));
-    console.log('  status: pending');
-
-    const [template] = await db
-      .insert(proxmoxTemplates)
-      .values({
-        userId,
-        parentTemplateId: input.parentTemplateId || null,
-        baseCtTemplate,
-        name: input.name,
-        description: input.description || null,
-        techStacks: techStacksStr,
-        inheritedTechStacks: inheritedTechStacksStr,
-        isDefault: input.isDefault || isFirstTemplate, // First template is always default
-        status: 'pending',
-      } as any)
-      .returning();
-
-    return template;
+    // Use raw SQL to bypass Drizzle type system issues with SQLite
+    return await this.createTemplateRaw(
+      userId,
+      {
+        ...input,
+        techStacks: newTechStacks,
+        isDefault: input.isDefault || isFirstTemplate,
+      },
+      inheritedTechStacks,
+      baseCtTemplate
+    );
   }
 
   /**
@@ -262,7 +293,7 @@ export class TemplateService {
       .update(proxmoxTemplates)
       .set({
         ...updates,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(proxmoxTemplates.id, templateId))
       .returning();
@@ -291,7 +322,7 @@ export class TemplateService {
         storage: storage ?? undefined,
         errorMessage: errorMessage ?? null,
         stagingContainerIp: stagingContainerIp ?? undefined,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(proxmoxTemplates.id, templateId));
   }
@@ -304,7 +335,7 @@ export class TemplateService {
       .update(proxmoxTemplates)
       .set({
         stagingContainerIp: null,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(proxmoxTemplates.id, templateId));
   }
@@ -321,10 +352,11 @@ export class TemplateService {
     }
 
     // Check for child templates that depend on this one
-    const childTemplates = await db
+    const childTemplatesRaw = await db
       .select()
       .from(proxmoxTemplates)
       .where(eq(proxmoxTemplates.parentTemplateId, templateId));
+    const childTemplates = childTemplatesRaw.map(t => this.parseTemplateFields(t));
 
     if (childTemplates.length > 0) {
       const childNames = childTemplates.map((t) => t.name).join(', ');
@@ -334,30 +366,17 @@ export class TemplateService {
     }
 
     // Find the default template for this user (excluding the one being deleted)
-    const [defaultTemplate] = await db
-      .select()
-      .from(proxmoxTemplates)
-      .where(
-        and(
-          eq(proxmoxTemplates.userId, template.userId),
-          eq(proxmoxTemplates.isDefault, true)
-        )
-      );
+    const userTemplates = await this.listTemplates(template.userId);
+    const defaultTemplate = userTemplates.find(t => t.isDefault && t.id !== templateId);
 
     // Get replacement template (default or first available)
     let replacementTemplateId: string | null = null;
     if (defaultTemplate && defaultTemplate.id !== templateId) {
       replacementTemplateId = defaultTemplate.id;
     } else {
-      // Find another template
-      const [otherTemplate] = await db
-        .select()
-        .from(proxmoxTemplates)
-        .where(eq(proxmoxTemplates.userId, template.userId))
-        .orderBy(desc(proxmoxTemplates.createdAt))
-        .limit(2);
-
-      if (otherTemplate && otherTemplate.id !== templateId) {
+      // Find another template (excluding the one being deleted)
+      const otherTemplate = userTemplates.find(t => t.id !== templateId);
+      if (otherTemplate) {
         replacementTemplateId = otherTemplate.id;
       }
     }
@@ -367,7 +386,7 @@ export class TemplateService {
       .update(repositories)
       .set({
         templateId: replacementTemplateId,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(repositories.templateId, templateId));
 
@@ -377,7 +396,7 @@ export class TemplateService {
       .update(workspaces)
       .set({
         templateId: null,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(workspaces.templateId, templateId));
 
@@ -388,7 +407,7 @@ export class TemplateService {
     if (template.isDefault && replacementTemplateId) {
       await db
         .update(proxmoxTemplates)
-        .set({ isDefault: true, updatedAt: Date.now() })
+        .set({ isDefault: true, updatedAt: sql`NOW()` })
         .where(eq(proxmoxTemplates.id, replacementTemplateId));
     }
   }
@@ -409,7 +428,7 @@ export class TemplateService {
     // Set new default
     await db
       .update(proxmoxTemplates)
-      .set({ isDefault: true, updatedAt: Date.now() })
+      .set({ isDefault: true, updatedAt: sql`NOW()` })
       .where(eq(proxmoxTemplates.id, templateId));
   }
 
@@ -419,7 +438,7 @@ export class TemplateService {
   private async clearDefaultTemplates(userId: string): Promise<void> {
     await db
       .update(proxmoxTemplates)
-      .set({ isDefault: false, updatedAt: Date.now() })
+      .set({ isDefault: false, updatedAt: sql`NOW()` })
       .where(eq(proxmoxTemplates.userId, userId));
   }
 

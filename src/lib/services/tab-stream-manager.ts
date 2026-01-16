@@ -87,7 +87,7 @@ class TabStreamManager {
 
     // Build the command, appending && exit if exitOnClose is enabled
     // Note: tmux already provides a shell, so we just send the command directly
-    let command = tab.command || ['/bin/bash'];
+    let command = (tab.command as string[]) || ['/bin/bash'];
     if (tab.exitOnClose && command.length > 0) {
       // Append && exit so the tmux shell exits when the command finishes
       const cmdString = command.map(arg =>

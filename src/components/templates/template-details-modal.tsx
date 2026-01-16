@@ -286,42 +286,49 @@ export function TemplateDetailsModal({
               )}
 
               {/* Inherited Tech Stacks */}
-              {template.inheritedTechStacks && template.inheritedTechStacks.length > 0 && (
-                <div>
-                  <span className="text-foreground-secondary text-sm">Inherited Tech Stacks</span>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(template.inheritedTechStacks as string[]).map((stack) => (
-                      <span
-                        key={stack}
-                        className="px-2 py-1 bg-purple-500/20 text-purple-400 text-sm rounded"
-                      >
-                        {stack}
-                      </span>
-                    ))}
+              {(() => {
+                const inherited = Array.isArray(template.inheritedTechStacks) ? template.inheritedTechStacks : [];
+                return inherited.length > 0 && (
+                  <div>
+                    <span className="text-foreground-secondary text-sm">Inherited Tech Stacks</span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {inherited.map((stack) => (
+                        <span
+                          key={stack}
+                          className="px-2 py-1 bg-purple-500/20 text-purple-400 text-sm rounded"
+                        >
+                          {stack}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Tech Stacks (own stacks, not inherited) */}
-              {template.techStacks && template.techStacks.length > 0 && (
-                <div>
-                  <span className="text-foreground-secondary text-sm">
-                    {template.inheritedTechStacks && template.inheritedTechStacks.length > 0
-                      ? 'Additional Tech Stacks'
-                      : 'Tech Stacks'}
-                  </span>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(template.techStacks as string[]).map((stack) => (
-                      <span
-                        key={stack}
-                        className="px-2 py-1 bg-primary/20 text-primary text-sm rounded"
-                      >
-                        {stack}
-                      </span>
-                    ))}
+              {(() => {
+                const techStacks = Array.isArray(template.techStacks) ? template.techStacks : [];
+                const inherited = Array.isArray(template.inheritedTechStacks) ? template.inheritedTechStacks : [];
+                return techStacks.length > 0 && (
+                  <div>
+                    <span className="text-foreground-secondary text-sm">
+                      {inherited.length > 0
+                        ? 'Additional Tech Stacks'
+                        : 'Tech Stacks'}
+                    </span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {techStacks.map((stack) => (
+                        <span
+                          key={stack}
+                          className="px-2 py-1 bg-primary/20 text-primary text-sm rounded"
+                        >
+                          {stack}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Actions */}

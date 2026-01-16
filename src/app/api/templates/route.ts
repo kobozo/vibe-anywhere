@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { getTemplateService } from '@/lib/services/template-service';
+import { getTemplateService } from '@/lib/services';
 import {
   requireAuth,
   successResponse,
@@ -63,18 +63,41 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   // All authenticated users can create templates (personal templates)
   try {
-    const template = await templateService.createTemplate(user.id, {
+    console.log('[API /api/templates POST] About to call createTemplate with data:', {
+      userId: user.id,
       name: result.data.name,
       description: result.data.description,
       techStacks: result.data.techStacks,
+      techStacksType: typeof result.data.techStacks,
+      techStacksIsArray: Array.isArray(result.data.techStacks),
       isDefault: result.data.isDefault,
       parentTemplateId: result.data.parentTemplateId,
       baseCtTemplate: result.data.baseCtTemplate,
     });
+
+    console.log('[API /api/templates POST] Calling method NOW...');
+    let template;
+    try {
+      template = await templateService.createTemplate(user.id, {
+        name: result.data.name,
+        description: result.data.description,
+        techStacks: result.data.techStacks,
+        isDefault: result.data.isDefault,
+        parentTemplateId: result.data.parentTemplateId,
+        baseCtTemplate: result.data.baseCtTemplate,
+      });
+    } catch (innerError: any) {
+      console.error('[API /api/templates POST] INNER CATCH - Error during createTemplate call:', innerError?.message);
+      console.error('[API /api/templates POST] INNER CATCH - Full error:', innerError);
+      throw innerError;
+    }
     console.log('[API /api/templates POST] Template created successfully');
     return successResponse({ template }, 201);
-  } catch (error) {
-    console.error('[API /api/templates POST] Error in createTemplate:', error);
+  } catch (error: any) {
+    console.error('[API /api/templates POST] OUTER CATCH - Error in createTemplate:', error);
+    console.error('[API /api/templates POST] OUTER CATCH - Error stack:', error?.stack);
+    console.error('[API /api/templates POST] OUTER CATCH - Error name:', error?.name);
+    console.error('[API /api/templates POST] OUTER CATCH - Error message:', error?.message);
     throw error;
   }
 });

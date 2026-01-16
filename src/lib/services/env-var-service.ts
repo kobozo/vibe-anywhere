@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { repositories, proxmoxTemplates, type EnvVarsJson, type EnvVarEntry } from '@/lib/db/schema';
 import { config } from '@/lib/config';
-import { eq } from 'drizzle-orm';
+import { eq , sql } from 'drizzle-orm';
 import * as crypto from 'crypto';
 
 // Note: config is still used for AUTH_SECRET to derive encryption key
@@ -130,7 +130,7 @@ export class EnvVarService {
         .where(eq(proxmoxTemplates.id, templateId));
 
       if (template?.envVars) {
-        Object.assign(merged, this.decryptEnvVars(template.envVars));
+        Object.assign(merged, this.decryptEnvVars(template.envVars as EnvVarsJson));
       }
     }
 
@@ -151,12 +151,12 @@ export class EnvVarService {
         .where(eq(proxmoxTemplates.id, repo.templateId));
 
       if (template?.envVars) {
-        Object.assign(merged, this.decryptEnvVars(template.envVars));
+        Object.assign(merged, this.decryptEnvVars(template.envVars as EnvVarsJson));
       }
     }
 
     if (repo?.envVars) {
-      Object.assign(merged, this.decryptEnvVars(repo.envVars));
+      Object.assign(merged, this.decryptEnvVars(repo.envVars as EnvVarsJson));
     }
 
     return merged;
@@ -175,7 +175,7 @@ export class EnvVarService {
       return [];
     }
 
-    return this.maskEnvVars(repo.envVars);
+    return this.maskEnvVars(repo.envVars as EnvVarsJson);
   }
 
   /**
@@ -191,7 +191,7 @@ export class EnvVarService {
       return [];
     }
 
-    return this.maskEnvVars(template.envVars);
+    return this.maskEnvVars(template.envVars as EnvVarsJson);
   }
 
   /**
@@ -204,7 +204,7 @@ export class EnvVarService {
       .update(repositories)
       .set({
         envVars: processedEnvVars,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(repositories.id, repositoryId));
   }
@@ -219,7 +219,7 @@ export class EnvVarService {
       .update(proxmoxTemplates)
       .set({
         envVars: processedEnvVars,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(proxmoxTemplates.id, templateId));
   }
@@ -247,7 +247,7 @@ export class EnvVarService {
     }
 
     // Return decrypted values for display
-    return this.decryptEnvVars(template.envVars);
+    return this.decryptEnvVars(template.envVars as EnvVarsJson);
   }
 }
 

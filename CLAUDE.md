@@ -46,6 +46,15 @@ Vibe Anywhere is a web application for persistent AI coding sessions on a Linux 
 - Run `npm run db:migrate` to apply migrations
 - Commit migration files (`drizzle/*.sql`) to version control
 
+### Docker Management
+- Claude Code has access to Docker commands for managing development containers
+- Main development container: `vibe-anywhere-dev` (runs on port 3000)
+- **Restart container**: `docker restart vibe-anywhere-dev` or `docker compose restart app`
+- **Rebuild image**: `docker compose build app` (use when code changes aren't picked up)
+- **Rebuild and restart**: `docker compose build app && docker compose restart app`
+- Files are mounted as volumes, so most changes don't require rebuilds
+- Use rebuilds when hot-reload doesn't pick up changes or compilation issues occur
+
 ### Agent Changes (packages/agent)
 Every change to the agent requires a version bump. The server detects outdated agents and prompts users to update.
 

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { getTemplateService } from '@/lib/services/template-service';
+import { getTemplateService } from '@/lib/services';
 import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
 import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 import { config } from '@/lib/config';

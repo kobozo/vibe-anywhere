@@ -495,8 +495,9 @@ export function AddRepositoryDialog({
                   </select>
                   {selectedTemplateId && (() => {
                     const selected = templates.find(t => t.id === selectedTemplateId);
-                    return selected?.techStacks && selected.techStacks.length > 0 && (
-                      <p className="text-xs text-foreground-tertiary mt-1">Includes: {selected.techStacks.join(', ')}</p>
+                    const techStacks = Array.isArray(selected?.techStacks) ? selected.techStacks : [];
+                    return techStacks.length > 0 && (
+                      <p className="text-xs text-foreground-tertiary mt-1">Includes: {techStacks.join(', ')}</p>
                     );
                   })()}
                 </div>

@@ -8,8 +8,8 @@ interface User {
   username: string;
   role: UserRole;
   forcePasswordChange: boolean;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface UserActionsMenuProps {

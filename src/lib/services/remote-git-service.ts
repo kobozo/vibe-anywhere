@@ -105,7 +105,7 @@ export class RemoteGitService {
       // Disable interactive prompts
       env.GIT_TERMINAL_PROMPT = '0';
 
-      const args = ['ls-remote', '--heads', '--symref', repoUrl];
+      const args = ['ls-remote', '--symref', repoUrl, 'HEAD', 'refs/heads/*'];
       const proc = spawn('git', args, { env, timeout: timeoutMs });
 
       let stdout = '';

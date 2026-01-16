@@ -1,4 +1,4 @@
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc , sql } from 'drizzle-orm';
 import { db, sessions, type Session, type NewSession, type SessionStatus, type ContainerStatus } from '@/lib/db';
 import { getGitService, GitService } from './git-service';
 import { getContainerBackend, type IContainerBackend } from '@/lib/container';
@@ -19,23 +19,21 @@ export class SessionService {
    * Create a new session
    */
   async createSession(userId: string, input: CreateSessionInput): Promise<Session> {
-    const sessionId = uuidv4();
-    const branchName = input.branchName || `session/${sessionId.slice(0, 8)}`;
+    // Generate branch name if not provided
+    const branchName = input.branchName || `session/${uuidv4().slice(0, 8)}`;
 
     // Create the session record
     const [session] = await db
       .insert(sessions)
       .values({
-        id: sessionId,
         name: input.name,
         description: input.description || null,
         userId,
         repoPath: input.repoPath,
         branchName,
-        claudeCommand: input.claudeCommand || null,
+        claudeCommand: input.claudeCommand ? JSON.stringify(input.claudeCommand) : null,
         status: 'pending',
         containerStatus: 'none',
-        outputBuffer: [],
         outputBufferSize: config.session.outputBufferSize,
       })
       .returning();
@@ -89,8 +87,8 @@ export class SessionService {
           containerId,
           containerStatus: 'running',
           status: 'running',
-          updatedAt: Date.now(),
-          lastActivityAt: Date.now(),
+          updatedAt: sql`NOW()`,
+          lastActivityAt: sql`NOW()`,
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -144,7 +142,7 @@ export class SessionService {
         .set({
           containerStatus: 'exited',
           status: 'stopped',
-          updatedAt: Date.now(),
+          updatedAt: sql`NOW()`,
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -218,7 +216,7 @@ export class SessionService {
       .update(sessions)
       .set({
         ...updates,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(sessions.id, sessionId))
       .returning();
@@ -262,7 +260,7 @@ export class SessionService {
    */
   async getOutputBuffer(sessionId: string): Promise<string[]> {
     const session = await this.getSession(sessionId);
-    return session?.outputBuffer || [];
+    return (session?.outputBuffer as string[]) || [];
   }
 
   /**
@@ -330,10 +328,10 @@ export class SessionService {
       repoPath: session.repoPath,
       branchName: session.branchName,
       worktreePath: session.worktreePath,
-      claudeCommand: session.claudeCommand,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      lastActivityAt: session.lastActivityAt,
+      claudeCommand: session.claudeCommand ? JSON.parse(session.claudeCommand) : null,
+      createdAt: new Date(session.createdAt),
+      updatedAt: new Date(session.updatedAt),
+      lastActivityAt: new Date(session.lastActivityAt),
     };
   }
 }

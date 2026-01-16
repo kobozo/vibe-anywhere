@@ -1,4 +1,4 @@
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc , sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { tabTemplates, type TabTemplate, type NewTabTemplate } from '@/lib/db/schema';
 
@@ -181,7 +181,7 @@ export class TabTemplateService {
             .set({
               icon: defaultTemplate.icon,
               requiredTechStack: defaultTemplate.requiredTechStack,
-              updatedAt: Date.now(),
+              updatedAt: sql`NOW()`,
             })
             .where(eq(tabTemplates.id, existing.id));
           updatedIds.add(existing.id);
@@ -304,7 +304,7 @@ export class TabTemplateService {
     // Serialize args if provided, to maintain consistency with createTemplate
     const setData: any = {
       ...updates,
-      updatedAt: Date.now(),
+      updatedAt: sql`NOW()`,
     };
 
     if (updates.args !== undefined) {

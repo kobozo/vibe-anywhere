@@ -11,7 +11,7 @@ import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
 import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
 import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
-import { getTemplateService } from '@/lib/services/template-service';
+import { getTemplateService } from '@/lib/services';
 import { requireAuth } from '@/lib/api-utils';
 
 /**

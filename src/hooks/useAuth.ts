@@ -5,8 +5,8 @@ import { useState, useEffect, useCallback, createContext, useContext } from 'rea
 interface User {
   id: string;
   username: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface AuthState {

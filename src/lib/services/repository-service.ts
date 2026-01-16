@@ -1,8 +1,6 @@
-import { eq, asc, sql } from 'drizzle-orm';
-import { db, queryClient } from '@/lib/db';
+import { eq, asc , sql } from 'drizzle-orm';
+import { db } from '@/lib/db';
 import { repositories, users, type Repository } from '@/lib/db/schema';
-import type Database from 'better-sqlite3';
-import * as crypto from 'crypto';
 
 /**
  * Input for creating a repository (metadata-only, no local cloning)
@@ -57,70 +55,25 @@ export class RepositoryService {
     // Validate resource values if provided
     this.validateResourceValues(input);
 
-    const repoId = crypto.randomUUID();
-    const now = Date.now();
+    // Insert using Drizzle ORM with PostgreSQL-native types
+    const [repo] = await db.insert(repositories).values({
+      userId,
+      name: input.name,
+      description: input.description || null,
+      cloneUrl: input.cloneUrl,
+      cloneDepth: input.cloneDepth || null,
+      defaultBranch: input.defaultBranch || 'main',
+      sshKeyId: input.sshKeyId || null,
+      techStack: input.techStack || [],
+      templateId: input.templateId || null,
+      resourceMemory: input.resourceMemory ?? null,
+      resourceCpuCores: input.resourceCpuCores ?? null,
+      resourceDiskSize: input.resourceDiskSize ?? null,
+      gitIdentityId: input.gitIdentityId ?? null,
+      gitCustomName: input.gitCustomName ?? null,
+      gitCustomEmail: input.gitCustomEmail ?? null,
+    }).returning();
 
-    // Use raw SQLite client directly to bypass Drizzle's type system
-    if (queryClient && 'prepare' in queryClient) {
-      // SQLite: Use raw prepared statements with explicit values for all fields
-      const stmt = (queryClient as Database.Database).prepare(`
-        INSERT INTO repositories (
-          id, user_id, template_id, ssh_key_id, name, description, clone_url, clone_depth,
-          default_branch, tech_stack, env_vars, git_hooks, cached_branches, branches_cached_at,
-          resource_memory, resource_cpu_cores, resource_disk_size,
-          git_identity_id, git_custom_name, git_custom_email, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      stmt.run(
-        repoId,
-        userId,
-        input.templateId || null,
-        input.sshKeyId || null,
-        input.name,
-        input.description || null,
-        input.cloneUrl,
-        input.cloneDepth || null,
-        input.defaultBranch || 'main',
-        JSON.stringify(input.techStack || []),
-        '{}', // env_vars default
-        '{}', // git_hooks default
-        '[]', // cached_branches default
-        null, // branches_cached_at
-        input.resourceMemory ?? null,
-        input.resourceCpuCores ?? null,
-        input.resourceDiskSize ?? null,
-        input.gitIdentityId ?? null,
-        input.gitCustomName ?? null,
-        input.gitCustomEmail ?? null,
-        now,
-        now
-      );
-    } else {
-      // PostgreSQL: Use Drizzle ORM
-      await db.insert(repositories).values({
-        id: repoId,
-        userId,
-        name: input.name,
-        description: input.description || null,
-        cloneUrl: input.cloneUrl,
-        cloneDepth: input.cloneDepth || null,
-        defaultBranch: input.defaultBranch || 'main',
-        sshKeyId: input.sshKeyId || null,
-        techStack: input.techStack || [],
-        templateId: input.templateId || null,
-        resourceMemory: input.resourceMemory ?? null,
-        resourceCpuCores: input.resourceCpuCores ?? null,
-        resourceDiskSize: input.resourceDiskSize ?? null,
-        gitIdentityId: input.gitIdentityId ?? null,
-        gitCustomName: input.gitCustomName ?? null,
-        gitCustomEmail: input.gitCustomEmail ?? null,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // Fetch the inserted repository
-    const [repo] = await db.select().from(repositories).where(eq(repositories.id, repoId));
     return repo;
   }
 
@@ -208,7 +161,7 @@ export class RepositoryService {
     const shouldInvalidateCache = updates.cloneUrl !== undefined;
     const updateData: Record<string, unknown> = {
       ...updates,
-      updatedAt: Date.now(),
+      updatedAt: sql`NOW()`,
     };
 
     if (shouldInvalidateCache) {
@@ -249,9 +202,9 @@ export class RepositoryService {
     }
 
     const updates: Record<string, unknown> = {
-      cachedBranches: branches,
-      branchesCachedAt: Date.now(),
-      updatedAt: Date.now(),
+      cachedBranches: JSON.stringify(branches),
+      branchesCachedAt: new Date().toISOString(),
+      updatedAt: sql`NOW()`,
     };
 
     // Update defaultBranch if:
@@ -280,7 +233,7 @@ export class RepositoryService {
    */
   async getCachedBranches(repoId: string): Promise<{
     branches: string[];
-    cachedAt: number | null;
+    cachedAt: Date | null;
     isStale: boolean;
   }> {
     const repo = await this.getRepository(repoId);
@@ -288,17 +241,19 @@ export class RepositoryService {
       throw new Error(`Repository ${repoId} not found`);
     }
 
-    const cachedBranches = (repo.cachedBranches as string[] | null) || [];
+    const cachedBranches = typeof repo.cachedBranches === 'string'
+      ? JSON.parse(repo.cachedBranches)
+      : (repo.cachedBranches || []);
     const branchesCachedAt = repo.branchesCachedAt;
 
     // Determine if cache is stale
     const isStale =
       !branchesCachedAt ||
-      Date.now() - branchesCachedAt > this.CACHE_STALE_MS;
+      Date.now() - new Date(branchesCachedAt).getTime() > this.CACHE_STALE_MS;
 
     return {
       branches: cachedBranches,
-      cachedAt: branchesCachedAt,
+      cachedAt: branchesCachedAt ? new Date(branchesCachedAt) : null,
       isStale,
     };
   }
@@ -310,9 +265,9 @@ export class RepositoryService {
     await db
       .update(repositories)
       .set({
-        cachedBranches: [],
+        cachedBranches: JSON.stringify([]),
         branchesCachedAt: null,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(repositories.id, repoId));
   }

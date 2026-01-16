@@ -37,10 +37,45 @@ export function errorResponse(code: string, message: string, status = 400, detai
 }
 
 /**
- * Create a JSON success response
+ * Safely serialize date fields in objects
+ * Converts Date objects to ISO strings, leaves strings as-is
+ */
+function serializeDates<T>(value: T): T {
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // Handle Date objects
+  if (value instanceof Date) {
+    return value.toISOString() as T;
+  }
+
+  // Handle arrays
+  if (Array.isArray(value)) {
+    return value.map(item => serializeDates(item)) as T;
+  }
+
+  // Handle objects (but not special types like RegExp, Error, etc.)
+  if (typeof value === 'object' && value.constructor === Object) {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = serializeDates(val);
+    }
+    return result as T;
+  }
+
+  // Return primitives and other types as-is
+  return value;
+}
+
+/**
+ * Create a JSON success response with proper date serialization
  */
 export function successResponse<T>(data: T, status = 200): NextResponse {
-  return NextResponse.json({ data }, { status });
+  // Serialize any Date objects to ISO strings to prevent serialization errors
+  const serializedData = serializeDates(data);
+  return NextResponse.json({ data: serializedData }, { status });
 }
 
 /**
@@ -102,6 +137,9 @@ export function withErrorHandling(
       return await handler(request, context);
     } catch (error) {
       console.error('API Error:', error);
+      if (error instanceof Error && error.stack) {
+        console.error('Stack trace:', error.stack);
+      }
 
       if (error instanceof ApiRequestError) {
         return error.toResponse();

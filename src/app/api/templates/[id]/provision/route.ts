@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
 import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
 import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
-import { getTemplateService } from '@/lib/services/template-service';
+import { getTemplateService } from '@/lib/services';
 import { getSettingsService } from '@/lib/services/settings-service';
 import { requireAuth } from '@/lib/api-utils';
 
@@ -141,7 +141,7 @@ export async function POST(
           name: template.name,
           storage,
           node: targetNode,
-          techStacks: template.techStacks || [], // Only NEW stacks (service already filtered inherited ones)
+          techStacks: Array.isArray(template.techStacks) ? template.techStacks : [], // Only NEW stacks (service already filtered inherited ones)
           stopAtStaging: staging,
           parentVmid, // Clone from parent if specified
           baseCtTemplate: template.baseCtTemplate || undefined, // CT template to use as base

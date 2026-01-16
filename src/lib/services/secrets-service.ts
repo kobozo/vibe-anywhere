@@ -13,7 +13,7 @@ import {
   type NewSecret,
   type RepositorySecret
 } from '@/lib/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { getEnvVarService } from './env-var-service';
 
 export interface SecretInput {
@@ -31,8 +31,8 @@ export interface SecretInfo {
   valueMasked: string;
   description: string | null;
   templateWhitelist: string[];
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface RepositorySecretAssignment {
@@ -84,7 +84,7 @@ export class SecretsService {
     role?: string
   ): Promise<Secret> {
     const updateData: Partial<NewSecret> = {
-      updatedAt: Date.now(),
+      updatedAt: sql`NOW()`,
     };
 
     if (updates.name !== undefined) {
@@ -163,8 +163,8 @@ export class SecretsService {
       valueMasked: '••••••••',
       description: secret.description,
       templateWhitelist: secret.templateWhitelist as string[],
-      createdAt: secret.createdAt,
-      updatedAt: secret.updatedAt,
+      createdAt: new Date(secret.createdAt),
+      updatedAt: new Date(secret.updatedAt),
     };
   }
 
@@ -188,8 +188,8 @@ export class SecretsService {
       valueMasked: '••••••••',
       description: s.description,
       templateWhitelist: s.templateWhitelist as string[],
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
+      createdAt: new Date(s.createdAt),
+      updatedAt: new Date(s.updatedAt),
     }));
   }
 
@@ -262,8 +262,8 @@ export class SecretsService {
         valueMasked: '••••••••',
         description: a.secret.description,
         templateWhitelist: a.secret.templateWhitelist as string[],
-        createdAt: a.secret.createdAt,
-        updatedAt: a.secret.updatedAt,
+        createdAt: new Date(a.secret.createdAt),
+        updatedAt: new Date(a.secret.updatedAt),
       },
       includeInEnvFile: a.includeInEnvFile,
     }));

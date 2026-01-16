@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { workspaces, repositories } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq , sql } from 'drizzle-orm';
 import { getEnvVarService } from './env-var-service';
 import { getSecretsService } from './secrets-service';
 import { execSSHCommand } from '@/lib/container/proxmox/ssh-stream';

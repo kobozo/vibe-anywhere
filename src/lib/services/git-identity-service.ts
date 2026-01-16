@@ -1,8 +1,6 @@
-import { eq, and } from 'drizzle-orm';
-import { db, queryClient } from '@/lib/db';
+import { eq, and , sql } from 'drizzle-orm';
+import { db } from '@/lib/db';
 import { gitIdentities, type GitIdentity, type NewGitIdentity } from '@/lib/db/schema';
-import type Database from 'better-sqlite3';
-import * as crypto from 'crypto';
 
 export interface CreateGitIdentityInput {
   name: string;
@@ -32,35 +30,15 @@ export class GitIdentityService {
       await this.clearDefaultIdentity(userId);
     }
 
-    const identityId = crypto.randomUUID();
-    const now = Date.now();
-    const isDefaultValue = input.isDefault ? 1 : 0;
+    // Insert using Drizzle ORM with PostgreSQL-native types
+    const [identity] = await db.insert(gitIdentities).values({
+      userId,
+      name: input.name,
+      gitName: input.gitName,
+      gitEmail: input.gitEmail,
+      isDefault: input.isDefault || false,
+    }).returning();
 
-    // Use raw SQLite client directly to bypass Drizzle's type system
-    if (queryClient && 'prepare' in queryClient) {
-      // SQLite: Use raw prepared statements
-      const stmt = (queryClient as Database.Database).prepare(`
-        INSERT INTO git_identities (
-          id, user_id, name, git_name, git_email, is_default, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      stmt.run(identityId, userId, input.name, input.gitName, input.gitEmail, isDefaultValue, now, now);
-    } else {
-      // PostgreSQL: Use Drizzle ORM
-      await db.insert(gitIdentities).values({
-        id: identityId,
-        userId,
-        name: input.name,
-        gitName: input.gitName,
-        gitEmail: input.gitEmail,
-        isDefault: input.isDefault || false,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // Fetch the inserted identity
-    const [identity] = await db.select().from(gitIdentities).where(eq(gitIdentities.id, identityId));
     return identity;
   }
 
@@ -93,7 +71,7 @@ export class GitIdentityService {
     const [identity] = await db
       .select()
       .from(gitIdentities)
-      .where(and(eq(gitIdentities.userId, userId), eq(gitIdentities.isDefault, 1))); // SQLite uses 0/1
+      .where(and(eq(gitIdentities.userId, userId), eq(gitIdentities.isDefault, true)));
     return identity || null;
   }
 
@@ -113,7 +91,7 @@ export class GitIdentityService {
       .update(gitIdentities)
       .set({
         ...input,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(gitIdentities.id, identityId))
       .returning();
@@ -139,45 +117,21 @@ export class GitIdentityService {
     // First, unset all defaults for this user
     await this.clearDefaultIdentity(userId);
 
-    const now = Date.now();
-
     // Then set the new default
-    if (queryClient && 'prepare' in queryClient) {
-      // SQLite: Use raw prepared statements
-      const stmt = (queryClient as Database.Database).prepare(`
-        UPDATE git_identities SET is_default = ?, updated_at = ?
-        WHERE id = ? AND user_id = ?
-      `);
-      stmt.run(1, now, identityId, userId);
-    } else {
-      // PostgreSQL: Use Drizzle ORM
-      await db
-        .update(gitIdentities)
-        .set({ isDefault: true, updatedAt: now })
-        .where(and(eq(gitIdentities.id, identityId), eq(gitIdentities.userId, userId)));
-    }
+    await db
+      .update(gitIdentities)
+      .set({ isDefault: true, updatedAt: sql`NOW()` })
+      .where(and(eq(gitIdentities.id, identityId), eq(gitIdentities.userId, userId)));
   }
 
   /**
    * Clear the default identity for a user (make none default)
    */
   async clearDefaultIdentity(userId: string): Promise<void> {
-    const now = Date.now();
-
-    if (queryClient && 'prepare' in queryClient) {
-      // SQLite: Use raw prepared statements
-      const stmt = (queryClient as Database.Database).prepare(`
-        UPDATE git_identities SET is_default = ?, updated_at = ?
-        WHERE user_id = ?
-      `);
-      stmt.run(0, now, userId);
-    } else {
-      // PostgreSQL: Use Drizzle ORM
-      await db
-        .update(gitIdentities)
-        .set({ isDefault: false, updatedAt: now })
-        .where(eq(gitIdentities.userId, userId));
-    }
+    await db
+      .update(gitIdentities)
+      .set({ isDefault: false, updatedAt: sql`NOW()` })
+      .where(eq(gitIdentities.userId, userId));
   }
 
   /**
@@ -192,13 +146,10 @@ export class GitIdentityService {
   }
 
   /**
-   * Convert identity to API-safe format (integer to boolean conversion)
+   * Convert identity to API-safe format
    */
   toIdentityInfo(identity: GitIdentity): GitIdentity {
-    return {
-      ...identity,
-      isDefault: Boolean(identity.isDefault), // Convert SQLite integer to boolean
-    };
+    return identity;
   }
 }
 

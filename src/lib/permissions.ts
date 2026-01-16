@@ -11,7 +11,7 @@
  * - security-admin: Can manage secrets and environment variables
  */
 
-import type { User, Repository } from './db/schema.sqlite';
+import type { User, Repository } from './db/schema';
 
 /**
  * User role type - defines the available roles in the system

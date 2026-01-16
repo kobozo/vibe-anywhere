@@ -34,11 +34,14 @@ export function TemplateProvisioningModal({
 
           <div className="mb-4">
             <div className="text-gray-400 mb-1">Template: <span className="text-white">{template.name}</span></div>
-            {template.techStacks && template.techStacks.length > 0 && (
-              <div className="text-gray-400 text-sm">
-                Tech stacks: {template.techStacks.join(', ')}
-              </div>
-            )}
+            {(() => {
+              const techStacks = Array.isArray(template.techStacks) ? template.techStacks : [];
+              return techStacks.length > 0 && (
+                <div className="text-gray-400 text-sm">
+                  Tech stacks: {techStacks.join(', ')}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Progress Bar */}

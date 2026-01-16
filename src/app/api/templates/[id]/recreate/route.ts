@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
 import { config } from '@/lib/config';
 import { ProxmoxTemplateManager } from '@/lib/container/proxmox/template-manager';
 import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
-import { getTemplateService } from '@/lib/services/template-service';
+import { getTemplateService } from '@/lib/services';
 import { getSettingsService } from '@/lib/services/settings-service';
 import { requireAuth } from '@/lib/api-utils';
 
@@ -130,7 +130,7 @@ export async function POST(
           name: template.name,
           storage: targetStorage,
           node: targetNode,
-          techStacks: template.techStacks || [],
+          techStacks: Array.isArray(template.techStacks) ? template.techStacks : [],
           parentVmid, // Clone from parent if this template is based on another
           onProgress: (progress) => {
             sendEvent('progress', progress);

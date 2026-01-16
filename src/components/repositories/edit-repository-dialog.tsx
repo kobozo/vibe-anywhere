@@ -438,11 +438,14 @@ export function EditRepositoryDialog({
                       <div className="text-foreground-secondary">
                         VMID: <span className="text-foreground">{selectedTemplate.vmid || 'Not provisioned'}</span>
                       </div>
-                      {selectedTemplate.techStacks && selectedTemplate.techStacks.length > 0 && (
-                        <div className="text-foreground-secondary">
-                          Tech stacks: <span className="text-foreground">{selectedTemplate.techStacks.join(', ')}</span>
-                        </div>
-                      )}
+                      {(() => {
+                        const techStacks = Array.isArray(selectedTemplate.techStacks) ? selectedTemplate.techStacks : [];
+                        return techStacks.length > 0 && (
+                          <div className="text-foreground-secondary">
+                            Tech stacks: <span className="text-foreground">{techStacks.join(', ')}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

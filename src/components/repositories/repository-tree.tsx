@@ -154,7 +154,7 @@ export function RepositoryTree({
           if (update.containerStatus !== undefined) newWs.containerStatus = update.containerStatus;
           if (update.containerIp !== undefined) newWs.containerIp = update.containerIp;
           if (update.agentConnected !== undefined) {
-            newWs.agentConnectedAt = update.agentConnected ? Date.now() : null;
+            newWs.agentConnectedAt = update.agentConnected ? new Date().toISOString() : null;
           }
           if (update.agentVersion !== undefined) newWs.agentVersion = update.agentVersion;
 

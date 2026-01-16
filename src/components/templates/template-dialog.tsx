@@ -160,10 +160,13 @@ export function TemplateDialog({
   // Get inherited stacks from effective parent
   const inheritedStacks = useMemo(() => {
     if (!effectiveParent) return [];
-    return [
-      ...(effectiveParent.inheritedTechStacks || []),
-      ...(effectiveParent.techStacks || []),
-    ];
+    const inherited = Array.isArray(effectiveParent.inheritedTechStacks)
+      ? (effectiveParent.inheritedTechStacks as string[])
+      : [];
+    const tech = Array.isArray(effectiveParent.techStacks)
+      ? (effectiveParent.techStacks as string[])
+      : [];
+    return [...inherited, ...tech];
   }, [effectiveParent]);
 
   // Get stacks by category
@@ -193,7 +196,7 @@ export function TemplateDialog({
         // Edit mode
         setName(template.name);
         setDescription(template.description || '');
-        setTechStacks(template.techStacks || []);
+        setTechStacks(Array.isArray(template.techStacks) ? template.techStacks : []);
         setIsDefault(template.isDefault);
         setEnableStaging(false);
         setSelectedBaseValue('');
@@ -276,10 +279,13 @@ export function TemplateDialog({
       const tplId = newValue.slice(4);
       const parent = templates.find(t => t.id === tplId);
       if (parent) {
-        const parentStacks = [
-          ...(parent.inheritedTechStacks || []),
-          ...(parent.techStacks || []),
-        ];
+        const inherited = Array.isArray(parent.inheritedTechStacks)
+          ? (parent.inheritedTechStacks as string[])
+          : [];
+        const tech = Array.isArray(parent.techStacks)
+          ? (parent.techStacks as string[])
+          : [];
+        const parentStacks = [...inherited, ...tech];
         setTechStacks(prev => prev.filter(s => !parentStacks.includes(s)));
       }
     }
@@ -564,11 +570,14 @@ export function TemplateDialog({
                         {/* Vibe Anywhere Templates Group */}
                         {availableParentTemplates.length > 0 && (
                           <optgroup label="Vibe Anywhere Templates">
-                            {availableParentTemplates.map((t) => (
-                              <option key={`tpl:${t.id}`} value={`tpl:${t.id}`}>
-                                {t.name} {t.techStacks && t.techStacks.length > 0 ? `(${t.techStacks.join(', ')})` : ''}
-                              </option>
-                            ))}
+                            {availableParentTemplates.map((t) => {
+                              const techStacks = Array.isArray(t.techStacks) ? t.techStacks : [];
+                              return (
+                                <option key={`tpl:${t.id}`} value={`tpl:${t.id}`}>
+                                  {t.name} {techStacks.length > 0 ? `(${techStacks.join(', ')})` : ''}
+                                </option>
+                              );
+                            })}
                           </optgroup>
                         )}
                       </select>

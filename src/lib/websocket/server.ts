@@ -12,7 +12,7 @@ import {
 } from '@/lib/services';
 import { getTabStreamManager } from '@/lib/services/tab-stream-manager';
 import { getWorkspaceStateBroadcaster } from '@/lib/services/workspace-state-broadcaster';
-import { getTemplateService } from '@/lib/services/template-service';
+import { getTemplateService } from '@/lib/services';
 import { createSSHStream } from '@/lib/container/proxmox/ssh-stream';
 import type { ContainerStream } from '@/lib/container';
 
@@ -1058,7 +1058,11 @@ async function handleSessionAttach(socket: AuthenticatedSocket, sessionId: strin
   }
 
   // Attach to container and start Claude CLI (with optional custom command)
-  const containerStream = await containerBackend.execCommand(session.containerId, session.claudeCommand);
+  // Parse claudeCommand from TEXT to string array
+  const claudeCommand = session.claudeCommand
+    ? JSON.parse(session.claudeCommand)
+    : null;
+  const containerStream = await containerBackend.execCommand(session.containerId, claudeCommand);
   socket.containerStream = containerStream;
 
   // Stream output to client

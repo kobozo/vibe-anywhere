@@ -22,8 +22,8 @@ interface User {
   username: string;
   role: UserRole;
   forcePasswordChange: boolean;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface UserManagementTabProps {
@@ -105,8 +105,8 @@ export function UserManagementTab({ onUserCountChange }: UserManagementTabProps)
     return roleMap[role] || role;
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
+  const formatDate = (timestamp: Date) => {
+    return timestamp.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

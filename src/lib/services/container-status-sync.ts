@@ -8,7 +8,7 @@
 
 import { db } from '@/lib/db';
 import { workspaces, type ContainerStatus } from '@/lib/db/schema';
-import { eq, isNotNull, and, ne } from 'drizzle-orm';
+import { eq, isNotNull, and, ne , sql } from 'drizzle-orm';
 import { getContainerBackendAsync, type IContainerBackend } from '@/lib/container';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { getAgentRegistry } from './agent-registry';
@@ -151,20 +151,29 @@ class ContainerStatusSyncService {
       `${workspace.containerStatus} -> ${newStatus}`
     );
 
-    // Update database
-    await db
-      .update(workspaces)
-      .set({
-        containerId: newContainerId,
-        containerStatus: newStatus,
-        containerIp: newContainerIp,
-        updatedAt: Date.now(),
-        // Clear agent info if container is gone
-        ...(newStatus === 'none' ? {
-          agentConnectedAt: null,
-        } : {}),
-      })
-      .where(eq(workspaces.id, workspace.id));
+    // Update database - use raw SQL to avoid Drizzle timestamp issues
+    if (newStatus === 'none') {
+      await db.execute(sql`
+        UPDATE workspaces
+        SET
+          container_id = ${newContainerId},
+          container_status = ${newStatus},
+          container_ip = ${newContainerIp},
+          updated_at = ${new Date().toISOString()}::timestamptz,
+          agent_connected_at = NULL
+        WHERE id = ${workspace.id}
+      `);
+    } else {
+      await db.execute(sql`
+        UPDATE workspaces
+        SET
+          container_id = ${newContainerId},
+          container_status = ${newStatus},
+          container_ip = ${newContainerIp},
+          updated_at = ${new Date().toISOString()}::timestamptz
+        WHERE id = ${workspace.id}
+      `);
+    }
 
     // Broadcast the change
     broadcaster.broadcastContainerStatus(

@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { repositories, type GitHooksJson, type GitHookEntry } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq , sql } from 'drizzle-orm';
 import { execSSHCommand } from '@/lib/container/proxmox/ssh-stream';
 
 // Standard git hooks that we manage
@@ -44,7 +44,7 @@ export class GitHooksService {
       .from(repositories)
       .where(eq(repositories.id, repositoryId));
 
-    return repo?.gitHooks || {};
+    return (repo?.gitHooks as GitHooksJson) || {};
   }
 
   /**
@@ -55,7 +55,7 @@ export class GitHooksService {
       .update(repositories)
       .set({
         gitHooks: hooks,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(repositories.id, repositoryId));
   }

@@ -19,7 +19,7 @@ interface AuditLog {
   details: string | null;
   ipAddress: string | null;
   userAgent: string | null;
-  timestamp: number;
+  timestamp: Date;
 }
 
 interface AuditLogPanelProps {
@@ -65,8 +65,8 @@ export function AuditLogPanel({ isOpen, onClose }: AuditLogPanelProps) {
     }
   };
 
-  const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('en-US', {
+  const formatTimestamp = (timestamp: Date) => {
+    return timestamp.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

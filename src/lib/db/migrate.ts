@@ -1,45 +1,29 @@
-import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
-import { drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
-import { migrate as migratePostgres } from 'drizzle-orm/postgres-js/migrator';
-import { migrate as migrateSqlite } from 'drizzle-orm/better-sqlite3/migrator';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
-import Database from 'better-sqlite3';
-import { getDatabaseConfig } from './config';
 
 /**
- * Run database migrations for the configured backend.
+ * Run database migrations for PostgreSQL.
  * This function can be called from server startup or as a standalone script.
  */
 export async function runMigrations() {
-  const dbConfig = getDatabaseConfig();
+  const connectionString = process.env.DATABASE_URL;
 
-  console.log(`Running migrations for ${dbConfig.backend} backend...`);
-
-  if (dbConfig.backend === 'postgresql') {
-    // PostgreSQL migrations
-    const migrationClient = postgres(dbConfig.connectionString, { max: 1 });
-    const db = drizzlePostgres(migrationClient);
-
-    await migratePostgres(db, { migrationsFolder: './drizzle-postgres' });
-
-    console.log('PostgreSQL migrations complete!');
-
-    await migrationClient.end();
-  } else {
-    // SQLite migrations
-    const migrationClient = new Database(dbConfig.connectionString);
-
-    // Enable WAL mode before migrations
-    migrationClient.pragma('journal_mode = WAL');
-
-    const db = drizzleSqlite(migrationClient);
-
-    migrateSqlite(db, { migrationsFolder: './drizzle-sqlite' });
-
-    console.log('SQLite migrations complete!');
-
-    migrationClient.close();
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
   }
+
+  console.log('Running PostgreSQL migrations...');
+
+  // Create a dedicated migration client with a single connection
+  const migrationClient = postgres(connectionString, { max: 1 });
+  const db = drizzle(migrationClient);
+
+  await migrate(db, { migrationsFolder: './drizzle' });
+
+  console.log('PostgreSQL migrations complete!');
+
+  await migrationClient.end();
 }
 
 // When run as a standalone script (ES module detection)

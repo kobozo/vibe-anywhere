@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { eq, desc, and, or, ne } from 'drizzle-orm';
+import { eq, desc, and, or, ne , sql } from 'drizzle-orm';
 import { db, users, repositories, workspaces, type User, type NewUser, type UserRole } from '@/lib/db';
 import { config } from '@/lib/config';
 import { v4 as uuidv4 } from 'uuid';
@@ -65,8 +65,7 @@ export class AuthService {
 
     // Generate new token on each login
     const token = this.generateToken();
-    const updatedAt = Date.now();
-    await db.update(users).set({ token, updatedAt }).where(eq(users.id, user.id));
+    await db.update(users).set({ token, updatedAt: sql`NOW()` }).where(eq(users.id, user.id));
 
     return {
       user: {
@@ -74,7 +73,7 @@ export class AuthService {
         username: user.username,
         role: user.role,
         createdAt: user.createdAt,
-        updatedAt,
+        updatedAt: user.updatedAt,
       },
       token,
       forcePasswordChange: Boolean(user.forcePasswordChange),
@@ -164,7 +163,7 @@ export class AuthService {
       .set({
         passwordHash: newPasswordHash,
         forcePasswordChange: false,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(users.id, userId));
   }
@@ -210,7 +209,7 @@ export class AuthService {
       .update(users)
       .set({
         username: newUsername,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(users.id, userId))
       .returning({
@@ -243,7 +242,7 @@ export class AuthService {
 
     const updates: Partial<NewUser> = {
       forcePasswordChange: true,
-      updatedAt: Date.now(),
+      updatedAt: sql`NOW()`,
     };
 
     // If a new password is provided, hash it
@@ -283,9 +282,9 @@ export class AuthService {
       .update(users)
       .set({
         status: 'inactive',
-        deactivatedAt: Date.now(),
+        deactivatedAt: sql`NOW()`,
         deactivatedBy,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(users.id, userId))
       .returning({
@@ -344,7 +343,7 @@ export class AuthService {
       .update(users)
       .set({
         role: newRole,
-        updatedAt: Date.now(),
+        updatedAt: sql`NOW()`,
       })
       .where(eq(users.id, userId))
       .returning({

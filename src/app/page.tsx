@@ -690,7 +690,7 @@ function Dashboard() {
           ...(update.containerStatus !== undefined && { containerStatus: update.containerStatus }),
           ...(update.containerId !== undefined && { containerId: update.containerId }),
           ...(update.containerIp !== undefined && { containerIp: update.containerIp }),
-          ...(update.agentConnected !== undefined && { agentConnectedAt: update.agentConnected ? Date.now() : null }),
+          ...(update.agentConnected !== undefined && { agentConnectedAt: update.agentConnected ? new Date().toISOString() : null }),
         };
       });
     }

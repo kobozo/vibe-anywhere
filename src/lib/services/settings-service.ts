@@ -5,7 +5,7 @@
 
 import { db } from '@/lib/db';
 import { appSettings, workspaces } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq , sql } from 'drizzle-orm';
 import { getProxmoxClientAsync } from '@/lib/container/proxmox/client';
 import { config } from '@/lib/config';
 import * as crypto from 'crypto';
@@ -137,17 +137,14 @@ export class SettingsService {
         .set({
           value: JSON.stringify(value),
           description,
-          updatedAt: Date.now(),
+          updatedAt: sql`NOW()`,
         })
         .where(eq(appSettings.key, key));
     } else {
       await db.insert(appSettings).values({
-        id: crypto.randomUUID(),
         key,
         value: JSON.stringify(value),
         description,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
       });
     }
   }

@@ -6,7 +6,7 @@
 import type { Socket } from 'socket.io';
 import { db } from '@/lib/db';
 import { workspaces, tabs, repositories } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and , sql } from 'drizzle-orm';
 import { getWorkspaceStateBroadcaster } from './workspace-state-broadcaster';
 import { startupProgressStore } from './startup-progress-store';
 import { getTabService } from './tab-service';
@@ -106,8 +106,8 @@ class AgentRegistry {
     await db
       .update(workspaces)
       .set({
-        agentConnectedAt: Date.now(),
-        agentLastHeartbeat: Date.now(),
+        agentConnectedAt: new Date().toISOString(),
+        agentLastHeartbeat: new Date().toISOString(),
         agentVersion: version,
       })
       .where(eq(workspaces.id, workspaceId));
@@ -243,7 +243,7 @@ class AgentRegistry {
     await db
       .update(workspaces)
       .set({
-        agentLastHeartbeat: Date.now(),
+        agentLastHeartbeat: new Date().toISOString(),
       })
       .where(eq(workspaces.id, workspaceId));
   }

@@ -10,9 +10,9 @@ export interface SessionInfo {
   branchName: string;
   worktreePath: string | null;
   claudeCommand: string[] | null; // Custom Claude CLI command (e.g., ['claude', '-p', 'my prompt'])
-  createdAt: number;
-  updatedAt: number;
-  lastActivityAt: number;
+  createdAt: Date;
+  updatedAt: Date;
+  lastActivityAt: Date;
 }
 
 export interface CreateSessionInput {
