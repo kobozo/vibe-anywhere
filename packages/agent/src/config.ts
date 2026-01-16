@@ -7,7 +7,7 @@
 function getPackageVersion(): string {
   // For SEA binaries, the version is baked in at build time
   // This matches the version in packages/agent/package.json
-  return '3.0.0';
+  return '3.1.0';
 }
 
 function requireEnv(name: string): string {
