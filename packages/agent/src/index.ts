@@ -414,7 +414,7 @@ const wsClient = new AgentWebSocket(config, {
   onChromeHostUpdate: async (data) => {
     console.log(`Chrome host update: ${data.chromeHost || 'local'}`);
     try {
-      chromeProxyHandler.setChromeHost(data.chromeHost);
+      await chromeProxyHandler.setChromeHost(data.chromeHost);
     } catch (error) {
       console.error('Failed to update Chrome host:', error);
     }

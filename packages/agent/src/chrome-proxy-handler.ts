@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { SocketProxyHandler } from './socket-proxy-handler.js';
 
 const execAsync = promisify(exec);
 
@@ -20,9 +21,11 @@ export class ChromeProxyHandler {
   private chromeHost: string | null = null;
   private chromeDir = path.join(process.env.HOME || '/home/kobozo', '.local', 'bin');
   private fakeChromeScript = '';
+  private socketProxy: SocketProxyHandler;
 
   constructor() {
     this.fakeChromeScript = path.join(this.chromeDir, 'chromium');
+    this.socketProxy = new SocketProxyHandler();
 
     // Ensure ~/.local/bin exists
     if (!fs.existsSync(this.chromeDir)) {
@@ -33,17 +36,19 @@ export class ChromeProxyHandler {
   /**
    * Set the Chrome host (Tailscale IP) to proxy to
    */
-  setChromeHost(host: string | null): void {
+  async setChromeHost(host: string | null): Promise<void> {
     console.log(`[Chrome Proxy] Setting Chrome host to: ${host || 'local'}`);
     this.chromeHost = host;
 
-    // Create or update fake Chrome binary
+    // Create or update fake Chrome binary and start proxies
     if (host) {
       this.createFakeChromeScript(host);
-      this.startProxyServer();
+      await this.startProxyServer();
+      await this.startSocketProxy(host);
     } else {
       this.removeFakeChromeScript();
-      this.stopProxyServer();
+      await this.stopProxyServer();
+      await this.stopSocketProxy();
     }
   }
 
@@ -314,10 +319,33 @@ exit 0
   }
 
   /**
+   * Start the Unix socket proxy
+   */
+  private async startSocketProxy(host: string): Promise<void> {
+    try {
+      await this.socketProxy.start(host);
+    } catch (error) {
+      console.error('[Chrome Proxy] Failed to start socket proxy:', error);
+    }
+  }
+
+  /**
+   * Stop the Unix socket proxy
+   */
+  private async stopSocketProxy(): Promise<void> {
+    try {
+      await this.socketProxy.stop();
+    } catch (error) {
+      console.error('[Chrome Proxy] Failed to stop socket proxy:', error);
+    }
+  }
+
+  /**
    * Cleanup on shutdown
    */
   async cleanup(): Promise<void> {
     await this.stopProxyServer();
+    await this.stopSocketProxy();
     this.removeFakeChromeScript();
   }
 }
