@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
-import { Settings, Download, X } from 'lucide-react';
+import { Settings, Download, X, Copy, Check } from 'lucide-react';
 
 interface TailscalePeer {
   id: string;
@@ -52,6 +52,10 @@ export function TailscaleWidget({
   const [error, setError] = useState<string | null>(null);
   const [selectedChromeHost, setSelectedChromeHost] = useState<string | null>(chromeTailscaleHost);
   const [showSettings, setShowSettings] = useState(false);
+  const [showScriptContent, setShowScriptContent] = useState(false);
+  const [scriptContent, setScriptContent] = useState<string>('');
+  const [isLoadingScript, setIsLoadingScript] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { token } = useAuth();
   const { socket, isConnected: isSocketConnected } = useSocket({ token });
 
@@ -194,9 +198,50 @@ export function TailscaleWidget({
     }
   };
 
-  const handleDownloadBridge = () => {
-    // Download the chrome-bridge script
-    window.open('/api/chrome-bridge/download', '_blank');
+  const handleViewScript = async () => {
+    if (scriptContent) {
+      // Already loaded, just show it
+      setShowScriptContent(true);
+      return;
+    }
+
+    setIsLoadingScript(true);
+    try {
+      const response = await fetch('/api/chrome-bridge/download');
+      if (!response.ok) {
+        throw new Error('Failed to load script');
+      }
+      const content = await response.text();
+      setScriptContent(content);
+      setShowScriptContent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load script');
+    } finally {
+      setIsLoadingScript(false);
+    }
+  };
+
+  const handleCopyScript = async () => {
+    try {
+      await navigator.clipboard.writeText(scriptContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setError('Failed to copy to clipboard');
+    }
+  };
+
+  const handleDownloadScript = () => {
+    // Create blob and download
+    const blob = new Blob([scriptContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chrome-bridge.js';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Determine overall status
@@ -384,21 +429,22 @@ export function TailscaleWidget({
               </div>
             )}
 
-            {/* Download Bridge Button */}
+            {/* Bridge Script Section */}
             <div className="mb-4 p-4 bg-background border border-border rounded">
               <h5 className="text-sm font-medium text-foreground mb-2">Chrome Bridge Server</h5>
               <p className="text-xs text-foreground-secondary mb-3">
-                Download and run this on the machine with Chrome to enable remote browser control.
+                Copy and save this script on the machine with Chrome to enable remote browser control.
               </p>
               <button
-                onClick={handleDownloadBridge}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground font-medium"
+                onClick={handleViewScript}
+                disabled={isLoadingScript}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 rounded text-sm text-foreground font-medium"
               >
-                <Download size={16} />
-                Download chrome-bridge.js
+                <Copy size={16} />
+                {isLoadingScript ? 'Loading...' : 'View Script'}
               </button>
               <p className="text-xs text-foreground-secondary mt-2">
-                Run with: <code className="bg-background-tertiary px-1 rounded">node chrome-bridge.js</code>
+                Save as <code className="bg-background-tertiary px-1 rounded">chrome-bridge.js</code> and run with: <code className="bg-background-tertiary px-1 rounded">node chrome-bridge.js</code>
               </p>
             </div>
 
@@ -413,6 +459,56 @@ export function TailscaleWidget({
                 View full setup instructions →
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Script Content Modal */}
+      {showScriptContent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowScriptContent(false)}>
+          <div className="bg-background-secondary border border-border rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-foreground">chrome-bridge.js</h4>
+              <button
+                onClick={() => setShowScriptContent(false)}
+                className="p-1 text-foreground-secondary hover:text-foreground hover:bg-background-tertiary rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Script Content */}
+            <div className="flex-1 overflow-hidden mb-4">
+              <textarea
+                readOnly
+                value={scriptContent}
+                className="w-full h-full min-h-[400px] p-3 bg-background border border-border rounded font-mono text-xs text-foreground resize-none focus:outline-none"
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopyScript}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground font-medium"
+              >
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? 'Copied!' : 'Copy to Clipboard'}
+              </button>
+              <button
+                onClick={handleDownloadScript}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-background border border-border rounded text-sm text-foreground font-medium"
+              >
+                <Download size={16} />
+                Download as .js
+              </button>
+            </div>
+
+            <p className="text-xs text-foreground-secondary mt-3">
+              💡 Tip: Copy the script content and paste it into a new file named <code className="bg-background-tertiary px-1 rounded">chrome-bridge.js</code>
+            </p>
           </div>
         </div>
       )}
