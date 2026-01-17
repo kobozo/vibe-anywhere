@@ -128,8 +128,42 @@ function checkSocket() {
       console.warn(`\n⚠️  Warning: MCP bridge socket not found: ${SOCKET_PATH}`);
       console.warn('Make sure Claude Code is running with --chrome flag.');
       console.warn('Example: claude --chrome\n');
+
+      // Help debug by looking for alternative socket locations
+      try {
+        const tmpdir = process.env.TMPDIR || '/tmp/';
+        const files = fs.readdirSync(tmpdir);
+        const bridgeSockets = files.filter(f => f.startsWith('claude-mcp-browser-bridge-'));
+
+        if (bridgeSockets.length > 0) {
+          console.warn(`Found other MCP bridge sockets in ${tmpdir}:`);
+          bridgeSockets.forEach(s => {
+            const fullPath = `${tmpdir}${s}`;
+            const stats = fs.statSync(fullPath);
+            console.warn(`  - ${s} (modified: ${stats.mtime.toLocaleString()})`);
+          });
+          console.warn('\nNote: Using the socket for current user ($USER)\n');
+        }
+      } catch (err) {
+        // Ignore errors while searching for sockets
+      }
     } else {
+      const stats = fs.statSync(SOCKET_PATH);
       console.log(`✓ MCP bridge socket found: ${SOCKET_PATH}`);
+      console.log(`  Last modified: ${stats.mtime.toLocaleString()}`);
+
+      // Check if there are multiple Claude sessions
+      try {
+        const tmpdir = process.env.TMPDIR || '/tmp/';
+        const files = fs.readdirSync(tmpdir);
+        const bridgeSockets = files.filter(f => f.startsWith('claude-mcp-browser-bridge-'));
+
+        if (bridgeSockets.length > 1) {
+          console.log(`\nℹ️  Note: Found ${bridgeSockets.length} MCP bridge sockets (using ${user}'s socket)`);
+        }
+      } catch (err) {
+        // Ignore errors
+      }
     }
   }
 }
