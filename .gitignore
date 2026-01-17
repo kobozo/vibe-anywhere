@@ -61,3 +61,7 @@ docker-compose.local.yml
 
 # Generated JS files from tsx transformation
 src/**/*.js
+
+# Chrome bridge build artifacts
+scripts/chrome-bridge-build/
+scripts/chrome-bridge-dist/

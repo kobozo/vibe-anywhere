@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
+import { Settings, Download, X } from 'lucide-react';
 
 interface TailscalePeer {
   id: string;
@@ -50,6 +51,7 @@ export function TailscaleWidget({
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedChromeHost, setSelectedChromeHost] = useState<string | null>(chromeTailscaleHost);
+  const [showSettings, setShowSettings] = useState(false);
   const { token } = useAuth();
   const { socket, isConnected: isSocketConnected } = useSocket({ token });
 
@@ -192,6 +194,11 @@ export function TailscaleWidget({
     }
   };
 
+  const handleDownloadBridge = () => {
+    // Download the chrome-bridge script
+    window.open('/api/chrome-bridge/download', '_blank');
+  };
+
   // Determine overall status
   let statusColor = 'bg-foreground-tertiary';
   let statusText = 'Unknown';
@@ -223,13 +230,23 @@ export function TailscaleWidget({
     <div className="bg-background-secondary border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Tailscale Network</h3>
-        <button
-          onClick={handleRefreshStatus}
-          className="text-xs text-primary hover:text-primary-hover"
-          disabled={!isAgentConnected}
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-1.5 text-foreground-secondary hover:text-foreground hover:bg-background-tertiary rounded"
+            title="Chrome Browser Settings"
+            disabled={!isAgentConnected || !effectiveStatus?.online}
+          >
+            <Settings size={16} />
+          </button>
+          <button
+            onClick={handleRefreshStatus}
+            className="text-xs text-primary hover:text-primary-hover"
+            disabled={!isAgentConnected}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Status Badge */}
@@ -273,51 +290,6 @@ export function TailscaleWidget({
         </div>
       )}
 
-      {/* Chrome Browser Control */}
-      {effectiveStatus?.online && effectiveStatus.peers && effectiveStatus.peers.length > 0 && (
-        <div className="border-t border-border pt-3 mb-4">
-          <div className="text-xs text-foreground-secondary mb-2">Chrome Browser Control</div>
-
-          {/* Chrome Host Selector */}
-          <div className="mb-3">
-            <label className="block text-xs text-foreground-secondary mb-1">
-              Chrome Device:
-            </label>
-            <select
-              value={selectedChromeHost || ''}
-              onChange={(e) => handleChromeHostChange(e.target.value || null)}
-              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground"
-              disabled={!isAgentConnected}
-            >
-              <option value="">None (Local Chrome)</option>
-              {effectiveStatus.peers
-                .filter(peer => peer.online)
-                .map(peer => (
-                  <option key={peer.id} value={peer.tailscaleIP}>
-                    {peer.hostname} ({peer.tailscaleIP})
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          {/* Chrome Status */}
-          {chromeStatus && (
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  chromeStatus.connected ? 'bg-success' : 'bg-foreground-tertiary'
-                }`}
-              />
-              <span className="text-sm text-foreground">
-                {chromeStatus.connected
-                  ? `Connected: ${chromeStatus.chromeHost}`
-                  : 'Not Connected'}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Control Buttons */}
       {isTailscaleConfigured && isAgentConnected && (
         <div className="flex gap-2">
@@ -348,6 +320,100 @@ export function TailscaleWidget({
           <span className="text-primary cursor-pointer hover:text-primary-hover">
             Settings → Tailscale
           </span>
+        </div>
+      )}
+
+      {/* Chrome Browser Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSettings(false)}>
+          <div className="bg-background-secondary border border-border rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-foreground">Chrome Browser Settings</h4>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-1 text-foreground-secondary hover:text-foreground hover:bg-background-tertiary rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Chrome Device Selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Chrome Device
+              </label>
+              <select
+                value={selectedChromeHost || ''}
+                onChange={(e) => handleChromeHostChange(e.target.value || null)}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={!isAgentConnected}
+              >
+                <option value="">None (Local Chrome)</option>
+                {effectiveStatus?.peers
+                  ?.filter(peer => peer.online)
+                  .map(peer => (
+                    <option key={peer.id} value={peer.tailscaleIP}>
+                      {peer.hostname} ({peer.tailscaleIP})
+                    </option>
+                  ))}
+              </select>
+              <p className="text-xs text-foreground-secondary mt-1">
+                Select which Tailscale peer has Chrome with Claude extension
+              </p>
+            </div>
+
+            {/* Chrome Status */}
+            {chromeStatus && (
+              <div className="mb-4 p-3 bg-background border border-border rounded">
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      chromeStatus.connected ? 'bg-success' : 'bg-foreground-tertiary'
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-foreground">
+                    {chromeStatus.connected ? 'Connected' : 'Not Connected'}
+                  </span>
+                </div>
+                {chromeStatus.connected && (
+                  <p className="text-xs text-foreground-secondary ml-4">
+                    Host: {chromeStatus.chromeHost}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Download Bridge Button */}
+            <div className="mb-4 p-4 bg-background border border-border rounded">
+              <h5 className="text-sm font-medium text-foreground mb-2">Chrome Bridge Server</h5>
+              <p className="text-xs text-foreground-secondary mb-3">
+                Download and run this on the machine with Chrome to enable remote browser control.
+              </p>
+              <button
+                onClick={handleDownloadBridge}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover rounded text-sm text-foreground font-medium"
+              >
+                <Download size={16} />
+                Download chrome-bridge.js
+              </button>
+              <p className="text-xs text-foreground-secondary mt-2">
+                Run with: <code className="bg-background-tertiary px-1 rounded">node chrome-bridge.js</code>
+              </p>
+            </div>
+
+            {/* Setup Instructions Link */}
+            <div className="text-xs text-foreground-secondary">
+              <a
+                href="https://github.com/kobozo/vibe-anywhere/blob/main/docs/CHROME-PROXY.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary-hover underline"
+              >
+                View full setup instructions →
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>

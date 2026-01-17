@@ -43,8 +43,8 @@ build_binary() {
   # Generate SEA config
   cat > "$BUILD_DIR/sea-config.json" <<EOF
 {
-  "main": "chrome-bridge-bundled.js",
-  "output": "sea-prep.blob",
+  "main": "$BUILD_DIR/chrome-bridge-bundled.js",
+  "output": "$BUILD_DIR/sea-prep.blob",
   "disableExperimentalSEAWarning": true,
   "useSnapshot": false,
   "useCodeCache": true
