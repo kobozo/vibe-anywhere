@@ -1,6 +1,6 @@
 {
   "name": "@vibe-anywhere/agent",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "description": "Vibe Anywhere sidecar agent for LXC containers",
   "type": "module",
   "main": "dist/index.js",
