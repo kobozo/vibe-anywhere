@@ -22,6 +22,7 @@ export class ChromeProxyHandler {
   private chromeDir = path.join(process.env.HOME || '/home/kobozo', '.local', 'bin');
   private fakeChromeScript = '';
   private socketProxy: SocketProxyHandler;
+  private nativeHostWatcher: fs.FSWatcher | null = null;
 
   constructor() {
     this.fakeChromeScript = path.join(this.chromeDir, 'chromium');
@@ -45,10 +46,12 @@ export class ChromeProxyHandler {
       this.createFakeChromeScript(host);
       await this.startProxyServer();
       await this.startSocketProxy(host);
+      this.setupNativeHostBridge(host);
     } else {
       this.removeFakeChromeScript();
       await this.stopProxyServer();
       await this.stopSocketProxy();
+      this.removeNativeHostBridge();
     }
   }
 
@@ -61,9 +64,70 @@ export class ChromeProxyHandler {
 # Fake Chrome/Chromium binary for CDP proxy
 # This makes Claude Code think Chrome is running locally
 
+# Comprehensive logging to understand what Claude Code is trying to do
+LOGFILE="$HOME/.local/share/fake-chrome-invocations.log"
+mkdir -p "$(dirname "$LOGFILE")"
+
+# Log all invocations with timestamp and details
+{
+  echo "==================== INVOCATION ===================="
+  echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "PID: $$"
+  echo "PPID: $PPID"
+  echo "Command: $0"
+  echo "Arguments count: $#"
+  echo "All arguments: $*"
+  echo "Arguments (individual):"
+  idx=1
+  for arg in "$@"; do
+    echo "  [\$idx]: \$arg"
+    idx=\$((idx + 1))
+  done
+  echo "Working directory: $(pwd)"
+  echo "User: $(whoami)"
+  echo "Relevant environment variables:"
+  env | grep -E '(CHROME|CHROMIUM|CDP|DEBUG|CLAUDE|MCP|DISPLAY)' || echo "  (none found)"
+  echo "==================================================="
+  echo ""
+} >> "$LOGFILE" 2>&1
+
 # Handle --version flag (Claude Code checks this)
 if [[ "$1" == "--version" ]]; then
-  echo "Chromium 120.0.0.0"
+  # Try to get real Chrome version from remote host via the socket bridge
+  REAL_VERSION=""
+  SOCKET_PATH="/tmp/vibe-anywhere-chrome-proxy-$(whoami)"
+
+  # Check if socket exists
+  if [ -S "$SOCKET_PATH" ]; then
+    # Send a version query through the socket bridge
+    # The Mac bridge should handle this and execute Chrome --version
+    REAL_VERSION=$(echo '{"type":"version"}' | nc -U "$SOCKET_PATH" -w 2 2>/dev/null || echo "")
+
+    {
+      echo "Sent version query through socket bridge: $SOCKET_PATH"
+      echo "Response from bridge: $REAL_VERSION"
+    } >> "$LOGFILE" 2>&1
+  fi
+
+  if [ -n "$REAL_VERSION" ] && [[ "$REAL_VERSION" != *"error"* ]]; then
+    # Successfully got real version from remote Chrome via bridge
+    echo "$REAL_VERSION"
+    {
+      echo "Response: Version check - queried remote Chrome via socket bridge"
+      echo "Real version: $REAL_VERSION"
+      echo "✓ Bridge communication confirmed!"
+      echo ""
+    } >> "$LOGFILE" 2>&1
+  else
+    # Fallback to fake version if bridge not available
+    echo "Chromium 120.0.0.0"
+    {
+      echo "Response: Version check - bridge not available, returned fake version"
+      echo "Fake version: Chromium 120.0.0.0"
+      echo "Note: Socket bridge may not be running or Mac bridge may not support version queries yet"
+      echo ""
+    } >> "$LOGFILE" 2>&1
+  fi
   exit 0
 fi
 
@@ -78,13 +142,38 @@ if [[ "$*" == *"--remote-debugging-port"* ]]; then
   # Report that we're "running" on the port
   echo "DevTools listening on ws://127.0.0.1:$PORT/devtools/browser"
 
+  {
+    echo "Response: Remote debugging port request (port=$PORT)"
+    echo "Output: DevTools listening on ws://127.0.0.1:$PORT/devtools/browser"
+    echo "Status: Keeping process alive (sleep infinity)"
+    echo ""
+  } >> "$LOGFILE" 2>&1
+
   # Keep the process alive (Claude Code expects Chrome to stay running)
   sleep infinity
   exit 0
 fi
 
+# Handle URL arguments (Claude trying to open URLs like https://clau.de/chrome/reconnect)
+# We silently accept these but don't actually open anything since Chrome is on the remote Mac
+if [[ "$1" == http* ]] || [[ "$1" == chrome-extension://* ]]; then
+  {
+    echo "Response: URL open request - accepting silently"
+    echo "URL: $1"
+    echo "Note: Not actually opening URL (Chrome is remote on ${remoteHost})"
+    echo ""
+  } >> "$LOGFILE" 2>&1
+  # Exit successfully - Claude Code expects chrome to handle this
+  exit 0
+fi
+
 # For other invocations, just report success
 echo "Chromium proxy active - forwarding to ${remoteHost}:9222"
+{
+  echo "Response: Generic invocation - proxy active message"
+  echo "Note: Unhandled invocation pattern - may need to add specific handling"
+  echo ""
+} >> "$LOGFILE" 2>&1
 exit 0
 `;
 
@@ -353,11 +442,119 @@ exit 0
   }
 
   /**
+   * Setup native host bridge for Chrome extension
+   * This replaces Claude Code's native host script with our socket bridge
+   */
+  private setupNativeHostBridge(remoteHost: string): void {
+    const chromeDir = path.join(process.env.HOME || '/home/kobozo', '.claude', 'chrome');
+    const nativeHostPath = path.join(chromeDir, 'chrome-native-host');
+    // Use Vibe Anywhere proxy socket (different from Claude Code's MCP socket to avoid conflicts)
+    const user = process.env.USER || 'kobozo';
+    const socketPath = `/tmp/vibe-anywhere-chrome-proxy-${user}`;
+
+    // Ensure directory exists
+    if (!fs.existsSync(chromeDir)) {
+      fs.mkdirSync(chromeDir, { recursive: true });
+    }
+
+    // Function to replace the native host script
+    const replaceNativeHost = () => {
+      try {
+        const bridgeScript = `#!/bin/sh
+# Chrome native host socket bridge (auto-managed by Vibe Anywhere agent)
+# Connects Claude Code to remote Chrome via Tailscale
+exec /usr/bin/node -e "
+const net = require('net');
+const socket = net.createConnection('${socketPath}', () => {
+  console.error('[Native Host] Connected to socket proxy');
+});
+
+socket.on('data', (data) => process.stdout.write(data));
+process.stdin.on('data', (data) => socket.write(data));
+
+socket.on('error', (err) => {
+  console.error('[Native Host] Socket error:', err.message);
+  process.exit(1);
+});
+
+socket.on('end', () => process.exit(0));
+process.stdin.on('end', () => socket.end());
+"
+`;
+
+        fs.writeFileSync(nativeHostPath, bridgeScript, { mode: 0o755 });
+        console.log(`[Chrome Proxy] Replaced native host with socket bridge`);
+      } catch (error) {
+        console.error('[Chrome Proxy] Failed to replace native host:', error);
+      }
+    };
+
+    // Replace immediately
+    replaceNativeHost();
+
+    // Watch for changes (Claude Code regenerates this file)
+    try {
+      if (this.nativeHostWatcher) {
+        this.nativeHostWatcher.close();
+      }
+
+      this.nativeHostWatcher = fs.watch(chromeDir, (eventType, filename) => {
+        if (filename === 'chrome-native-host' && eventType === 'change') {
+          // Check if it's been regenerated by Claude Code
+          try {
+            const content = fs.readFileSync(nativeHostPath, 'utf8');
+            if (content.includes('--chrome-native-host')) {
+              console.log('[Chrome Proxy] Claude Code regenerated native host, replacing...');
+              replaceNativeHost();
+            }
+          } catch (error) {
+            // File might be being written, ignore
+          }
+        }
+      });
+
+      console.log(`[Chrome Proxy] Watching native host for changes at ${chromeDir}`);
+    } catch (error) {
+      console.error('[Chrome Proxy] Failed to setup file watcher:', error);
+    }
+  }
+
+  /**
+   * Remove native host bridge
+   */
+  private removeNativeHostBridge(): void {
+    if (this.nativeHostWatcher) {
+      this.nativeHostWatcher.close();
+      this.nativeHostWatcher = null;
+      console.log('[Chrome Proxy] Stopped watching native host');
+    }
+
+    // Restore original native host script
+    const chromeDir = path.join(process.env.HOME || '/home/kobozo', '.claude', 'chrome');
+    const nativeHostPath = path.join(chromeDir, 'chrome-native-host');
+
+    try {
+      if (fs.existsSync(nativeHostPath)) {
+        const restoreScript = `#!/bin/sh
+# Chrome native host wrapper script
+# Generated by Claude Code - do not edit manually
+exec "/usr/bin/node" "/home/kobozo/.npm-global/lib/node_modules/@anthropic-ai/claude-code/cli.js" --chrome-native-host
+`;
+        fs.writeFileSync(nativeHostPath, restoreScript, { mode: 0o755 });
+        console.log('[Chrome Proxy] Restored original native host');
+      }
+    } catch (error) {
+      console.error('[Chrome Proxy] Failed to restore native host:', error);
+    }
+  }
+
+  /**
    * Cleanup on shutdown
    */
   async cleanup(): Promise<void> {
     await this.stopProxyServer();
     await this.stopSocketProxy();
     this.removeFakeChromeScript();
+    this.removeNativeHostBridge();
   }
 }

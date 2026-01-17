@@ -56,6 +56,7 @@ export class TailscaleHandler {
       // Self represents the current device
       const self = status.Self;
       if (!self) {
+        console.log('[Tailscale] No Self object in status, returning null');
         return null;
       }
 
@@ -96,6 +97,7 @@ export class TailscaleHandler {
       };
     } catch (error) {
       // If command fails, Tailscale might not be installed or not running
+      console.log('[Tailscale] getStatus() error:', error instanceof Error ? error.message : String(error));
       return null;
     }
   }

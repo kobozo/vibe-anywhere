@@ -303,6 +303,14 @@ The Proxmox LXC template contains:
 | Home | `/home/kobozo` |
 | Workspace | `/workspace` (owned by kobozo) |
 
+**⚠️ CRITICAL - User-Specific Tools:**
+- **Claude Code CLI** and other AI assistants are installed **ONLY for the `kobozo` user**, NOT globally
+- When running commands in containers, **ALWAYS use `sudo -u kobozo`** or switch to kobozo user
+- The tools are in `/home/kobozo/.npm-global/bin/` which is in kobozo's PATH (via `.bashrc`)
+- Running as root will NOT have access to `claude`, `cursor`, etc.
+- Example: `pct exec 502 -- sudo -u kobozo claude --version` ✓
+- Wrong: `pct exec 502 -- claude --version` ✗ (runs as root, command not found)
+
 ### Network
 - Containers get DHCP IP on VLAN 2 (192.168.3.x)
 - SSH enabled for rsync sync operations

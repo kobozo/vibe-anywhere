@@ -204,9 +204,58 @@ async function startBridge() {
       console.log(`[${new Date().toISOString()}] Connected to MCP bridge socket`);
     });
 
-    // Pipe data bidirectionally
-    clientSocket.pipe(unixSocket);
-    unixSocket.pipe(clientSocket);
+    // Handle incoming data from client
+    clientSocket.on('data', async (data) => {
+      const message = data.toString();
+
+      // Check if this is a version query from the fake chromium
+      if (message.includes('"type":"version"')) {
+        console.log(`[${new Date().toISOString()}] Version query received`);
+
+        try {
+          // Get Chrome version based on platform
+          let chromeVersion = '';
+
+          if (PLATFORM === 'darwin') {
+            // MacOS
+            const { stdout } = await execAsync('/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --version');
+            chromeVersion = stdout.trim();
+          } else if (PLATFORM === 'linux') {
+            // Linux - try common Chrome locations
+            try {
+              const { stdout } = await execAsync('google-chrome --version');
+              chromeVersion = stdout.trim();
+            } catch {
+              const { stdout } = await execAsync('chromium-browser --version');
+              chromeVersion = stdout.trim();
+            }
+          } else if (PLATFORM === 'win32') {
+            // Windows
+            const { stdout } = await execAsync('"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --version');
+            chromeVersion = stdout.trim();
+          }
+
+          console.log(`[${new Date().toISOString()}] Chrome version: ${chromeVersion}`);
+
+          // Send version back to client
+          clientSocket.write(chromeVersion);
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Failed to get Chrome version:`, error.message);
+          clientSocket.write('Error: Could not get Chrome version');
+        }
+
+        // Don't forward version queries to MCP socket
+        return;
+      }
+
+      // Forward all other data to MCP bridge socket
+      unixSocket.write(data);
+    });
+
+    // Pipe data from Unix socket back to client
+    unixSocket.on('data', (data) => {
+      clientSocket.write(data);
+    });
 
     // Handle errors and cleanup
     const cleanup = () => {

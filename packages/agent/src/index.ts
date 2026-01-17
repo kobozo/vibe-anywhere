@@ -12,6 +12,7 @@ import { GitHandler } from './git-handler.js';
 import { StatsHandler } from './stats-handler.js';
 import { TailscaleHandler } from './tailscale-handler.js';
 import { ChromeProxyHandler } from './chrome-proxy-handler.js';
+import { MCPReverseProxy } from './mcp-reverse-proxy.js';
 import { AgentIpcServer } from './ipc-server.js';
 import { CliInstaller } from './cli-installer.js';
 import * as fs from 'fs';
@@ -48,6 +49,7 @@ const gitHandler = new GitHandler('/workspace');
 const statsHandler = new StatsHandler();
 const tailscaleHandler = new TailscaleHandler();
 const chromeProxyHandler = new ChromeProxyHandler();
+const mcpReverseProxy = new MCPReverseProxy();
 
 const tmuxManager = new TmuxManager(
   config.workspaceId,
@@ -464,6 +466,17 @@ try {
   // Continue - IPC server is optional
 }
 
+// Start MCP Reverse Proxy for Chrome extension
+try {
+  mcpReverseProxy.start().catch(error => {
+    console.error('Failed to start MCP reverse proxy:', error);
+    // Continue without reverse proxy - Chrome extension won't work but agent can still function
+  });
+} catch (error) {
+  console.error('Failed to initialize MCP reverse proxy:', error);
+  // Continue - MCP reverse proxy is optional
+}
+
 // Initialize CLI installer (wrapped in try-catch to prevent startup failures)
 try {
   const cliInstaller = new CliInstaller({
@@ -512,6 +525,14 @@ setInterval(async () => {
   const windows = tmuxManager.getWindowStatus();
   const tailscaleStatus = await tailscaleHandler.getStatus();
   const chromeStatus = await checkChromeStatus();
+
+  // Debug logging
+  if (tailscaleStatus) {
+    console.log(`[Heartbeat] Tailscale status: online=${tailscaleStatus.online}, IP=${tailscaleStatus.tailscaleIP}, peers=${tailscaleStatus.peerCount}`);
+  } else {
+    console.log('[Heartbeat] Tailscale status: null (not connected or error)');
+  }
+
   wsClient.sendHeartbeat(
     windows.map(w => ({
       tabId: w.tabId,

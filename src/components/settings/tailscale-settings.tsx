@@ -203,6 +203,230 @@ export function TailscaleSettings({ onSettingsChange }: TailscaleSettingsProps) 
         </div>
       )}
 
+      {/* Chrome MCP Scripts */}
+      {isConfigured && (
+        <div className="mt-6 space-y-4">
+          <h4 className="text-sm font-medium text-foreground">Chrome Browser Control Scripts</h4>
+
+          {/* Mac Bridge Script */}
+          <div className="p-4 bg-background-tertiary/20 rounded space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h5 className="text-sm font-medium text-foreground">Mac Bridge Server</h5>
+                <p className="text-xs text-foreground-tertiary">Run on your Mac to forward Chrome extension to workspace</p>
+              </div>
+              <button
+                onClick={() => {
+                  const script = `#!/usr/bin/env node
+/**
+ * Claude Code Chrome MCP Bridge Server
+ */
+
+import net from 'net';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import os from 'os';
+import fs from 'fs';
+
+const execAsync = promisify(exec);
+const TCP_PORT = 19222;
+const connections = new Set();
+const PLATFORM = os.platform();
+const user = process.env.USER || process.env.USERNAME || os.userInfo().username;
+
+function getSocketPath() {
+  if (PLATFORM === 'win32') {
+    return \`\\\\\\\\.\\\\pipe\\\\claude-mcp-browser-bridge-\${user}\`;
+  } else if (PLATFORM === 'darwin') {
+    const tmpdir = process.env.TMPDIR || '/tmp/';
+    return \`\${tmpdir}claude-mcp-browser-bridge-\${user}\`;
+  } else {
+    return \`/tmp/claude-mcp-browser-bridge-\${user}\`;
+  }
+}
+
+const SOCKET_PATH = getSocketPath();
+
+async function getTailscaleIP() {
+  if (process.env.TAILSCALE_IP) return process.env.TAILSCALE_IP;
+  const paths = ['tailscale', '/usr/bin/tailscale', '/usr/local/bin/tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale'];
+  for (const path of paths) {
+    try {
+      const { stdout } = await execAsync(\`"\${path}" ip -4\`);
+      return stdout.trim();
+    } catch { continue; }
+  }
+  console.error('Failed to get Tailscale IP');
+  process.exit(1);
+}
+
+async function startBridge() {
+  const tailscaleIP = await getTailscaleIP();
+  console.log('='.repeat(60));
+  console.log('Claude Code Chrome MCP Bridge Server');
+  console.log('='.repeat(60));
+  console.log(\`Platform: \${PLATFORM}\`);
+  console.log(\`User: \${user}\`);
+  console.log(\`Tailscale IP: \${tailscaleIP}\`);
+  console.log(\`TCP Port: \${TCP_PORT}\`);
+  console.log(\`Socket: \${SOCKET_PATH}\`);
+  console.log('='.repeat(60));
+
+  const server = net.createServer((clientSocket) => {
+    const clientId = \`\${clientSocket.remoteAddress}:\${clientSocket.remotePort}\`;
+    console.log(\`[\${new Date().toISOString()}] Client connected: \${clientId}\`);
+    connections.add(clientSocket);
+    const unixSocket = net.connect(SOCKET_PATH);
+    unixSocket.on('connect', () => console.log(\`[\${new Date().toISOString()}] Connected to MCP bridge socket\`));
+
+    clientSocket.on('data', async (data) => {
+      const message = data.toString();
+      if (message.includes('"type":"version"')) {
+        console.log(\`[\${new Date().toISOString()}] Version query received\`);
+        try {
+          let chromeVersion = '';
+          if (PLATFORM === 'darwin') {
+            const { stdout } = await execAsync('/Applications/Google\\\\ Chrome.app/Contents/MacOS/Google\\\\ Chrome --version');
+            chromeVersion = stdout.trim();
+          } else if (PLATFORM === 'linux') {
+            try { const { stdout } = await execAsync('google-chrome --version'); chromeVersion = stdout.trim(); }
+            catch { const { stdout } = await execAsync('chromium-browser --version'); chromeVersion = stdout.trim(); }
+          } else if (PLATFORM === 'win32') {
+            const { stdout } = await execAsync('"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe" --version');
+            chromeVersion = stdout.trim();
+          }
+          console.log(\`[\${new Date().toISOString()}] Chrome version: \${chromeVersion}\`);
+          clientSocket.write(chromeVersion);
+        } catch (error) {
+          console.error(\`[\${new Date().toISOString()}] Failed to get Chrome version:\`, error.message);
+          clientSocket.write('Error: Could not get Chrome version');
+        }
+        return;
+      }
+      unixSocket.write(data);
+    });
+
+    unixSocket.on('data', (data) => clientSocket.write(data));
+    const cleanup = () => { connections.delete(clientSocket); clientSocket.destroy(); unixSocket.destroy(); console.log(\`[\${new Date().toISOString()}] Client disconnected: \${clientId}\`); };
+    clientSocket.on('error', (err) => { console.error(\`[\${new Date().toISOString()}] Client socket error:\`, err.message); cleanup(); });
+    unixSocket.on('error', (err) => { console.error(\`[\${new Date().toISOString()}] Unix socket error:\`, err.message); if (err.code === 'ENOENT') console.error('\\n⚠️  MCP bridge socket not found. Is Claude Code running with --chrome?'); cleanup(); });
+    clientSocket.on('end', cleanup);
+    unixSocket.on('end', cleanup);
+  });
+
+  server.listen(TCP_PORT, '0.0.0.0', () => {
+    console.log(\`\\n✓ Bridge server listening on 0.0.0.0:\${TCP_PORT}\`);
+    console.log(\`\\nRemote containers can now connect via: \${tailscaleIP}:\${TCP_PORT}\`);
+    console.log('\\nPress Ctrl+C to stop the bridge server.\\n');
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(\`\\n❌ Port \${TCP_PORT} is already in use.\`);
+      console.error('Another bridge server may already be running.\\n');
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+      process.exit(1);
+    }
+  });
+
+  process.on('SIGINT', () => {
+    console.log('\\n\\nShutting down bridge server...');
+    for (const socket of connections) socket.destroy();
+    connections.clear();
+    server.close(() => { console.log('Bridge server stopped.'); process.exit(0); });
+  });
+}
+
+startBridge().catch(err => { console.error('Failed to start bridge server:', err); process.exit(1); });`;
+                  navigator.clipboard.writeText(script);
+                  alert('Bridge script copied to clipboard!');
+                }}
+                className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-foreground"
+              >
+                Copy Script
+              </button>
+            </div>
+            <p className="text-xs text-foreground-tertiary">
+              Save as <code className="px-1 py-0.5 bg-background-tertiary rounded">chrome-bridge.js</code>, then run: <code className="px-1 py-0.5 bg-background-tertiary rounded">node chrome-bridge.js</code>
+            </p>
+          </div>
+
+          {/* Chrome Native Host Script */}
+          <div className="p-4 bg-background-tertiary/20 rounded space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h5 className="text-sm font-medium text-foreground">Chrome Native Host</h5>
+                <p className="text-xs text-foreground-tertiary">Connects Chrome extension to remote workspace</p>
+              </div>
+              <button
+                onClick={() => {
+                  // Get workspace IP from somewhere - we'll need to pass this as a prop or fetch it
+                  const script = `#!/usr/bin/env node
+/**
+ * Chrome Native Host for Mac
+ * Connects to Claude Code MCP socket in remote workspace via Tailscale
+ */
+
+const net = require('net');
+
+// TODO: Replace with your workspace Tailscale IP from workspace settings
+const WORKSPACE_HOST = 'YOUR_WORKSPACE_TAILSCALE_IP';
+const WORKSPACE_PORT = 19223;
+
+const socket = net.connect(WORKSPACE_PORT, WORKSPACE_HOST);
+
+socket.on('connect', () => {
+  console.error('[Native Host] Connected to workspace Claude Code via Tailscale');
+});
+
+socket.on('data', (data) => process.stdout.write(data));
+process.stdin.on('data', (data) => socket.write(data));
+
+socket.on('error', (err) => {
+  console.error('[Native Host] Socket error:', err.message);
+  process.exit(1);
+});
+
+socket.on('end', () => {
+  console.error('[Native Host] Connection closed');
+  process.exit(0);
+});
+
+process.stdin.on('end', () => socket.end());`;
+                  navigator.clipboard.writeText(script);
+                  alert('Native host script copied! Remember to replace YOUR_WORKSPACE_TAILSCALE_IP with your workspace Tailscale IP.');
+                }}
+                className="px-3 py-1.5 bg-primary hover:bg-primary-hover rounded text-sm text-foreground"
+              >
+                Copy Script
+              </button>
+            </div>
+            <p className="text-xs text-foreground-tertiary">
+              Replace <code className="px-1 py-0.5 bg-background-tertiary rounded">chrome-native-host</code> in your Chrome native messaging directory
+            </p>
+            <p className="text-xs text-foreground-tertiary">
+              Location: <code className="px-1 py-0.5 bg-background-tertiary rounded">~/Library/Application Support/Google/Chrome/NativeMessagingHosts/</code>
+            </p>
+          </div>
+
+          <div className="p-3 bg-background-tertiary/10 rounded">
+            <p className="text-xs text-foreground-tertiary">
+              📖 Full setup guide:{' '}
+              <a
+                href="https://github.com/your-repo/vibe-anywhere/blob/main/docs/chrome-proxy.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary-hover underline"
+              >
+                docs/chrome-proxy.md
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Instructions */}
       <div className="mt-6 p-4 bg-background-tertiary/20 rounded">
         <h4 className="text-sm font-medium text-foreground mb-2">How to set up Tailscale:</h4>

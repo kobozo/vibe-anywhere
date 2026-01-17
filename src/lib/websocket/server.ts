@@ -721,6 +721,28 @@ function setupAgentNamespace(io: SocketServer): void {
           recoveryMode: result.needsUpdate === false, // Only recovery if not updating
         });
 
+        // Restore Chrome host configuration from database
+        try {
+          const { db } = await import('@/lib/db');
+          const { workspaces } = await import('@/lib/db/schema');
+          const { eq } = await import('drizzle-orm');
+
+          const [workspace] = await db
+            .select({ chromeTailscaleHost: workspaces.chromeTailscaleHost })
+            .from(workspaces)
+            .where(eq(workspaces.id, data.workspaceId))
+            .limit(1);
+
+          if (workspace?.chromeTailscaleHost) {
+            console.log(`[Agent Registration] Restoring Chrome host for workspace ${data.workspaceId}: ${workspace.chromeTailscaleHost}`);
+            // Send chrome:host-update to agent to restore configuration
+            agentRegistry.emit(data.workspaceId, 'chrome:host-update', { chromeHost: workspace.chromeTailscaleHost });
+          }
+        } catch (error) {
+          console.error('Failed to restore Chrome host configuration:', error);
+          // Non-fatal error - continue with registration
+        }
+
         // If agent needs update, send update request
         if (result.needsUpdate) {
           const bundleUrl = `${process.env.SESSION_HUB_URL || 'http://localhost:3000'}/api/agent/bundle`;
@@ -745,6 +767,14 @@ function setupAgentNamespace(io: SocketServer): void {
       metrics?: unknown
     }) => {
       if (socket.workspaceId && socket.workspaceId === data.workspaceId) {
+        // Debug logging to see what we're receiving
+        console.log(`[Heartbeat] Received for ${data.workspaceId}: tailscale=${data.tailscaleStatus ? 'present' : data.tailscaleStatus === null ? 'null' : 'undefined'}, chrome=${data.chromeStatus ? 'present' : data.chromeStatus === null ? 'null' : 'undefined'}`);
+        if (data.tailscaleStatus) {
+          console.log(`[Heartbeat] Tailscale data:`, JSON.stringify(data.tailscaleStatus));
+        }
+        if (data.chromeStatus) {
+          console.log(`[Heartbeat] Chrome data:`, JSON.stringify(data.chromeStatus));
+        }
         await agentRegistry.heartbeat(data.workspaceId, data.tabs, data.tailscaleStatus, data.chromeStatus);
       }
     });

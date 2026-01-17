@@ -48,7 +48,7 @@ interface ConnectedAgent {
 }
 
 // Expected agent version (agents older than this will be asked to update)
-const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '3.1.5';
+const EXPECTED_AGENT_VERSION = process.env.AGENT_VERSION || '3.2.6';
 
 class AgentRegistry {
   private agents: Map<string, ConnectedAgent> = new Map();
@@ -218,17 +218,22 @@ class AgentRegistry {
     chromeStatus?: ChromeStatus | null
   ): Promise<void> {
     const agent = this.agents.get(workspaceId);
-    if (!agent) return;
+    if (!agent) {
+      console.log(`[AgentRegistry] No agent found for workspace ${workspaceId} in heartbeat`);
+      return;
+    }
 
     agent.lastHeartbeat = new Date();
 
     // Update Tailscale status if provided
     if (tailscaleStatus !== undefined) {
+      console.log(`[AgentRegistry] Updating Tailscale status for ${workspaceId}:`, tailscaleStatus ? `online=${tailscaleStatus.online}, IP=${tailscaleStatus.tailscaleIP}` : 'null');
       agent.tailscaleStatus = tailscaleStatus;
     }
 
     // Update Chrome connection status if provided
     if (chromeStatus !== undefined) {
+      console.log(`[AgentRegistry] Updating Chrome status for ${workspaceId}:`, chromeStatus ? `connected=${chromeStatus.connected}, host=${chromeStatus.chromeHost}` : 'null');
       agent.chromeStatus = chromeStatus;
     }
 

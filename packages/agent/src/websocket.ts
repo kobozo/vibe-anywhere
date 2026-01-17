@@ -104,12 +104,12 @@ export class AgentWebSocket {
       });
 
       this.events.onConnected();
-      this.startHeartbeat();
+      // Don't start internal heartbeat - we have a proper one in index.ts that includes status
+      // this.startHeartbeat();
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log(`Disconnected from Vibe Anywhere: ${reason}`);
-      this.stopHeartbeat();
       this.events.onDisconnected(reason);
 
       if (this.shouldReconnect) {
@@ -357,7 +357,8 @@ export class AgentWebSocket {
     this.socket.emit('agent:heartbeat', {
       workspaceId: this.config.workspaceId,
       tabs: tabs || [],
-      tailscaleStatus: tailscaleStatus || null,
+      // IMPORTANT: Don't convert undefined to null - undefined means "don't update"
+      tailscaleStatus,
       chromeStatus,
       metrics: {
         uptime: process.uptime(),

@@ -18,9 +18,11 @@ export class SocketProxyHandler {
   private connections = new Set<net.Socket>();
 
   constructor() {
-    // Socket path for Claude Code MCP browser bridge
+    // Socket path for Vibe Anywhere Chrome proxy
+    // NOTE: This is different from Claude Code's MCP socket (/tmp/claude-mcp-browser-bridge-${user})
+    // to avoid conflicts when Claude Code runs in the workspace
     const user = process.env.USER || 'kobozo';
-    this.localSocketPath = `/tmp/claude-mcp-browser-bridge-${user}`;
+    this.localSocketPath = `/tmp/vibe-anywhere-chrome-proxy-${user}`;
   }
 
   /**
