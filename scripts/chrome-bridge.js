@@ -59,14 +59,53 @@ const SOCKET_PATH = getSocketPath();
  * Get Tailscale IP address
  */
 async function getTailscaleIP() {
-  try {
-    const { stdout } = await execAsync('tailscale ip -4');
-    return stdout.trim();
-  } catch (error) {
-    console.error('Failed to get Tailscale IP. Is Tailscale running?');
-    console.error('Run: tailscale status');
-    process.exit(1);
+  // Check if manually specified via environment variable
+  if (process.env.TAILSCALE_IP) {
+    console.log(`Using Tailscale IP from environment: ${process.env.TAILSCALE_IP}`);
+    return process.env.TAILSCALE_IP;
   }
+
+  // Try different Tailscale CLI locations
+  const tailscalePaths = [
+    'tailscale', // In PATH
+    '/usr/bin/tailscale', // Linux
+    '/usr/local/bin/tailscale', // Homebrew on Mac
+    '/Applications/Tailscale.app/Contents/MacOS/Tailscale', // Mac GUI app
+  ];
+
+  for (const tailscalePath of tailscalePaths) {
+    try {
+      const { stdout } = await execAsync(`"${tailscalePath}" ip -4`);
+      return stdout.trim();
+    } catch (error) {
+      // Try next path
+      continue;
+    }
+  }
+
+  // If all attempts failed, show helpful error
+  console.error('Failed to get Tailscale IP. Is Tailscale running?');
+  console.error('\nTroubleshooting:');
+  console.error('1. Check Tailscale is running:');
+  if (PLATFORM === 'darwin') {
+    console.error('   /Applications/Tailscale.app/Contents/MacOS/Tailscale status');
+  } else if (PLATFORM === 'win32') {
+    console.error('   tailscale status');
+  } else {
+    console.error('   tailscale status');
+  }
+  console.error('2. Verify you have a Tailscale IP:');
+  if (PLATFORM === 'darwin') {
+    console.error('   /Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4');
+  } else if (PLATFORM === 'win32') {
+    console.error('   tailscale ip -4');
+  } else {
+    console.error('   tailscale ip -4');
+  }
+  console.error('\n3. Or manually specify your Tailscale IP:');
+  console.error('   Set TAILSCALE_IP environment variable:');
+  console.error('   TAILSCALE_IP=100.x.x.x node chrome-bridge.js');
+  process.exit(1);
 }
 
 /**
