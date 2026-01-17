@@ -70,7 +70,9 @@ Every change to the agent requires a version bump. The server detects outdated a
 **Files to update:**
 1. `packages/agent/package.json` - bump `version` field
 2. `packages/vibe-anywhere-cli/package.json` - bump `version` field (keep in sync)
-3. `src/lib/services/agent-registry.ts` - update `EXPECTED_AGENT_VERSION`
+3. `packages/agent/src/config.ts` - update hardcoded version in `getPackageVersion()` function
+4. `src/lib/services/agent-registry.ts` - update `EXPECTED_AGENT_VERSION`
+5. `src/app/api/agent/bundle/route.ts` - update `AGENT_VERSION` constant
 
 **Build process:**
 ```bash
@@ -289,6 +291,7 @@ The Proxmox LXC template contains:
 - Claude Code CLI
 - GitHub CLI (gh)
 - Python, Rust, Go, etc.
+- **Tailscale VPN** (requires TUN device - see below)
 
 ### Container User
 | Setting | Value |
@@ -303,6 +306,36 @@ The Proxmox LXC template contains:
 ### Network
 - Containers get DHCP IP on VLAN 2 (192.168.3.x)
 - SSH enabled for rsync sync operations
+
+### Tailscale VPN Configuration (LXC Containers)
+
+**IMPORTANT**: LXC containers need special configuration to use Tailscale VPN. The TUN device must be enabled in the container configuration.
+
+**Automated Configuration:**
+When you select the `tailscale-vpn` tech stack during template/workspace creation, Vibe Anywhere **automatically**:
+1. Adds TUN device access to the LXC configuration (`/etc/pve/lxc/VMID.conf`)
+2. Reboots the container to apply the changes
+3. Installs Tailscale and enables the daemon
+
+**No manual Proxmox steps required!**
+
+**Technical Details:**
+The following LXC configuration is automatically added when Tailscale is selected:
+```bash
+# Tailscale/VPN TUN device support
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+```
+
+**Why this is needed:**
+- LXC containers are isolated and don't have direct access to `/dev/net/tun` by default
+- VPN software (Tailscale, WireGuard, OpenVPN) requires TUN/TAP devices for networking
+- The config changes grant the container access to the host's TUN device
+
+**Implementation:**
+- File: `src/lib/container/backends/proxmox-backend.ts`
+- Method: `configureTunDevice()` (called automatically during tech stack installation)
+- Process: SSH to Proxmox host → Modify LXC config → Reboot container
 
 ## Release and Versioning Strategy
 
@@ -434,9 +467,11 @@ git push origin --delete hotfix/v1.0.1
 **When Agent Changes:**
 1. Update `packages/agent/package.json`
 2. Update `packages/vibe-anywhere-cli/package.json` (same version)
-3. Update `src/lib/services/agent-registry.ts` (`EXPECTED_AGENT_VERSION`)
-4. Rebuild agent: `cd packages/agent && npm run bundle`
-5. Include agent update in main release notes
+3. Update `packages/agent/src/config.ts` (`getPackageVersion()` function)
+4. Update `src/lib/services/agent-registry.ts` (`EXPECTED_AGENT_VERSION`)
+5. Update `src/app/api/agent/bundle/route.ts` (`AGENT_VERSION` constant)
+6. Rebuild agent: `cd packages/agent && npm run bundle`
+7. Include agent update in main release notes
 
 ### Release Checklist Reference
 

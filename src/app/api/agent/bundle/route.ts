@@ -7,7 +7,7 @@ const AGENT_BUNDLE_PATH = process.env.AGENT_BUNDLE_PATH ||
   path.join(process.cwd(), 'packages', 'agent', 'agent-bundle.tar.gz');
 
 // Expected agent version
-const AGENT_VERSION = process.env.AGENT_VERSION || '3.1.0';
+const AGENT_VERSION = process.env.AGENT_VERSION || '3.1.1';
 
 /**
  * GET /api/agent/bundle

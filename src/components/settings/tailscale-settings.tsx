@@ -218,7 +218,7 @@ export function TailscaleSettings({ onSettingsChange }: TailscaleSettingsProps) 
               Tailscale Admin Console
             </a>
           </li>
-          <li>Grant the OAuth client <kbd className="px-1 py-0.5 bg-background-tertiary rounded text-foreground">devices:write</kbd> permission</li>
+          <li>Grant the OAuth client <kbd className="px-1 py-0.5 bg-background-tertiary rounded text-foreground">Write</kbd> permission for <kbd className="px-1 py-0.5 bg-background-tertiary rounded text-foreground">Devices</kbd></li>
           <li>Copy the generated OAuth token (starts with <code className="px-1 py-0.5 bg-background-tertiary rounded text-foreground">tskey-</code>)</li>
           <li>Paste it above and click Test to verify, then Save</li>
           <li>

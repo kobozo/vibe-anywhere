@@ -84,6 +84,12 @@ export class TailscaleService {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[TailscaleService] Tailscale API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+          requestBody,
+        });
         throw new Error(`Tailscale API error (${response.status}): ${errorText}`);
       }
 

@@ -34,10 +34,9 @@ export const POST = withErrorHandling(async (request: NextRequest, context: unkn
       );
     }
 
-    // Generate ephemeral auth key with workspace tag
-    const authKeyData = await tailscaleService.generateEphemeralAuthKey([
-      `workspace:${workspaceId}`,
-    ]);
+    // Generate ephemeral auth key without tags
+    // Tags require ACL configuration in Tailscale, so we omit them for simplicity
+    const authKeyData = await tailscaleService.generateEphemeralAuthKey();
 
     return successResponse({
       authKey: authKeyData.key,

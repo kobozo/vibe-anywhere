@@ -525,9 +525,29 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       }
     });
 
-    socket.on('tailscale:connect', async (data: { requestId: string; workspaceId: string; authKey: string }) => {
+    socket.on('tailscale:connect', async (data: { requestId: string; workspaceId: string }) => {
       try {
         const agentRegistry = getAgentRegistry();
+
+        // Generate ephemeral auth key server-side
+        const { getTailscaleService } = await import('@/lib/services/tailscale-service');
+        const tailscaleService = getTailscaleService();
+        await tailscaleService.loadOAuthToken();
+
+        if (!tailscaleService.isConfigured()) {
+          socket.emit('tailscale:connect:response', {
+            requestId: data.requestId,
+            success: false,
+            error: 'Tailscale not configured. Please add OAuth token in Settings.',
+          });
+          return;
+        }
+
+        // Generate auth key
+        console.log(`[Tailscale] Generating ephemeral auth key for workspace ${data.workspaceId}`);
+        const authKeyData = await tailscaleService.generateEphemeralAuthKey();
+        console.log(`[Tailscale] Auth key generated, expires at ${authKeyData.expiresAt}`);
+
         const timeout = setTimeout(() => {
           socket.emit('tailscale:connect:response', { requestId: data.requestId, success: false, error: 'Operation timeout' });
           pendingTailscaleOperations.delete(data.requestId);
@@ -535,13 +555,15 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
 
         pendingTailscaleOperations.set(data.requestId, { socket, timeoutId: timeout });
 
-        const sent = agentRegistry.tailscaleConnect(data.workspaceId, data.requestId, data.authKey);
+        // Send to agent with auth key
+        const sent = agentRegistry.tailscaleConnect(data.workspaceId, data.requestId, authKeyData.key);
         if (!sent) {
           clearTimeout(timeout);
           pendingTailscaleOperations.delete(data.requestId);
           socket.emit('tailscale:connect:response', { requestId: data.requestId, success: false, error: 'Agent not connected' });
         }
       } catch (error) {
+        console.error('[Tailscale] Failed to generate auth key or send to agent:', error);
         socket.emit('tailscale:connect:response', {
           requestId: data.requestId,
           success: false,
@@ -903,11 +925,14 @@ function setupAgentNamespace(io: SocketServer): void {
     });
 
     socket.on('tailscale:connect:response', (data: { requestId: string; success: boolean; error?: string }) => {
+      console.log('[Tailscale] Agent response:', JSON.stringify(data, null, 2));
       const pending = pendingTailscaleOperations.get(data.requestId);
       if (pending) {
         clearTimeout(pending.timeoutId);
         pending.socket.emit('tailscale:connect:response', data);
         pendingTailscaleOperations.delete(data.requestId);
+      } else {
+        console.warn('[Tailscale] Received response for unknown request:', data.requestId);
       }
     });
 

@@ -100,6 +100,7 @@ export class TailscaleHandler {
       // Run tailscale up with the auth key
       // --accept-routes allows accessing subnet routes advertised by peers
       // --authkey authenticates the device
+      console.log('[Tailscale] Running: tailscale up --authkey=<redacted> --accept-routes');
       const { stdout, stderr } = await execAsync(
         `tailscale up --authkey=${authKey} --accept-routes`,
         {
@@ -107,37 +108,51 @@ export class TailscaleHandler {
         }
       );
 
+      console.log('[Tailscale] stdout:', stdout);
+      if (stderr) {
+        console.log('[Tailscale] stderr:', stderr);
+      }
+
       // Check if connection was successful
       const connected = await this.isConnected();
       if (!connected) {
+        const errorMsg = stderr || stdout || 'Failed to connect to Tailscale';
+        console.error('[Tailscale] Connection check failed:', errorMsg);
         return {
           success: false,
-          error: stderr || 'Failed to connect to Tailscale',
+          error: errorMsg,
         };
       }
 
+      console.log('[Tailscale] Successfully connected');
       return { success: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      // Capture the actual error from exec
+      const execError = error as any;
+      const stderr = execError.stderr || '';
+      const stdout = execError.stdout || '';
+      const message = execError.message || String(error);
 
-      // Provide helpful error messages
+      console.error('[Tailscale] Connection failed:', {
+        message,
+        stdout,
+        stderr,
+      });
+
+      // Return the actual Tailscale error message, not a generic one
+      const actualError = stderr || stdout || message;
+
+      // Provide helpful error messages based on actual error
       if (message.includes('timeout')) {
         return {
           success: false,
-          error: 'Connection timeout. Check network connectivity.',
-        };
-      }
-
-      if (message.includes('authentication') || message.includes('auth')) {
-        return {
-          success: false,
-          error: 'Authentication failed. Check your auth key.',
+          error: `Connection timeout. Check network connectivity. Details: ${actualError}`,
         };
       }
 
       return {
         success: false,
-        error: `Failed to connect: ${message}`,
+        error: `Tailscale error: ${actualError}`,
       };
     }
   }

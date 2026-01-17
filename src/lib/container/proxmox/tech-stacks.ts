@@ -35,6 +35,9 @@ curl -fsSL https://tailscale.com/install.sh | sh
 systemctl enable tailscaled
 systemctl start tailscaled
 
+# Set kobozo user as Tailscale operator (allows non-root Tailscale commands)
+sudo tailscale set --operator=kobozo
+
 # Authenticate with Tailscale using ephemeral auth key from environment variable
 # Note: TAILSCALE_AUTHKEY is injected by Vibe Anywhere during container startup
 if [ -n "$TAILSCALE_AUTHKEY" ]; then

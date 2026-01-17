@@ -871,6 +871,38 @@ DNSEOF
   }
 
   /**
+   * Configure TUN device for VPN support (Tailscale, WireGuard, etc.)
+   * This must be done BEFORE the container starts
+   */
+  private async configureTunDevice(vmid: number): Promise<void> {
+    const cfg = await this.getRuntimeConfig();
+
+    console.log(`[TUN Device] Configuring TUN device for container ${vmid}...`);
+
+    try {
+      // SSH to Proxmox host and add TUN device configuration to LXC config
+      const { execSync } = await import('child_process');
+      const sshCommand = `ssh -o StrictHostKeyChecking=no root@${cfg.host} "
+        # Check if TUN device config already exists
+        if ! grep -q 'lxc.cgroup2.devices.allow: c 10:200 rwm' /etc/pve/lxc/${vmid}.conf; then
+          echo '# Tailscale/VPN TUN device support' >> /etc/pve/lxc/${vmid}.conf
+          echo 'lxc.cgroup2.devices.allow: c 10:200 rwm' >> /etc/pve/lxc/${vmid}.conf
+          echo 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' >> /etc/pve/lxc/${vmid}.conf
+          echo 'TUN device configured for container ${vmid}'
+        else
+          echo 'TUN device already configured for container ${vmid}'
+        fi
+      "`;
+
+      execSync(sshCommand, { encoding: 'utf-8', stdio: 'inherit' });
+      console.log(`[TUN Device] ✓ TUN device configured for container ${vmid}`);
+    } catch (error) {
+      console.error(`[TUN Device] Failed to configure TUN device for container ${vmid}:`, error);
+      throw new Error(`TUN device configuration failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Install tech stacks in a running container
    * Used to install required tech stacks that aren't pre-installed in the template
    */
@@ -887,6 +919,32 @@ DNSEOF
     if (stacks.length === 0) {
       console.log(`No valid tech stacks found for IDs: ${techStackIds.join(', ')}`);
       return;
+    }
+
+    // Check if Tailscale VPN is in the tech stacks and configure TUN device if needed
+    const needsTunDevice = techStackIds.includes('tailscale-vpn');
+    if (needsTunDevice) {
+      console.log(`Tailscale VPN detected - configuring TUN device before installation...`);
+      try {
+        await this.configureTunDevice(vmid);
+
+        // Reboot container to apply TUN device configuration
+        console.log(`Rebooting container ${vmid} to apply TUN device configuration...`);
+        const rebootUpid = await client.rebootLxc(vmid);
+        await pollTaskUntilComplete(client, rebootUpid, { timeoutMs: 60000 });
+
+        // Wait for container to be running again
+        await waitForContainerRunning(client, vmid);
+
+        // Wait for IP to be available again
+        const ip = await waitForContainerIp(client, vmid, { timeoutMs: 30000 });
+        this.containerIps.set(containerId, ip);
+
+        console.log(`Container ${vmid} rebooted successfully with TUN device enabled`);
+      } catch (error) {
+        console.error(`Failed to configure TUN device for container ${vmid}:`, error);
+        throw new Error(`TUN device configuration failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
 
     // Get container IP

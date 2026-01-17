@@ -172,6 +172,7 @@ export function TemplateDialog({
   // Get stacks by category
   const runtimeStacks = useMemo(() => getStacksByCategory('runtime'), []);
   const aiStacks = useMemo(() => getStacksByCategory('ai-assistant'), []);
+  const networkStacks = useMemo(() => getStacksByCategory('network'), []);
 
   // Check if a stack is locked (has dependents that are selected)
   const getLockedDependents = useCallback((stackId: string): string[] => {
@@ -386,7 +387,7 @@ export function TemplateDialog({
 
   if (!isOpen) return null;
 
-  const currentStacks = activeTab === 'runtime' ? runtimeStacks : aiStacks;
+  const currentStacks = activeTab === 'runtime' ? runtimeStacks : activeTab === 'ai-assistant' ? aiStacks : networkStacks;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -655,6 +656,17 @@ export function TemplateDialog({
                   }`}
                 >
                   AI Assistants
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('network')}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === 'network'
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-foreground-secondary hover:text-foreground'
+                  }`}
+                >
+                  Network
                 </button>
               </div>
 

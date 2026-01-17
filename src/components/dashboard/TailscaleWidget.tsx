@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { io } from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from '@/hooks/useAuth';
+import { useSocket } from '@/hooks/useSocket';
 
 interface TailscaleStatus {
   online: boolean;
@@ -38,6 +39,8 @@ export function TailscaleWidget({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { token } = useAuth();
+  const { socket, isConnected: isSocketConnected } = useSocket({ token });
 
   const handleConnect = async () => {
     if (!isTailscaleConfigured) {
@@ -45,42 +48,32 @@ export function TailscaleWidget({
       return;
     }
 
+    if (!socket || !isSocketConnected) {
+      setError('WebSocket not connected. Please refresh the page.');
+      return;
+    }
+
     setIsConnecting(true);
     setError(null);
 
     try {
-      // First, generate an ephemeral auth key from the server
-      const keyResponse = await fetch(`/api/workspaces/${workspaceId}/tailscale/auth-key`, {
-        method: 'POST',
-      });
-
-      if (!keyResponse.ok) {
-        const errorData = await keyResponse.json();
-        throw new Error(errorData.error?.message || 'Failed to generate auth key');
-      }
-
-      const { data } = await keyResponse.json();
-      const authKey = data.authKey;
-
-      // Connect to WebSocket and request Tailscale connection
-      const socket = io('/');
+      // Send connect request to server via WebSocket
+      // Auth key generation happens server-side
       const requestId = uuidv4();
 
       const result = await new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          socket.disconnect();
           reject(new Error('Connection timeout'));
         }, 30000);
 
         socket.once(`tailscale:connect:response`, (response: { requestId: string; success: boolean; error?: string }) => {
           if (response.requestId === requestId) {
             clearTimeout(timeout);
-            socket.disconnect();
             resolve({ success: response.success, error: response.error });
           }
         });
 
-        socket.emit('tailscale:connect', { requestId, workspaceId, authKey });
+        socket.emit('tailscale:connect', { requestId, workspaceId });
       });
 
       if (!result.success) {
@@ -94,23 +87,25 @@ export function TailscaleWidget({
   };
 
   const handleDisconnect = async () => {
+    if (!socket || !isSocketConnected) {
+      setError('WebSocket not connected. Please refresh the page.');
+      return;
+    }
+
     setIsDisconnecting(true);
     setError(null);
 
     try {
-      const socket = io('/');
       const requestId = uuidv4();
 
       const result = await new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          socket.disconnect();
           reject(new Error('Disconnection timeout'));
         }, 30000);
 
         socket.once(`tailscale:disconnect:response`, (response: { requestId: string; success: boolean; error?: string }) => {
           if (response.requestId === requestId) {
             clearTimeout(timeout);
-            socket.disconnect();
             resolve({ success: response.success, error: response.error });
           }
         });
@@ -129,13 +124,14 @@ export function TailscaleWidget({
   };
 
   const handleRefreshStatus = async () => {
+    if (!socket || !isSocketConnected) {
+      return;
+    }
+
     // Trigger a refresh by requesting status from agent
     try {
-      const socket = io('/');
       const requestId = uuidv4();
-
       socket.emit('tailscale:status', { requestId, workspaceId });
-      socket.disconnect();
     } catch (err) {
       console.error('Failed to refresh status:', err);
     }

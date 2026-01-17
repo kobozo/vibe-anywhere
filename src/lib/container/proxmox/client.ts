@@ -190,6 +190,15 @@ export class ProxmoxClient {
   }
 
   /**
+   * Reboot an LXC container
+   */
+  async rebootLxc(vmid: number, timeout = 30): Promise<string> {
+    return await this.proxmox.nodes.$(this.node).lxc.$(vmid).status.reboot.$post({
+      timeout,
+    });
+  }
+
+  /**
    * Delete an LXC container
    */
   async deleteLxc(vmid: number, purge = true): Promise<string> {
