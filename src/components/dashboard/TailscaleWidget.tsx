@@ -27,6 +27,7 @@ interface TailscaleStatus {
 interface ChromeStatus {
   connected: boolean;
   chromeHost: string | null;
+  socketProxyRunning?: boolean;
   lastActivity: string;
 }
 
@@ -414,16 +415,26 @@ export function TailscaleWidget({
                 <div className="flex items-center gap-2 mb-1">
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      chromeStatus.connected ? 'bg-success' : 'bg-foreground-tertiary'
+                      chromeStatus.socketProxyRunning ? 'bg-success' : 'bg-foreground-tertiary'
                     }`}
                   />
                   <span className="text-sm font-medium text-foreground">
-                    {chromeStatus.connected ? 'Connected' : 'Not Connected'}
+                    {chromeStatus.socketProxyRunning ? 'Socket Proxy Running' : 'Socket Proxy Not Running'}
                   </span>
                 </div>
-                {chromeStatus.connected && (
+                {chromeStatus.chromeHost && (
                   <p className="text-xs text-foreground-secondary ml-4">
-                    Host: {chromeStatus.chromeHost}
+                    Proxying to: {chromeStatus.chromeHost}:19222
+                  </p>
+                )}
+                {chromeStatus.socketProxyRunning && (
+                  <p className="text-xs text-success ml-4 mt-1">
+                    ✓ Ready for claude --chrome
+                  </p>
+                )}
+                {!chromeStatus.socketProxyRunning && chromeStatus.chromeHost && (
+                  <p className="text-xs text-warning ml-4 mt-1">
+                    ⚠ Select Chrome device above to start proxy
                   </p>
                 )}
               </div>

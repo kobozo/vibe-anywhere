@@ -310,11 +310,23 @@ exit 0
   /**
    * Get Chrome connection status
    */
-  async getStatus(): Promise<{ connected: boolean; chromeHost: string | null }> {
-    const connected = await this.checkRemoteChrome();
+  async getStatus(): Promise<{ connected: boolean; chromeHost: string | null; socketProxyRunning: boolean }> {
+    // For socket proxy mode, we check if the proxy is running
+    // CDP check is less relevant since we're not using it for the actual connection
+    const socketProxyRunning = this.socketProxy.isRunning();
+
+    // Only check CDP if we want to verify Chrome is actually accessible
+    // But don't fail the status if CDP check fails - socket proxy is what matters
+    let connected = false;
+    if (this.chromeHost && socketProxyRunning) {
+      // Socket proxy is running, consider it connected
+      connected = true;
+    }
+
     return {
       connected,
       chromeHost: this.chromeHost,
+      socketProxyRunning,
     };
   }
 

@@ -21,6 +21,7 @@ interface TabState {
 interface ChromeStatus {
   connected: boolean;
   chromeHost: string | null;
+  socketProxyRunning?: boolean;
   lastActivity: string;
 }
 
