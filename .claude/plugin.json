@@ -1,0 +1,133 @@
+{
+  "name": "vibe-anywhere-dev",
+  "version": "1.0.0",
+  "description": "Specialized agents and skills for Vibe Anywhere development - comprehensive domain expertise for workspace lifecycle, APIs, agent system, git operations, templates, security, real-time features, and tab management",
+  "author": "Vibe Anywhere Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/vibe-anywhere"
+  },
+  "agents": [
+    {
+      "id": "workspace-lifecycle",
+      "name": "Workspace Lifecycle Agent",
+      "description": "Expert in workspace creation, container provisioning, template selection, and startup orchestration",
+      "file": "agents/workspace-lifecycle.md"
+    },
+    {
+      "id": "api-database",
+      "name": "API & Database Agent",
+      "description": "Expert in API endpoints, database schema, migrations, and validation",
+      "file": "agents/api-database.md"
+    },
+    {
+      "id": "agent-system",
+      "name": "Agent System Agent",
+      "description": "Expert in sidecar agent development, version management, and WebSocket protocol",
+      "file": "agents/agent-system.md"
+    },
+    {
+      "id": "git-repository",
+      "name": "Git & Repository Agent",
+      "description": "Expert in Git operations, SSH key encryption, and repository management",
+      "file": "agents/git-repository.md"
+    },
+    {
+      "id": "template-techstack",
+      "name": "Template & Tech Stack Agent",
+      "description": "Expert in Proxmox template management and tech stack definitions",
+      "file": "agents/template-techstack.md"
+    },
+    {
+      "id": "security-config",
+      "name": "Security & Configuration Agent",
+      "description": "Expert in authentication, secrets encryption, and user management",
+      "file": "agents/security-config.md"
+    },
+    {
+      "id": "realtime-integration",
+      "name": "Real-time & Integration Agent",
+      "description": "Expert in WebSocket server, state broadcasting, and external integrations",
+      "file": "agents/realtime-integration.md"
+    },
+    {
+      "id": "tab-management",
+      "name": "Tab Management Agent",
+      "description": "Expert in tab lifecycle, templates, groups, and output buffering",
+      "file": "agents/tab-management.md"
+    }
+  ],
+  "skills": [
+    {
+      "id": "workspace-dev",
+      "name": "Workspace Development",
+      "description": "Auto-triggers for workspace, container, and provisioning work",
+      "file": "skills/workspace-dev/SKILL.md",
+      "agent": "workspace-lifecycle"
+    },
+    {
+      "id": "api-dev",
+      "name": "API Development",
+      "description": "Auto-triggers for API and database work",
+      "file": "skills/api-dev/SKILL.md",
+      "agent": "api-database"
+    },
+    {
+      "id": "agent-dev",
+      "name": "Agent Development",
+      "description": "Auto-triggers for sidecar agent work",
+      "file": "skills/agent-dev/SKILL.md",
+      "agent": "agent-system"
+    },
+    {
+      "id": "git-ops",
+      "name": "Git Operations",
+      "description": "Auto-triggers for Git and SSH key work",
+      "file": "skills/git-ops/SKILL.md",
+      "agent": "git-repository"
+    },
+    {
+      "id": "template-ops",
+      "name": "Template Operations",
+      "description": "Auto-triggers for template and tech stack work",
+      "file": "skills/template-ops/SKILL.md",
+      "agent": "template-techstack"
+    },
+    {
+      "id": "security-ops",
+      "name": "Security Operations",
+      "description": "Auto-triggers for security and authentication work",
+      "file": "skills/security-ops/SKILL.md",
+      "agent": "security-config"
+    },
+    {
+      "id": "realtime-ops",
+      "name": "Real-time Operations",
+      "description": "Auto-triggers for WebSocket and integration work",
+      "file": "skills/realtime-ops/SKILL.md",
+      "agent": "realtime-integration"
+    },
+    {
+      "id": "tab-ops",
+      "name": "Tab Operations",
+      "description": "Auto-triggers for tab and terminal work",
+      "file": "skills/tab-ops/SKILL.md",
+      "agent": "tab-management"
+    }
+  ],
+  "keywords": [
+    "vibe-anywhere",
+    "workspace",
+    "container",
+    "proxmox",
+    "agent",
+    "api",
+    "database",
+    "git",
+    "template",
+    "security",
+    "websocket",
+    "tabs"
+  ]
+}

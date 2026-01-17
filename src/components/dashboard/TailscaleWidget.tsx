@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
@@ -41,6 +41,19 @@ export function TailscaleWidget({
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
   const { socket, isConnected: isSocketConnected } = useSocket({ token });
+
+  // Cache the last known good status to avoid flickering between connected/unknown
+  const lastKnownStatusRef = useRef<TailscaleStatus | null>(null);
+
+  // Update cache when we receive a valid status
+  useEffect(() => {
+    if (tailscaleStatus !== null && tailscaleStatus !== undefined) {
+      lastKnownStatusRef.current = tailscaleStatus;
+    }
+  }, [tailscaleStatus]);
+
+  // Use cached status when current status is unknown/null
+  const effectiveStatus = tailscaleStatus ?? lastKnownStatusRef.current;
 
   const handleConnect = async () => {
     if (!isTailscaleConfigured) {
@@ -150,11 +163,11 @@ export function TailscaleWidget({
     statusColor = 'bg-foreground-tertiary';
     statusText = 'Agent Offline';
     statusTitle = 'Agent is not connected';
-  } else if (tailscaleStatus?.online) {
+  } else if (effectiveStatus?.online) {
     statusColor = 'bg-success';
     statusText = 'Connected';
     statusTitle = 'Connected to Tailscale network';
-  } else if (tailscaleStatus === null) {
+  } else if (effectiveStatus === null) {
     statusColor = 'bg-foreground-tertiary';
     statusText = 'Unknown';
     statusTitle = 'Tailscale status unknown - may not be installed';
@@ -191,28 +204,28 @@ export function TailscaleWidget({
       )}
 
       {/* Network Info */}
-      {tailscaleStatus?.online && (
+      {effectiveStatus?.online && (
         <div className="space-y-2 mb-4 text-sm">
           <div className="flex justify-between">
             <span className="text-foreground-secondary">IP Address:</span>
-            <span className="text-foreground font-mono">{tailscaleStatus.tailscaleIP || 'N/A'}</span>
+            <span className="text-foreground font-mono">{effectiveStatus.tailscaleIP || 'N/A'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-foreground-secondary">Hostname:</span>
-            <span className="text-foreground">{tailscaleStatus.hostname || 'N/A'}</span>
+            <span className="text-foreground">{effectiveStatus.hostname || 'N/A'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-foreground-secondary">Tailnet:</span>
-            <span className="text-foreground">{tailscaleStatus.tailnet || 'N/A'}</span>
+            <span className="text-foreground">{effectiveStatus.tailnet || 'N/A'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-foreground-secondary">Peers:</span>
-            <span className="text-foreground">{tailscaleStatus.peerCount}</span>
+            <span className="text-foreground">{effectiveStatus.peerCount}</span>
           </div>
-          {tailscaleStatus.exitNode && (
+          {effectiveStatus.exitNode && (
             <div className="flex justify-between">
               <span className="text-foreground-secondary">Exit Node:</span>
-              <span className="text-foreground">{tailscaleStatus.exitNode}</span>
+              <span className="text-foreground">{effectiveStatus.exitNode}</span>
             </div>
           )}
         </div>
@@ -240,7 +253,7 @@ export function TailscaleWidget({
       {/* Control Buttons */}
       {isTailscaleConfigured && isAgentConnected && (
         <div className="flex gap-2">
-          {tailscaleStatus?.online ? (
+          {effectiveStatus?.online ? (
             <button
               onClick={handleDisconnect}
               disabled={isDisconnecting}
