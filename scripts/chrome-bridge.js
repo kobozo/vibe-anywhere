@@ -48,8 +48,13 @@ function getSocketPath() {
   if (PLATFORM === 'win32') {
     // Windows uses Named Pipes
     return `\\\\.\\pipe\\claude-mcp-browser-bridge-${user}`;
+  } else if (PLATFORM === 'darwin') {
+    // macOS uses TMPDIR (usually /var/folders/.../T/)
+    const tmpdir = process.env.TMPDIR || '/tmp/';
+    const socketPath = `${tmpdir}claude-mcp-browser-bridge-${user}`;
+    return socketPath;
   } else {
-    // MacOS and Linux use Unix sockets
+    // Linux uses /tmp
     return `/tmp/claude-mcp-browser-bridge-${user}`;
   }
 }
