@@ -7,9 +7,12 @@ import { getAuthService, getWorkspaceService } from '@/lib/services';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params (Next.js 15 requirement)
+    const { id } = await params;
+
     // Authenticate
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -32,7 +35,7 @@ export async function POST(
 
     // Get workspace and verify ownership
     const workspaceService = await getWorkspaceService();
-    const workspace = await workspaceService.getWorkspace(params.id);
+    const workspace = await workspaceService.getWorkspace(id);
 
     if (!workspace) {
       return NextResponse.json(
@@ -57,7 +60,7 @@ export async function POST(
     const body = await request.json();
     const { chromeHost } = body;
 
-    console.log(`[Chrome Host API] Received update for workspace ${params.id}:`, chromeHost);
+    console.log(`[Chrome Host API] Received update for workspace ${id}:`, chromeHost);
 
     // Validate chromeHost (optional Tailscale IP)
     if (chromeHost !== null && typeof chromeHost !== 'string') {
@@ -75,20 +78,20 @@ export async function POST(
     await db
       .update(workspaces)
       .set({ chromeTailscaleHost: chromeHost })
-      .where(eq(workspaces.id, params.id));
+      .where(eq(workspaces.id, id));
 
-    console.log(`[Chrome Host API] Updated database for workspace ${params.id}`);
+    console.log(`[Chrome Host API] Updated database for workspace ${id}`);
 
     // Notify agent of the change via WebSocket
     const { getAgentRegistry } = await import('@/lib/services/agent-registry');
     const agentRegistry = getAgentRegistry();
 
-    if (agentRegistry.hasAgent(params.id)) {
+    if (agentRegistry.hasAgent(id)) {
       // Send chrome host update to agent
       console.log(`[Chrome Host API] Notifying agent with chromeHost:`, chromeHost);
-      agentRegistry.emit(params.id, 'chrome:host-update', { chromeHost });
+      agentRegistry.emit(id, 'chrome:host-update', { chromeHost });
     } else {
-      console.log(`[Chrome Host API] No agent connected for workspace ${params.id}`);
+      console.log(`[Chrome Host API] No agent connected for workspace ${id}`);
     }
 
     return NextResponse.json({ success: true, chromeHost });
