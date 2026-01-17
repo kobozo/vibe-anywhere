@@ -28,6 +28,7 @@ import net from 'net';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import os from 'os';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -112,8 +113,6 @@ async function getTailscaleIP() {
  * Check if Claude Code MCP bridge socket exists
  */
 function checkSocket() {
-  const fs = require('fs');
-
   if (PLATFORM === 'win32') {
     // On Windows, we can't easily check Named Pipe existence before connecting
     console.log(`⏳ Will attempt to connect to: ${SOCKET_PATH}`);
