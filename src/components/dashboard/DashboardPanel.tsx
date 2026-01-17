@@ -593,6 +593,7 @@ export function DashboardPanel({
             chromeStatus={agentInfo?.chromeStatus || null}
             isAgentConnected={agentInfo?.connected || false}
             isTailscaleConfigured={isTailscaleConfigured}
+            chromeTailscaleHost={workspace.chromeTailscaleHost || null}
           />
 
           {/* Workspace Info Card */}

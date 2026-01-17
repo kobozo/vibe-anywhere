@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ADD COLUMN "chrome_tailscale_host" text;

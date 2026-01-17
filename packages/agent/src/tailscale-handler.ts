@@ -8,6 +8,13 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+export interface TailscalePeer {
+  id: string;
+  hostname: string;
+  tailscaleIP: string;
+  online: boolean;
+}
+
 export interface TailscaleStatus {
   online: boolean;
   tailscaleIP: string | null;
@@ -16,6 +23,7 @@ export interface TailscaleStatus {
   peerCount: number;
   version: string | null;
   exitNode: string | null;
+  peers: TailscalePeer[];
 }
 
 export class TailscaleHandler {
@@ -51,18 +59,29 @@ export class TailscaleHandler {
         return null;
       }
 
-      // Count peers (excluding self)
-      const peers = status.Peer || {};
-      const peerCount = Object.keys(peers).length;
+      // Parse peers (excluding self)
+      const peersObj = status.Peer || {};
+      const peerCount = Object.keys(peersObj).length;
 
-      // Get exit node if configured
+      // Build peers array
+      const peersList: TailscalePeer[] = [];
       let exitNode: string | null = null;
-      for (const [_, peer] of Object.entries(peers)) {
+
+      for (const [nodeId, peer] of Object.entries(peersObj)) {
         const p = peer as any;
+
+        // Check if this peer is an exit node
         if (p.ExitNode) {
           exitNode = p.HostName || p.DNSName || null;
-          break;
         }
+
+        // Add to peers list
+        peersList.push({
+          id: nodeId,
+          hostname: p.HostName || p.DNSName || 'unknown',
+          tailscaleIP: p.TailscaleIPs?.[0] || '',
+          online: p.Online || false,
+        });
       }
 
       return {
@@ -73,6 +92,7 @@ export class TailscaleHandler {
         peerCount,
         version: status.Version || null,
         exitNode,
+        peers: peersList,
       };
     } catch (error) {
       // If command fails, Tailscale might not be installed or not running

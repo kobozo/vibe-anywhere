@@ -11,6 +11,7 @@ import { selfUpdate } from './updater.js';
 import { GitHandler } from './git-handler.js';
 import { StatsHandler } from './stats-handler.js';
 import { TailscaleHandler } from './tailscale-handler.js';
+import { ChromeProxyHandler } from './chrome-proxy-handler.js';
 import { AgentIpcServer } from './ipc-server.js';
 import { CliInstaller } from './cli-installer.js';
 import * as fs from 'fs';
@@ -46,6 +47,7 @@ const bufferManager = new OutputBufferManager(config.bufferSize);
 const gitHandler = new GitHandler('/workspace');
 const statsHandler = new StatsHandler();
 const tailscaleHandler = new TailscaleHandler();
+const chromeProxyHandler = new ChromeProxyHandler();
 
 const tmuxManager = new TmuxManager(
   config.workspaceId,
@@ -409,6 +411,15 @@ const wsClient = new AgentWebSocket(config, {
     }
   },
 
+  onChromeHostUpdate: async (data) => {
+    console.log(`Chrome host update: ${data.chromeHost || 'local'}`);
+    try {
+      chromeProxyHandler.setChromeHost(data.chromeHost);
+    } catch (error) {
+      console.error('Failed to update Chrome host:', error);
+    }
+  },
+
   onError: (error) => {
     console.error('WebSocket error:', error);
   },
@@ -481,16 +492,14 @@ interface ChromeStatus {
 }
 
 /**
- * Check Chrome CDP connection status by reading status file written by CDP proxy shim
- * Returns status object or null if status file doesn't exist
+ * Check Chrome CDP connection status via the chrome proxy handler
+ * Returns status object or null if Chrome proxy is not active
  */
 async function checkChromeStatus(): Promise<ChromeStatus | null> {
   try {
-    const statusContent = await fs.promises.readFile('/tmp/cdp-status.json', 'utf-8');
-    const status: ChromeStatus = JSON.parse(statusContent);
-    return status;
+    const status = await chromeProxyHandler.getStatus();
+    return status.connected ? status : null;
   } catch {
-    // Status file doesn't exist or can't be read (CDP shim not running)
     return null;
   }
 }

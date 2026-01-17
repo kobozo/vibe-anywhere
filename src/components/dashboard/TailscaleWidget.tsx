@@ -5,6 +5,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
 
+interface TailscalePeer {
+  id: string;
+  hostname: string;
+  tailscaleIP: string;
+  online: boolean;
+}
+
 interface TailscaleStatus {
   online: boolean;
   tailscaleIP: string | null;
@@ -13,6 +20,7 @@ interface TailscaleStatus {
   peerCount: number;
   version: string | null;
   exitNode: string | null;
+  peers?: TailscalePeer[];
 }
 
 interface ChromeStatus {
@@ -27,6 +35,7 @@ interface TailscaleWidgetProps {
   chromeStatus: ChromeStatus | null;
   isAgentConnected: boolean;
   isTailscaleConfigured: boolean;
+  chromeTailscaleHost: string | null;
 }
 
 export function TailscaleWidget({
@@ -35,15 +44,22 @@ export function TailscaleWidget({
   chromeStatus,
   isAgentConnected,
   isTailscaleConfigured,
+  chromeTailscaleHost,
 }: TailscaleWidgetProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChromeHost, setSelectedChromeHost] = useState<string | null>(chromeTailscaleHost);
   const { token } = useAuth();
   const { socket, isConnected: isSocketConnected } = useSocket({ token });
 
   // Cache the last known good status to avoid flickering between connected/unknown
   const lastKnownStatusRef = useRef<TailscaleStatus | null>(null);
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setSelectedChromeHost(chromeTailscaleHost);
+  }, [chromeTailscaleHost]);
 
   // Update cache when we receive a valid status
   useEffect(() => {
@@ -150,6 +166,32 @@ export function TailscaleWidget({
     }
   };
 
+  const handleChromeHostChange = async (chromeHost: string | null) => {
+    try {
+      // Update local state immediately for responsive UI
+      setSelectedChromeHost(chromeHost);
+
+      const response = await fetch(`/api/workspaces/${workspaceId}/chrome-host`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ chromeHost }),
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setSelectedChromeHost(chromeTailscaleHost);
+        throw new Error('Failed to update Chrome host');
+      }
+
+      console.log('[Chrome Host] Updated to:', chromeHost || 'local');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update Chrome host');
+    }
+  };
+
   // Determine overall status
   let statusColor = 'bg-foreground-tertiary';
   let statusText = 'Unknown';
@@ -231,22 +273,48 @@ export function TailscaleWidget({
         </div>
       )}
 
-      {/* Chrome Status */}
-      {chromeStatus && (
+      {/* Chrome Browser Control */}
+      {effectiveStatus?.online && effectiveStatus.peers && effectiveStatus.peers.length > 0 && (
         <div className="border-t border-border pt-3 mb-4">
           <div className="text-xs text-foreground-secondary mb-2">Chrome Browser Control</div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                chromeStatus.connected ? 'bg-success' : 'bg-foreground-tertiary'
-              }`}
-            />
-            <span className="text-sm text-foreground">
-              {chromeStatus.connected
-                ? `Connected: ${chromeStatus.chromeHost}`
-                : 'Not Connected'}
-            </span>
+
+          {/* Chrome Host Selector */}
+          <div className="mb-3">
+            <label className="block text-xs text-foreground-secondary mb-1">
+              Chrome Device:
+            </label>
+            <select
+              value={selectedChromeHost || ''}
+              onChange={(e) => handleChromeHostChange(e.target.value || null)}
+              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground"
+              disabled={!isAgentConnected}
+            >
+              <option value="">None (Local Chrome)</option>
+              {effectiveStatus.peers
+                .filter(peer => peer.online)
+                .map(peer => (
+                  <option key={peer.id} value={peer.tailscaleIP}>
+                    {peer.hostname} ({peer.tailscaleIP})
+                  </option>
+                ))}
+            </select>
           </div>
+
+          {/* Chrome Status */}
+          {chromeStatus && (
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  chromeStatus.connected ? 'bg-success' : 'bg-foreground-tertiary'
+                }`}
+              />
+              <span className="text-sm text-foreground">
+                {chromeStatus.connected
+                  ? `Connected: ${chromeStatus.chromeHost}`
+                  : 'Not Connected'}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

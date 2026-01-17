@@ -36,6 +36,8 @@ export interface AgentEvents {
   onTailscaleStatus: (data: { requestId: string }) => void;
   onTailscaleConnect: (data: { requestId: string; authKey: string }) => void;
   onTailscaleDisconnect: (data: { requestId: string }) => void;
+  // Chrome proxy events
+  onChromeHostUpdate: (data: { chromeHost: string | null }) => void;
 }
 
 export class AgentWebSocket {
@@ -218,6 +220,11 @@ export class AgentWebSocket {
 
     this.socket.on('tailscale:disconnect', (data) => {
       this.events.onTailscaleDisconnect(data);
+    });
+
+    // Chrome proxy events
+    this.socket.on('chrome:host-update', (data) => {
+      this.events.onChromeHostUpdate(data);
     });
 
     // Environment variable update event

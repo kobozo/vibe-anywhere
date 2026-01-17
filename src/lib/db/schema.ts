@@ -239,6 +239,8 @@ export const workspaces = pgTable('workspaces', {
   agentConnectedAt: timestamp('agent_connected_at', { mode: 'string' }),
   agentLastHeartbeat: timestamp('agent_last_heartbeat', { mode: 'string' }),
   agentVersion: text('agent_version'), // Agent version string
+  // Chrome browser control via Tailscale
+  chromeTailscaleHost: text('chrome_tailscale_host'), // Tailscale IP of device with Chrome (e.g., 100.108.52.10)
   // Advanced creation options (nullable = use defaults)
   staticIpAddress: text('static_ip_address'), // CIDR format: 192.168.3.50/24
   staticIpGateway: text('static_ip_gateway'), // Gateway IP: 192.168.3.1
